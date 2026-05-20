@@ -1,0 +1,327 @@
+package com.empmgmt.service;
+
+import com.empmgmt.dto.PaymentEntryDTO;
+import com.empmgmt.dto.TransactionLogDTO;
+import com.empmgmt.entity.PaymentEntry;
+import com.empmgmt.entity.TransactionLog;
+import com.empmgmt.entity.User;
+import com.empmgmt.repository.PaymentEntryRepository;
+import com.empmgmt.repository.TransactionLogRepository;
+import com.empmgmt.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class PaymentEntryService {
+
+    private final PaymentEntryRepository paymentEntryRepository;
+    private final UserRepository userRepository;
+    private final TransactionLogRepository transactionLogRepository;
+
+    private static final DateTimeFormatter ENTRY_FORMATTER =
+            DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a");
+    private static final DateTimeFormatter LOG_FORMATTER =
+            DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm:ss a");
+    private static final DateTimeFormatter DAY_FORMATTER =
+            DateTimeFormatter.ofPattern("EEE, dd MMM yyyy");
+
+    // ─────────────────────────────────────────────────────────
+    // CREATE
+    // ─────────────────────────────────────────────────────────
+
+    public PaymentEntryDTO.Response createEntry(PaymentEntryDTO.Request request, String username) {
+        // Employees can only create entries for today
+        if (request.getEntryDate() != null && !request.getEntryDate().equals(LocalDate.now())) {
+            throw new RuntimeException("Entries can only be added for today's date.");
+        }
+        // Always stamp today's date regardless
+        request.setEntryDate(LocalDate.now());
+        User employee = findUserByUsername(username);
+
+        PaymentEntry entry = PaymentEntry.builder()
+                .partyName(request.getPartyName())
+                .amount(request.getAmount())
+                .modeOfPayment(request.getModeOfPayment())
+                .entryDate(request.getEntryDate())
+                .remarks(request.getRemarks())
+                .employee(employee)
+                .build();
+
+        entry = paymentEntryRepository.save(entry);
+        logAction("CREATE", entry, username, "Entry created");
+        return mapToResponse(entry);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // READ – Employee
+    // ─────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<PaymentEntryDTO.Response> getEntriesForEmployee(String username) {
+        User employee = findUserByUsername(username);
+        return paymentEntryRepository.findByEmployeeOrderByCreatedAtDesc(employee)
+                .stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentEntryDTO.Response> getTodayEntriesForEmployee(String username) {
+        User employee = findUserByUsername(username);
+        return paymentEntryRepository
+                .findByEmployeeAndEntryDateOrderByCreatedAtDesc(employee, LocalDate.now())
+                .stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentEntryDTO.DailySummary getDailySummaryForEmployee(String username) {
+        User employee = findUserByUsername(username);
+        LocalDate today = LocalDate.now();
+        BigDecimal total = paymentEntryRepository.sumAmountByEmployeeAndDate(employee, today);
+        long count = paymentEntryRepository.countByEmployeeAndDate(employee, today);
+        return PaymentEntryDTO.DailySummary.builder()
+                .date(today).totalEntries(count)
+                .totalAmount(total != null ? total : BigDecimal.ZERO)
+                .employeeName(employee.getFullName())
+                .build();
+    }
+
+    /**
+     * Returns all entries for an employee grouped by entryDate descending.
+     * Each DayGroup contains the date label, totals and the flat list of entries.
+     */
+    @Transactional(readOnly = true)
+    public List<PaymentEntryDTO.DayGroup> getEntriesGroupedByDayForEmployee(String username) {
+        List<PaymentEntryDTO.Response> all = getEntriesForEmployee(username);
+
+        Map<LocalDate, List<PaymentEntryDTO.Response>> grouped = all.stream()
+                .collect(Collectors.groupingBy(PaymentEntryDTO.Response::getEntryDate));
+
+        return grouped.entrySet().stream()
+                .sorted(Map.Entry.<LocalDate, List<PaymentEntryDTO.Response>>comparingByKey().reversed())
+                .map(e -> {
+                    BigDecimal dayTotal = e.getValue().stream()
+                            .map(PaymentEntryDTO.Response::getAmount)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    return PaymentEntryDTO.DayGroup.builder()
+                            .date(e.getKey())
+                            .dateFormatted(e.getKey().format(DAY_FORMATTER))
+                            .totalEntries(e.getValue().size())
+                            .totalAmount(dayTotal)
+                            .entries(e.getValue())
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // READ – Admin
+    // ─────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<PaymentEntryDTO.Response> getAllEntries() {
+        return paymentEntryRepository.findAllByOrderByCreatedAtDesc()
+                .stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentEntryDTO.Response> getEntriesForEmployeeById(Long employeeId) {
+        return paymentEntryRepository.findByEmployeeId(employeeId)
+                .stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentEntryDTO.Response getEntryById(Long id) {
+        return mapToResponse(findEntryById(id));
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // UPDATE
+    // ─────────────────────────────────────────────────────────
+
+    /** Admin can update any entry (any date). Remarks mandatory. */
+    public PaymentEntryDTO.Response updateEntry(Long id, PaymentEntryDTO.Request request, String performedBy) {
+        if (request.getRemarks() == null || request.getRemarks().isBlank()) {
+            throw new RuntimeException("Remarks are mandatory when editing an entry");
+        }
+        PaymentEntry entry = findEntryById(id);
+        String diff = computeDiff(entry, request);
+
+        entry.setPartyName(request.getPartyName());
+        entry.setAmount(request.getAmount());
+        entry.setModeOfPayment(request.getModeOfPayment());
+        entry.setEntryDate(request.getEntryDate());
+        entry.setRemarks(request.getRemarks());
+        entry.setEdited(true);
+        entry.setEditedBy("ADMIN");
+        entry.setEditedAt(java.time.LocalDateTime.now());
+
+        entry = paymentEntryRepository.save(entry);
+        logAction("UPDATE", entry, performedBy, diff);
+        return mapToResponse(entry);
+    }
+
+    /**
+     * Employee can only update their own entry AND only if entryDate == today.
+     * Remarks are mandatory.
+     */
+    public PaymentEntryDTO.Response updateEntryByEmployee(Long id, PaymentEntryDTO.Request request, String username) {
+        if (request.getRemarks() == null || request.getRemarks().isBlank()) {
+            throw new RuntimeException("Remarks are mandatory when editing an entry");
+        }
+        PaymentEntry entry = findEntryById(id);
+        if (!entry.getEmployee().getUsername().equals(username)) {
+            throw new AccessDeniedException("You can only edit your own entries");
+        }
+        if (!entry.getEntryDate().equals(LocalDate.now())) {
+            throw new RuntimeException("You can only edit today's entries. Past entries cannot be modified.");
+        }
+
+        String diff = computeDiff(entry, request);
+
+        entry.setPartyName(request.getPartyName());
+        entry.setAmount(request.getAmount());
+        entry.setModeOfPayment(request.getModeOfPayment());
+        entry.setEntryDate(request.getEntryDate());
+        entry.setRemarks(request.getRemarks());
+        entry.setEdited(true);
+        entry.setEditedBy("EMPLOYEE");
+        entry.setEditedAt(java.time.LocalDateTime.now());
+
+        entry = paymentEntryRepository.save(entry);
+        logAction("UPDATE", entry, username, diff);
+        return mapToResponse(entry);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // DELETE
+    // ─────────────────────────────────────────────────────────
+
+    /** Admin can delete any entry */
+    public void deleteEntry(Long id, String performedBy) {
+        PaymentEntry entry = findEntryById(id);
+        logAction("DELETE", entry, performedBy, "Entry deleted");
+        paymentEntryRepository.deleteById(id);
+    }
+
+    /** Employee can only delete their own entry */
+    public void deleteEntryByEmployee(Long id, String username) {
+        PaymentEntry entry = findEntryById(id);
+        if (!entry.getEmployee().getUsername().equals(username)) {
+            throw new AccessDeniedException("You can only delete your own entries");
+        }
+        deleteEntry(id, username);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // TRANSACTION LOG
+    // ─────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<TransactionLogDTO.Response> getTransactionLogsForEmployee(String username) {
+        return transactionLogRepository
+                .findByEmployeeUsernameOrderByPerformedAtDesc(username)
+                .stream().map(this::mapLogToResponse).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<TransactionLogDTO.Response> getAllTransactionLogs() {
+        return transactionLogRepository.findAllByOrderByPerformedAtDesc()
+                .stream().map(this::mapLogToResponse).collect(Collectors.toList());
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // PRIVATE HELPERS
+    // ─────────────────────────────────────────────────────────
+
+    private void logAction(String action, PaymentEntry entry, String performedBy, String notes) {
+        TransactionLog log = TransactionLog.builder()
+                .action(action)
+                .entryId(entry.getId())
+                .employeeName(entry.getEmployee().getFullName())
+                .employeeUsername(entry.getEmployee().getUsername())
+                .partyName(entry.getPartyName())
+                .amount(entry.getAmount())
+                .modeOfPayment(entry.getModeOfPayment().getDisplayName())
+                .entryDate(entry.getEntryDate())
+                .remarks(entry.getRemarks())
+                .performedBy(performedBy)
+                .notes(notes)
+                .build();
+        transactionLogRepository.save(log);
+    }
+
+    private String computeDiff(PaymentEntry before, PaymentEntryDTO.Request after) {
+        List<String> changes = new ArrayList<>();
+        if (!before.getPartyName().equals(after.getPartyName()))
+            changes.add("Party: \"" + before.getPartyName() + "\" → \"" + after.getPartyName() + "\"");
+        if (before.getAmount().compareTo(after.getAmount()) != 0)
+            changes.add("Amount: ₹" + before.getAmount() + " → ₹" + after.getAmount());
+        if (!before.getModeOfPayment().equals(after.getModeOfPayment()))
+            changes.add("Mode: " + before.getModeOfPayment().getDisplayName()
+                    + " → " + after.getModeOfPayment().getDisplayName());
+        if (!before.getEntryDate().equals(after.getEntryDate()))
+            changes.add("Date: " + before.getEntryDate() + " → " + after.getEntryDate());
+        if (!Objects.equals(before.getRemarks(), after.getRemarks()))
+            changes.add("Remarks: \"" + before.getRemarks() + "\" → \"" + after.getRemarks() + "\"");
+        return changes.isEmpty() ? "No changes detected" : String.join("; ", changes);
+    }
+
+    private User findUserByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+    }
+
+    private PaymentEntry findEntryById(Long id) {
+        return paymentEntryRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Entry not found: " + id));
+    }
+
+    private PaymentEntryDTO.Response mapToResponse(PaymentEntry entry) {
+        return PaymentEntryDTO.Response.builder()
+                .id(entry.getId())
+                .partyName(entry.getPartyName())
+                .amount(entry.getAmount())
+                .modeOfPayment(entry.getModeOfPayment().getDisplayName())
+                .entryDate(entry.getEntryDate())
+                .remarks(entry.getRemarks())
+                .employeeName(entry.getEmployee().getFullName())
+                .employeeUsername(entry.getEmployee().getUsername())
+                .createdAt(entry.getCreatedAt() != null
+                        ? entry.getCreatedAt().format(ENTRY_FORMATTER) : "")
+                .updatedAt(entry.getUpdatedAt() != null
+                        ? entry.getUpdatedAt().format(ENTRY_FORMATTER) : "")
+                .edited(entry.isEdited())
+                .editedBy(entry.getEditedBy())
+                .editedAt(entry.getEditedAt() != null
+                        ? entry.getEditedAt().format(ENTRY_FORMATTER) : null)
+                .build();
+    }
+
+    private TransactionLogDTO.Response mapLogToResponse(TransactionLog log) {
+        return TransactionLogDTO.Response.builder()
+                .id(log.getId())
+                .action(log.getAction())
+                .entryId(log.getEntryId())
+                .employeeName(log.getEmployeeName())
+                .employeeUsername(log.getEmployeeUsername())
+                .partyName(log.getPartyName())
+                .amount(log.getAmount())
+                .modeOfPayment(log.getModeOfPayment())
+                .entryDate(log.getEntryDate())
+                .remarks(log.getRemarks())
+                .performedBy(log.getPerformedBy())
+                .notes(log.getNotes())
+                .performedAt(log.getPerformedAt() != null
+                        ? log.getPerformedAt().format(LOG_FORMATTER) : "")
+                .build();
+    }
+}

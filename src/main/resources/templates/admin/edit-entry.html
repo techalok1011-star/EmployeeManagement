@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Edit Entry — PayTrack</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&amp;family=DM+Sans:wght@300;400;500&amp;display=swap" rel="stylesheet"/>
+    <style>
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        :root{--ink:#0d0f14;--surface:#161a24;--card:#1e2330;--border:#2a3045;--accent:#6c8eff;--accent2:#a78bfa;--gold:#f5c842;--green:#34d399;--red:#f87171;--orange:#fb923c;--text:#e2e8f0;--muted:#8892a4;--muted2:#4a556a}
+        body{font-family:'DM Sans',sans-serif;background:var(--ink);color:var(--text);min-height:100vh;display:flex}
+        .sidebar{width:240px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100}
+        .sidebar-brand{padding:24px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+        .sidebar-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px}
+        .sidebar-title{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:var(--text)}
+        .sidebar-title span{color:var(--accent)}
+        .sidebar-user{padding:16px 20px;border-bottom:1px solid var(--border)}
+        .sidebar-user-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);margin-bottom:4px}
+        .sidebar-user-name{font-size:14px;font-weight:500;color:var(--text)}
+        .sidebar-user-role{font-size:11px;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px;background:rgba(245,200,66,0.15);color:var(--gold)}
+        .sidebar-nav{padding:16px 12px;flex:1}
+        .nav-section-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);padding:0 8px;margin-bottom:6px;display:block;margin-top:12px}
+        .nav-link{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;text-decoration:none;color:var(--muted);font-size:14px;font-weight:500;transition:all 0.15s;margin-bottom:2px}
+        .nav-link:hover{background:rgba(255,255,255,0.05);color:var(--text)}
+        .nav-link.active{background:rgba(108,142,255,0.12);color:var(--accent)}
+        .sidebar-footer{padding:16px 12px;border-top:1px solid var(--border)}
+        .logout-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:var(--muted);font-size:14px;font-weight:500;transition:all 0.15s;width:100%;cursor:pointer;background:transparent;border:none;font-family:'DM Sans',sans-serif}
+        .logout-btn:hover{background:rgba(248,113,113,0.1);color:var(--red)}
+        .main{margin-left:240px;flex:1}
+        .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
+        .topbar-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700}
+        .content{padding:28px 32px;max-width:600px}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px}
+        .section-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px}
+        .section-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+        .meta-row{display:flex;gap:16px;margin-bottom:24px;padding:14px 16px;background:var(--surface);border-radius:10px;border:1px solid var(--border)}
+        .meta-item .label{font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);margin-bottom:3px}
+        .meta-item .value{font-size:13px;font-weight:500;color:var(--text)}
+        .form-label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:7px;font-weight:600}
+        .form-control{width:100%;padding:11px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color 0.2s;margin-bottom:16px}
+        .form-control:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,142,255,0.12)}
+        .form-control::placeholder{color:var(--muted2)}
+        .form-error{font-size:12px;color:var(--red);margin-bottom:12px;margin-top:-12px}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+        .btn-group{display:flex;gap:12px;margin-top:8px}
+        .btn{padding:11px 22px;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+        .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}
+        .btn-primary:hover{opacity:0.88;transform:translateY(-1px)}
+        .btn-ghost{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--border)}
+        .btn-ghost:hover{background:rgba(255,255,255,0.09)}
+        select.form-control option{background:var(--surface)}
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div class="sidebar-brand">
+        <div class="sidebar-icon">💳</div>
+        <div class="sidebar-title">Pay<span>Track</span></div>
+    </div>
+    <div class="sidebar-user">
+        <div class="sidebar-user-label">Signed in as</div>
+        <div class="sidebar-user-name">Administrator</div>
+        <span class="sidebar-user-role">👑 Admin</span>
+    </div>
+    <nav class="sidebar-nav">
+        <span class="nav-section-label">Administration</span>
+        <a href="/admin/dashboard" class="nav-link"><span>📊</span> Dashboard</a>
+        <a href="/admin/employees" class="nav-link"><span>👥</span> Employees</a>
+        <a href="/admin/entries" class="nav-link active"><span>📋</span> All Entries</a>
+        <a href="/admin/history" class="nav-link"><span>📜</span> Audit Log</a>
+    </nav>
+    <div class="sidebar-footer">
+        <form th:action="@{/logout}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="logout-btn"><span>🚪</span> Sign Out</button>
+        </form>
+    </div>
+</div>
+<div class="main">
+    <div class="topbar">
+        <span class="topbar-title">Edit Entry</span>
+        <a href="/admin/entries" class="btn btn-ghost" style="padding:8px 16px;border-radius:8px;background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--border);text-decoration:none;font-size:13px">← Back to Entries</a>
+    </div>
+    <div class="content">
+        <div class="card">
+            <div class="section-title">✏️ Edit Payment Entry</div>
+            <div class="section-sub" style="margin-bottom:12px">
+                Modifying entry by <strong th:text="${entry.employeeName}"></strong>
+                <span th:if="${entry.editedBy == 'EMPLOYEE'}" style="margin-left:8px;background:rgba(251,146,60,0.18);color:#fb923c;padding:2px 8px;border-radius:6px;font-size:11px">✏ Emp Edited</span>
+                <span th:if="${entry.editedBy == 'ADMIN'}" style="margin-left:8px;background:rgba(167,139,250,0.2);color:#a78bfa;padding:2px 8px;border-radius:6px;font-size:11px">👑 Admin Edited</span>
+            </div>
+
+            <div class="meta-row">
+                <div class="meta-item">
+                    <div class="label">Entry ID</div>
+                    <div class="value" th:text="'#' + ${entry.id}"></div>
+                </div>
+                <div class="meta-item">
+                    <div class="label">Created</div>
+                    <div class="value" th:text="${entry.createdAt}"></div>
+                </div>
+                <div class="meta-item">
+                    <div class="label">Last Modified</div>
+                    <div class="value" th:text="${entry.updatedAt}"></div>
+                </div>
+            </div>
+
+            <form th:action="@{/admin/entries/{id}/edit(id=${entry.id})}" method="post" th:object="${editRequest}">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                <label class="form-label">Party Name</label>
+                <input type="text" class="form-control" th:field="*{partyName}" placeholder="Party name"/>
+                <div class="form-error" th:if="${#fields.hasErrors('partyName')}" th:errors="*{partyName}"></div>
+
+                <label class="form-label">Amount (₹)</label>
+                <input type="number" step="0.01" min="0.01" class="form-control" th:field="*{amount}" placeholder="0.00"/>
+                <div class="form-error" th:if="${#fields.hasErrors('amount')}" th:errors="*{amount}"></div>
+
+                <div class="form-row">
+                    <div>
+                        <label class="form-label">Mode of Payment</label>
+                        <select class="form-control" th:field="*{modeOfPayment}">
+                            <option value="">Select mode...</option>
+                            <option th:each="mode : ${paymentModes}" th:value="${mode}" th:text="${mode.displayName}"
+                                    th:selected="${mode.displayName == entry.modeOfPayment}"></option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-control" th:field="*{entryDate}"/>
+                    </div>
+                </div>
+
+                <label class="form-label">Remarks <span style="color:var(--red)">*</span> <span style="font-size:10px;font-weight:400;text-transform:none;color:var(--muted)">(Required when editing)</span></label>
+                <input type="text" class="form-control" th:field="*{remarks}"
+                       placeholder="Reason for edit (e.g. Corrected amount, mode changed...)" required/>
+                <div class="form-error" th:if="${#fields.hasErrors('remarks')}" th:errors="*{remarks}"></div>
+
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+                    <a href="/admin/entries" class="btn btn-ghost">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

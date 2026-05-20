@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayTrack — Sign In</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --ink: #0d0f14;
+            --surface: #161a24;
+            --card: #1e2330;
+            --border: #2a3045;
+            --accent: #6c8eff;
+            --accent2: #a78bfa;
+            --gold: #f5c842;
+            --green: #34d399;
+            --text: #e2e8f0;
+            --muted: #8892a4;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--ink);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Ambient background orbs */
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.12;
+            pointer-events: none;
+        }
+        .orb1 { width: 500px; height: 500px; background: var(--accent); top: -100px; left: -100px; }
+        .orb2 { width: 400px; height: 400px; background: var(--accent2); bottom: -80px; right: -80px; }
+        .orb3 { width: 300px; height: 300px; background: var(--gold); top: 50%; left: 50%; transform: translate(-50%,-50%); }
+
+        .grid-overlay {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(108,142,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(108,142,255,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .login-wrapper {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 440px;
+            padding: 20px;
+        }
+
+        .brand {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .brand-logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .brand-icon {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+        }
+        .brand-name {
+            font-family: 'Syne', sans-serif;
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--text);
+            letter-spacing: -0.5px;
+        }
+        .brand-name span { color: var(--accent); }
+        .brand-tagline {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.5px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 36px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03);
+        }
+
+        .card-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+        .card-subtitle {
+            color: var(--muted);
+            font-size: 14px;
+            margin-bottom: 28px;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 13.5px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .alert-error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+        .alert-success { background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.3); color: #6ee7b7; }
+
+        .form-group { margin-bottom: 20px; }
+        label {
+            display: block;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 8px;
+        }
+        .input-wrap { position: relative; }
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted);
+            font-size: 16px;
+            pointer-events: none;
+        }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 12px 14px 12px 42px;
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 15px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+        }
+        input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(108,142,255,0.12);
+        }
+        input::placeholder { color: var(--muted); }
+
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-family: 'Syne', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.15s;
+            margin-top: 8px;
+            letter-spacing: 0.3px;
+        }
+        .btn-login:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-login:active { transform: translateY(0); }
+
+        .demo-creds {
+            margin-top: 24px;
+            padding: 16px;
+            background: rgba(108,142,255,0.06);
+            border: 1px solid rgba(108,142,255,0.15);
+            border-radius: 10px;
+        }
+        .demo-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+        .cred-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-size: 12.5px;
+        }
+        .cred-row:last-child { border-bottom: none; }
+        .cred-role { color: var(--gold); font-weight: 500; min-width: 80px; }
+        .cred-info { color: var(--muted); font-family: monospace; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="bg-orb orb1"></div>
+    <div class="bg-orb orb2"></div>
+    <div class="bg-orb orb3"></div>
+    <div class="grid-overlay"></div>
+
+    <div class="login-wrapper">
+        <div class="brand">
+            <div class="brand-logo">
+                <div class="brand-icon">💳</div>
+                <div class="brand-name">Pay<span>Track</span></div>
+            </div>
+            <div class="brand-tagline">Payment Entry Management System</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Welcome back</div>
+            <div class="card-subtitle">Sign in to your account to continue</div>
+
+            <div th:if="${errorMsg}" class="alert alert-error">
+                ⚠️ <span th:text="${errorMsg}"></span>
+            </div>
+            <div th:if="${logoutMsg}" class="alert alert-success">
+                ✓ <span th:text="${logoutMsg}"></span>
+            </div>
+
+            <form th:action="@{/login}" method="post">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <div class="input-wrap">
+                        <span class="input-icon">👤</span>
+                        <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="input-wrap">
+                        <span class="input-icon">🔒</span>
+                        <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                    </div>
+                </div>
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button type="submit" class="btn-login">Sign In →</button>
+            </form>
+
+            <div class="demo-creds">
+                <div class="demo-title">🧪 Demo Credentials</div>
+                <div class="cred-row">
+                    <span class="cred-role">👑 Admin</span>
+                    <span class="cred-info">admin / admin123</span>
+                </div>
+                <div class="cred-row">
+                    <span class="cred-role">👤 Emp 1</span>
+                    <span class="cred-info">rahul.sharma / emp123</span>
+                </div>
+                <div class="cred-row">
+                    <span class="cred-role">👤 Emp 2</span>
+                    <span class="cred-info">priya.patel / emp123</span>
+                </div>
+                <div class="cred-row">
+                    <span class="cred-role">👤 Emp 3</span>
+                    <span class="cred-info">amit.kumar / emp123</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
