@@ -47,6 +47,8 @@ public class SecurityConfig {
             .authenticationProvider(authenticationProvider())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/h2-console/**").permitAll()
+                .requestMatchers("/api/parties/suggest", "/api/parties").authenticated()
+                .requestMatchers("/api/parties/import", "/api/parties/cleanup").hasRole("ADMIN")
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/employee/**").hasRole("EMPLOYEE")
                 .anyRequest().authenticated()
@@ -72,7 +74,7 @@ public class SecurityConfig {
                 .permitAll()
             )
             .csrf(csrf -> csrf
-                .ignoringRequestMatchers("/h2-console/**")
+                .ignoringRequestMatchers("/h2-console/**", "/api/parties/import", "/api/parties/cleanup")
             )
             .headers(headers -> headers
                 .frameOptions(frame -> frame.sameOrigin())

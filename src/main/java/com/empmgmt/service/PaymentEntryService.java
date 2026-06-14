@@ -27,6 +27,7 @@ public class PaymentEntryService {
     private final PaymentEntryRepository paymentEntryRepository;
     private final UserRepository userRepository;
     private final TransactionLogRepository transactionLogRepository;
+    private final com.empmgmt.service.ExcelPartyService excelPartyService;
 
     private static final DateTimeFormatter ENTRY_FORMATTER =
             DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a");
@@ -47,6 +48,9 @@ public class PaymentEntryService {
         // Always stamp today's date regardless
         request.setEntryDate(LocalDate.now());
         User employee = findUserByUsername(username);
+
+        // ensure party exists in parties table (accepts "Name" or "Name_GSTIN")
+        excelPartyService.ensureExists(request.getPartyName());
 
         PaymentEntry entry = PaymentEntry.builder()
                 .partyName(request.getPartyName())
@@ -155,6 +159,8 @@ public class PaymentEntryService {
         PaymentEntry entry = findEntryById(id);
         String diff = computeDiff(entry, request);
 
+        // ensure party exists for updated value
+        excelPartyService.ensureExists(request.getPartyName());
         entry.setPartyName(request.getPartyName());
         entry.setAmount(request.getAmount());
         entry.setModeOfPayment(request.getModeOfPayment());
@@ -187,6 +193,8 @@ public class PaymentEntryService {
 
         String diff = computeDiff(entry, request);
 
+        // ensure party exists for updated value
+        excelPartyService.ensureExists(request.getPartyName());
         entry.setPartyName(request.getPartyName());
         entry.setAmount(request.getAmount());
         entry.setModeOfPayment(request.getModeOfPayment());
