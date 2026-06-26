@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Parties — PayTrack</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&amp;family=DM+Sans:wght@300;400;500&amp;display=swap" rel="stylesheet"/>
+    <style>
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        :root{--ink:#0d0f14;--surface:#161a24;--card:#1e2330;--border:#2a3045;--accent:#6c8eff;--accent2:#a78bfa;--gold:#f5c842;--green:#34d399;--red:#f87171;--orange:#fb923c;--text:#e2e8f0;--muted:#8892a4;--muted2:#4a556a}
+        body{font-family:'DM Sans',sans-serif;background:var(--ink);color:var(--text);min-height:100vh;display:flex}
+        .sidebar{width:240px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100}
+        .sidebar-brand{padding:24px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+        .sidebar-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px}
+        .sidebar-title{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:var(--text)}
+        .sidebar-title span{color:var(--accent)}
+        .sidebar-user{padding:16px 20px;border-bottom:1px solid var(--border)}
+        .sidebar-user-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);margin-bottom:4px}
+        .sidebar-user-name{font-size:14px;font-weight:500;color:var(--text)}
+        .sidebar-user-role{font-size:11px;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px;background:rgba(245,200,66,0.15);color:var(--gold)}
+        .sidebar-nav{padding:16px 12px;flex:1}
+        .nav-section-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);padding:0 8px;margin-bottom:6px;display:block;margin-top:12px}
+        .nav-link{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;text-decoration:none;color:var(--muted);font-size:14px;font-weight:500;transition:all 0.15s;margin-bottom:2px}
+        .nav-link:hover{background:rgba(255,255,255,0.05);color:var(--text)}
+        .nav-link.active{background:rgba(108,142,255,0.12);color:var(--accent)}
+        .sidebar-footer{padding:16px 12px;border-top:1px solid var(--border)}
+        .logout-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:var(--muted);font-size:14px;font-weight:500;transition:all 0.15s;width:100%;cursor:pointer;background:transparent;border:none;font-family:'DM Sans',sans-serif}
+        .logout-btn:hover{background:rgba(248,113,113,0.1);color:var(--red)}
+        .main{margin-left:240px;flex:1}
+        .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
+        .topbar-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700}
+        .content{padding:28px 32px}
+        .two-col{display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start}
+        @media(max-width:1050px){.two-col{grid-template-columns:1fr}}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px}
+        .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+        .section-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700}
+        .search-bar{display:flex;gap:8px;margin-bottom:18px}
+        .search-input{flex:1;padding:10px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color 0.2s}
+        .search-input:focus{border-color:var(--accent)}
+        .search-input::placeholder{color:var(--muted2)}
+        .table-wrapper{overflow-x:auto;border-radius:12px;border:1px solid var(--border)}
+        table{width:100%;border-collapse:collapse}
+        thead{background:var(--surface)}
+        th{padding:10px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+        td{padding:11px 14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle}
+        tr:last-child td{border-bottom:none}
+        tr:hover td{background:rgba(255,255,255,0.02)}
+        .party-name{font-weight:500}
+        .gstin{font-size:11px;color:var(--muted);font-family:monospace}
+        .phone-val{font-size:12px;color:var(--accent2);font-family:monospace}
+        .text-muted{color:var(--muted);font-size:12px}
+        .badge-optin{background:rgba(52,211,153,0.15);color:var(--green);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+        .badge-optout{background:rgba(255,255,255,0.06);color:var(--muted2);padding:3px 9px;border-radius:20px;font-size:11px}
+        .amount{font-weight:600;color:var(--green)}
+        .btn{padding:6px 12px;border-radius:7px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+        .btn-ghost{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--border)}
+        .btn-ghost:hover{background:rgba(255,255,255,0.09)}
+        .btn-danger{background:rgba(248,113,113,0.1);color:var(--red);border:1px solid rgba(248,113,113,0.2)}
+        .btn-danger:hover{background:rgba(248,113,113,0.2)}
+        .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;width:100%;justify-content:center;padding:11px;font-size:14px;border-radius:9px;margin-top:8px}
+        .btn-primary:hover{opacity:0.88}
+        .btn-search{background:rgba(108,142,255,0.12);color:var(--accent);border:1px solid rgba(108,142,255,0.25);padding:9px 16px;font-size:13px}
+        .btn-search:hover{background:rgba(108,142,255,0.2)}
+        .btn-clear{background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid var(--border);padding:9px 14px;font-size:13px}
+        .actions{display:flex;gap:6px}
+        .alert{padding:12px 16px;border-radius:10px;font-size:13.5px;margin-bottom:20px}
+        .alert-success{background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#6ee7b7}
+        .alert-danger{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);color:#fca5a5}
+        .form-label{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:6px;font-weight:600}
+        .form-control{width:100%;padding:10px 13px;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;outline:none;transition:border-color 0.2s;margin-bottom:14px}
+        .form-control:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,142,255,0.12)}
+        .form-control::placeholder{color:var(--muted2)}
+        .form-error{font-size:12px;color:var(--red);margin-bottom:10px;margin-top:-10px}
+        .toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+        .toggle-label{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13.5px;color:var(--text)}
+        .toggle-label input[type=checkbox]{accent-color:var(--green);width:16px;height:16px}
+        .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+        .empty-icon{font-size:44px;margin-bottom:12px}
+        .count-badge{background:rgba(108,142,255,0.12);color:var(--accent);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div class="sidebar-brand">
+        <div class="sidebar-icon">💳</div>
+        <div class="sidebar-title">Pay<span>Track</span></div>
+    </div>
+    <div class="sidebar-user">
+        <div class="sidebar-user-label">Signed in as</div>
+        <div class="sidebar-user-name" th:text="${adminName}">Admin</div>
+        <span class="sidebar-user-role">👑 Admin</span>
+    </div>
+    <nav class="sidebar-nav">
+        <span class="nav-section-label">Administration</span>
+        <a href="/admin/dashboard" class="nav-link"><span>📊</span> Dashboard</a>
+        <a href="/admin/employees" class="nav-link"><span>👥</span> Employees</a>
+        <a href="/admin/entries" class="nav-link"><span>📋</span> All Entries</a>
+        <a href="/admin/parties" class="nav-link active"><span>🏢</span> Parties</a>
+        <a href="/admin/invoices" class="nav-link"><span>🧾</span> Invoices</a>
+        <a href="/admin/history" class="nav-link"><span>📜</span> Audit Log</a>
+    </nav>
+    <div class="sidebar-footer">
+        <form th:action="@{/logout}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="logout-btn"><span>🚪</span> Sign Out</button>
+        </form>
+    </div>
+</div>
+
+<div class="main">
+    <div class="topbar">
+        <span class="topbar-title">🏢 Party Management</span>
+        <span class="count-badge" th:text="${#lists.size(parties)} + ' parties'"></span>
+    </div>
+
+    <div class="content">
+
+        <div th:if="${successMsg}" class="alert alert-success" th:text="${successMsg}"></div>
+        <div th:if="${errorMsg}"   class="alert alert-danger"  th:text="${errorMsg}"></div>
+
+        <div class="two-col">
+
+            <!-- Left: Party list -->
+            <div>
+                <div class="card">
+                    <div class="section-header">
+                        <span class="section-title">All Parties</span>
+                    </div>
+
+                    <!-- Search bar -->
+                    <form th:action="@{/admin/parties}" method="get" class="search-bar">
+                        <input type="text" name="q" class="search-input" th:value="${q}"
+                               placeholder="🔍 Search by name or GSTIN…"/>
+                        <button type="submit" class="btn btn-search">Search</button>
+                        <a href="/admin/parties" class="btn btn-clear">Clear</a>
+                    </form>
+
+                    <div th:if="${#lists.isEmpty(parties)}" class="empty-state">
+                        <div class="empty-icon">🏢</div>
+                        <div style="font-size:15px;font-weight:600;margin-bottom:6px">No parties found</div>
+                        <div style="font-size:13px">Add one using the form on the right, or import via Excel on the Dashboard.</div>
+                    </div>
+
+                    <div th:if="${!#lists.isEmpty(parties)}" class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Party Name</th>
+                                    <th>GSTIN</th>
+                                    <th>Phone</th>
+                                    <th>WhatsApp</th>
+                                    <th>Invoiced</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="p, iStat : ${parties}">
+                                    <td class="text-muted" th:text="${iStat.count}"></td>
+                                    <td>
+                                        <div class="party-name" th:text="${p.name}"></div>
+                                    </td>
+                                    <td>
+                                        <span class="gstin" th:if="${p.gst != null and !p.gst.isEmpty()}"
+                                              th:text="${p.gst}"></span>
+                                        <span class="text-muted" th:if="${p.gst == null or p.gst.isEmpty()}">—</span>
+                                    </td>
+                                    <td>
+                                        <span class="phone-val" th:if="${p.phone != null}" th:text="${p.phone}"></span>
+                                        <span class="text-muted" th:if="${p.phone == null}">—</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge-optin" th:if="${p.whatsappOptIn}">✅ On</span>
+                                        <span class="badge-optout" th:if="${!p.whatsappOptIn}">Off</span>
+                                    </td>
+                                    <td>
+                                        <span class="amount" th:if="${p.totalAmount != null}">
+                                            ₹<span th:text="${#numbers.formatDecimal(p.totalAmount,1,'COMMA',2,'POINT')}"></span>
+                                        </span>
+                                        <span class="text-muted" th:if="${p.totalAmount == null}">—</span>
+                                    </td>
+                                    <td>
+                                        <div class="actions">
+                                            <a th:href="@{/admin/parties/{id}/edit(id=${p.id})}"
+                                               class="btn btn-ghost">✏️ Edit</a>
+                                            <form th:action="@{/admin/parties/{id}/delete(id=${p.id})}"
+                                                  method="post"
+                                                  onsubmit="return confirm('Delete party ' + this.dataset.name + '?')"
+                                                  th:data-name="${p.name}">
+                                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                <button type="submit" class="btn btn-danger">🗑</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Add party form -->
+            <div>
+                <div class="card">
+                    <div class="section-header">
+                        <span class="section-title">Add New Party</span>
+                    </div>
+                    <form th:action="@{/admin/parties/add}" method="post"
+                          th:object="${newParty}" autocomplete="off">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                        <label class="form-label">Party Name <span style="color:var(--red)">*</span></label>
+                        <input type="text" class="form-control" th:field="*{name}"
+                               placeholder="e.g. Reliance Industries"/>
+                        <div class="form-error" th:if="${#fields.hasErrors('name')}"
+                             th:errors="*{name}"></div>
+
+                        <label class="form-label">GSTIN <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted2)">(optional)</span></label>
+                        <input type="text" class="form-control" th:field="*{gstin}"
+                               placeholder="e.g. 27AAPFU0939F1ZV"/>
+                        <div class="form-error" th:if="${#fields.hasErrors('gstin')}"
+                             th:errors="*{gstin}"></div>
+
+                        <label class="form-label">WhatsApp Phone <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted2)">(E.164, optional)</span></label>
+                        <input type="tel" class="form-control" th:field="*{phone}"
+                               placeholder="e.g. 919876543210"/>
+                        <div class="form-error" th:if="${#fields.hasErrors('phone')}"
+                             th:errors="*{phone}"></div>
+
+                        <div class="toggle-row">
+                            <label class="toggle-label">
+                                <input type="checkbox" th:field="*{whatsappOptIn}"/>
+                                Enable WhatsApp reminders
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">➕ Add Party</button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+</body>
+</html>

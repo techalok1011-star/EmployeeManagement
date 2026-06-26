@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Invoices &amp; Outstanding — PayTrack</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&amp;family=DM+Sans:wght@300;400;500&amp;display=swap" rel="stylesheet"/>
+    <style>
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        :root{--ink:#0d0f14;--surface:#161a24;--card:#1e2330;--border:#2a3045;--accent:#6c8eff;--accent2:#a78bfa;--gold:#f5c842;--green:#34d399;--red:#f87171;--orange:#fb923c;--text:#e2e8f0;--muted:#8892a4;--muted2:#4a556a}
+        body{font-family:'DM Sans',sans-serif;background:var(--ink);color:var(--text);min-height:100vh;display:flex}
+        .sidebar{width:240px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100}
+        .sidebar-brand{padding:24px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+        .sidebar-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px}
+        .sidebar-title{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:var(--text)}
+        .sidebar-title span{color:var(--accent)}
+        .sidebar-user{padding:16px 20px;border-bottom:1px solid var(--border)}
+        .sidebar-user-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);margin-bottom:4px}
+        .sidebar-user-name{font-size:14px;font-weight:500;color:var(--text)}
+        .sidebar-user-role{font-size:11px;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px;background:rgba(245,200,66,0.15);color:var(--gold)}
+        .sidebar-nav{padding:16px 12px;flex:1}
+        .nav-section-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);padding:0 8px;margin-bottom:6px;display:block;margin-top:12px}
+        .nav-link{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;text-decoration:none;color:var(--muted);font-size:14px;font-weight:500;transition:all 0.15s;margin-bottom:2px}
+        .nav-link:hover{background:rgba(255,255,255,0.05);color:var(--text)}
+        .nav-link.active{background:rgba(108,142,255,0.12);color:var(--accent)}
+        .sidebar-footer{padding:16px 12px;border-top:1px solid var(--border)}
+        .logout-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:var(--muted);font-size:14px;font-weight:500;transition:all 0.15s;width:100%;cursor:pointer;background:transparent;border:none;font-family:'DM Sans',sans-serif}
+        .logout-btn:hover{background:rgba(248,113,113,0.1);color:var(--red)}
+        .main{margin-left:240px;flex:1}
+        .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
+        .topbar-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700}
+        .content{padding:28px 32px}
+        .stats-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+        .stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 20px}
+        .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:6px}
+        .stat-value{font-family:'Syne',sans-serif;font-size:22px;font-weight:700}
+        .stat-value.green{color:var(--green)}
+        .stat-value.orange{color:var(--orange)}
+        .stat-value.red{color:var(--red)}
+        .stat-value.accent{color:var(--accent)}
+        .two-col{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start}
+        @media(max-width:1100px){.two-col{grid-template-columns:1fr}}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px}
+        .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+        .section-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700}
+        .table-wrapper{overflow-x:auto;border-radius:12px;border:1px solid var(--border)}
+        table{width:100%;border-collapse:collapse}
+        thead{background:var(--surface)}
+        th{padding:10px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+        td{padding:11px 14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle}
+        tr:last-child td{border-bottom:none}
+        tr:hover td{background:rgba(255,255,255,0.02)}
+        .amount{font-weight:600;color:var(--green)}
+        .amount-red{font-weight:600;color:var(--red)}
+        .amount-credit{font-weight:600;color:var(--accent)}
+        .text-muted{color:var(--muted);font-size:12px}
+        .inv-no{font-family:'Syne',sans-serif;font-size:12.5px;font-weight:700;color:var(--accent2)}
+        .party-name{font-weight:500}
+        .gstin{font-size:11px;color:var(--muted);font-family:monospace}
+        .badge-credit{background:rgba(108,142,255,0.15);color:var(--accent);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+        .badge-outstanding{background:rgba(248,113,113,0.15);color:var(--red);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+        .badge-clear{background:rgba(52,211,153,0.15);color:var(--green);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+        .badge-sent{background:rgba(52,211,153,0.15);color:var(--green);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+        .badge-dryrun{background:rgba(108,142,255,0.15);color:var(--accent);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+        .badge-failed{background:rgba(248,113,113,0.15);color:var(--red);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+        .phone-input{padding:6px 10px;background:var(--surface);border:1.5px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;width:140px;transition:border-color 0.2s}
+        .phone-input:focus{border-color:var(--accent)}
+        .phone-input::placeholder{color:var(--muted2)}
+        .toggle-label{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--muted)}
+        .toggle-label input[type=checkbox]{accent-color:var(--green);width:14px;height:14px}
+        .btn-whatsapp{background:rgba(37,211,102,0.12);color:#25d366;border:1px solid rgba(37,211,102,0.3);padding:8px 16px;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;transition:all 0.15s}
+        .btn-whatsapp:hover{background:rgba(37,211,102,0.22)}
+        .btn{padding:7px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+        .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;width:100%;justify-content:center;padding:11px;font-size:14px;border-radius:9px;margin-top:8px}
+        .btn-primary:hover{opacity:0.88}
+        .btn-danger{background:rgba(248,113,113,0.1);color:var(--red);border:1px solid rgba(248,113,113,0.2)}
+        .btn-danger:hover{background:rgba(248,113,113,0.2)}
+        .btn-sm{padding:5px 10px;font-size:12px;border-radius:7px}
+        .alert{padding:12px 16px;border-radius:10px;font-size:13.5px;margin-bottom:20px}
+        .alert-success{background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#6ee7b7}
+        .alert-danger{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);color:#fca5a5}
+        .form-label{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:6px;font-weight:600}
+        .form-control{width:100%;padding:10px 13px;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;outline:none;transition:border-color 0.2s;margin-bottom:14px}
+        .form-control:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,142,255,0.12)}
+        .form-control::placeholder{color:var(--muted2)}
+        .form-error{font-size:12px;color:var(--red);margin-bottom:10px;margin-top:-10px}
+        .autocomplete-wrapper{position:relative}
+        .autocomplete-list{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:9px;z-index:200;max-height:200px;overflow-y:auto;display:none;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+        .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04)}
+        .autocomplete-item:last-child{border-bottom:none}
+        .autocomplete-item:hover{background:rgba(108,142,255,0.1);color:var(--accent)}
+        .autocomplete-item .item-gstin{font-size:11px;color:var(--muted);font-family:monospace;display:block}
+        .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+        .empty-icon{font-size:44px;margin-bottom:12px}
+        .search-input{width:100%;padding:10px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color 0.2s;margin-bottom:14px}
+        .search-input:focus{border-color:var(--accent)}
+        .search-input::placeholder{color:var(--muted2)}
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div class="sidebar-brand">
+        <div class="sidebar-icon">💳</div>
+        <div class="sidebar-title">Pay<span>Track</span></div>
+    </div>
+    <div class="sidebar-user">
+        <div class="sidebar-user-label">Signed in as</div>
+        <div class="sidebar-user-name" th:text="${adminName}">Admin</div>
+        <span class="sidebar-user-role">👑 Admin</span>
+    </div>
+    <nav class="sidebar-nav">
+        <span class="nav-section-label">Administration</span>
+        <a href="/admin/dashboard" class="nav-link"><span>📊</span> Dashboard</a>
+        <a href="/admin/employees" class="nav-link"><span>👥</span> Employees</a>
+        <a href="/admin/entries" class="nav-link"><span>📋</span> All Entries</a>
+        <a href="/admin/parties" class="nav-link"><span>🏢</span> Parties</a>
+        <a href="/admin/invoices" class="nav-link active"><span>🧾</span> Invoices</a>
+        <a href="/admin/history" class="nav-link"><span>📜</span> Audit Log</a>
+    </nav>
+    <div class="sidebar-footer">
+        <form th:action="@{/logout}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="logout-btn"><span>🚪</span> Sign Out</button>
+        </form>
+    </div>
+</div>
+
+<div class="main">
+    <div class="topbar">
+        <span class="topbar-title">🧾 Invoices &amp; Outstanding</span>
+        <div style="display:flex;align-items:center;gap:12px">
+            <span class="text-muted" th:text="${invoiceCount} + ' invoices'"></span>
+            <form th:action="@{/admin/notifications/send}" method="post" style="margin:0">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button type="submit" class="btn-whatsapp">📲 Send Reminders Now</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="content">
+
+        <!-- Alerts -->
+        <div th:if="${successMsg}" class="alert alert-success" th:text="${successMsg}"></div>
+        <div th:if="${errorMsg}"   class="alert alert-danger"  th:text="${errorMsg}"></div>
+
+        <!-- Stats bar -->
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="stat-label">Total Invoiced</div>
+                <div class="stat-value accent">₹<span th:text="${#numbers.formatDecimal(totalInvoiced,1,'COMMA',2,'POINT')}"></span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Collected</div>
+                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(totalPaid,1,'COMMA',2,'POINT')}"></span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Net Outstanding</div>
+                <div class="stat-value"
+                     th:classappend="${totalOutstanding.compareTo(T(java.math.BigDecimal).ZERO) > 0} ? 'red' : 'accent'">
+                    ₹<span th:text="${#numbers.formatDecimal(totalOutstanding,1,'COMMA',2,'POINT')}"></span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Invoices</div>
+                <div class="stat-value orange" th:text="${invoiceCount}">0</div>
+            </div>
+        </div>
+
+        <div class="two-col">
+
+            <!-- Left: Invoice table + search -->
+            <div>
+                <div class="card">
+                    <div class="section-header">
+                        <span class="section-title">Invoice List</span>
+                    </div>
+
+                    <div th:if="${#lists.isEmpty(invoices)}" class="empty-state">
+                        <div class="empty-icon">🧾</div>
+                        <div style="font-size:15px;font-weight:600;margin-bottom:6px">No invoices yet</div>
+                        <div style="font-size:13px">Add an invoice using the form on the right.</div>
+                    </div>
+
+                    <div th:if="${!#lists.isEmpty(invoices)}">
+                        <input type="text" id="invSearch" class="search-input"
+                               placeholder="🔍 Search by invoice no, party name…"/>
+                        <div class="table-wrapper">
+                            <table id="invTable">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Invoice No.</th>
+                                        <th>Date</th>
+                                        <th>Party Name / GSTIN</th>
+                                        <th>Amount (INR)</th>
+                                        <th>Description</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="inv, iStat : ${invoices}">
+                                        <td class="text-muted" th:text="${iStat.count}"></td>
+                                        <td><span class="inv-no" th:text="${inv.invoiceNumber}"></span></td>
+                                        <td class="text-muted"
+                                            th:text="${#temporals.format(inv.invoiceDate,'dd MMM yyyy')}"></td>
+                                        <td>
+                                            <div class="party-name" th:text="${inv.partyName.contains('_') ? inv.partyName.substring(0,inv.partyName.indexOf('_')) : inv.partyName}"></div>
+                                            <span class="gstin" th:if="${inv.partyName.contains('_')}"
+                                                  th:text="${inv.partyName.substring(inv.partyName.indexOf('_')+1)}"></span>
+                                        </td>
+                                        <td class="amount">₹<span th:text="${#numbers.formatDecimal(inv.amount,1,'COMMA',2,'POINT')}"></span></td>
+                                        <td class="text-muted" th:text="${inv.description != null ? inv.description : '—'}"></td>
+                                        <td>
+                                            <form th:action="@{/admin/invoices/{id}/delete(id=${inv.id})}"
+                                                  method="post"
+                                                  onsubmit="return confirm('Delete invoice ' + this.dataset.inv + '?')"
+                                                  th:data-inv="${inv.invoiceNumber}">
+                                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                <button type="submit" class="btn btn-danger btn-sm">🗑</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Outstanding Summary -->
+                <div class="card" style="margin-top:24px">
+                    <div class="section-header">
+                        <span class="section-title">Party Outstanding Summary</span>
+                    </div>
+
+                    <div th:if="${#lists.isEmpty(outstandingSummary)}" class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <div style="font-size:14px">No data yet.</div>
+                    </div>
+
+                    <div th:if="${!#lists.isEmpty(outstandingSummary)}" class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Party / GSTIN</th>
+                                    <th>Total Invoiced</th>
+                                    <th>Total Paid</th>
+                                    <th>Outstanding</th>
+                                    <th>Status</th>
+                                    <th>WhatsApp Phone</th>
+                                    <th>Opt-In</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="row : ${outstandingSummary}">
+                                    <td>
+                                        <div class="party-name" th:text="${row.displayName}"></div>
+                                        <span class="gstin" th:if="${!#strings.isEmpty(row.gstin)}" th:text="${row.gstin}"></span>
+                                    </td>
+                                    <td class="amount">₹<span th:text="${#numbers.formatDecimal(row.totalInvoiced,1,'COMMA',2,'POINT')}"></span></td>
+                                    <td class="amount">₹<span th:text="${#numbers.formatDecimal(row.totalPaid,1,'COMMA',2,'POINT')}"></span></td>
+                                    <td>
+                                        <span th:classappend="${row.credit} ? 'amount-credit' : (${row.outstanding.compareTo(T(java.math.BigDecimal).ZERO) == 0} ? 'amount' : 'amount-red')">
+                                            ₹<span th:text="${#numbers.formatDecimal(row.outstanding.abs(),1,'COMMA',2,'POINT')}"></span>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span th:if="${row.credit}" class="badge-credit">Credit</span>
+                                        <span th:if="${!row.credit and row.outstanding.compareTo(T(java.math.BigDecimal).ZERO) == 0}" class="badge-clear">Clear</span>
+                                        <span th:if="${!row.credit and row.outstanding.compareTo(T(java.math.BigDecimal).ZERO) > 0}" class="badge-outstanding">Due</span>
+                                    </td>
+                                    <!-- Phone + opt-in inline form (only if party exists in DB) -->
+                                    <td th:if="${row.partyId != null}">
+                                        <form th:action="@{/admin/parties/{id}/phone(id=${row.partyId})}"
+                                              method="post" style="display:flex;gap:6px;align-items:center">
+                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <input type="tel" name="phone" class="phone-input"
+                                                   th:value="${row.phone}"
+                                                   placeholder="91XXXXXXXXXX"/>
+                                            <!-- hidden opt-in value preserved on submit -->
+                                            <input type="hidden" name="whatsappOptIn" th:value="${row.whatsappOptIn}"/>
+                                            <button type="submit" class="btn btn-sm btn-ghost" title="Save phone">💾</button>
+                                        </form>
+                                    </td>
+                                    <td th:if="${row.partyId == null}" class="text-muted">—</td>
+
+                                    <td th:if="${row.partyId != null}">
+                                        <form th:action="@{/admin/parties/{id}/phone(id=${row.partyId})}"
+                                              method="post" style="margin:0">
+                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <input type="hidden" name="phone" th:value="${row.phone}"/>
+                                            <label class="toggle-label">
+                                                <input type="checkbox" name="whatsappOptIn" value="true"
+                                                       th:checked="${row.whatsappOptIn}"
+                                                       onchange="this.form.submit()"/>
+                                                <span th:text="${row.whatsappOptIn} ? '✅ On' : 'Off'"></span>
+                                            </label>
+                                        </form>
+                                    </td>
+                                    <td th:if="${row.partyId == null}" class="text-muted">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Add Invoice form -->
+            <div>
+                <div class="card">
+                    <div class="section-header">
+                        <span class="section-title">Add Invoice</span>
+                    </div>
+                    <form th:action="@{/admin/invoices/add}" method="post"
+                          th:object="${newInvoice}" autocomplete="off">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                        <label class="form-label">Invoice Number</label>
+                        <input type="text" class="form-control" th:field="*{invoiceNumber}"
+                               placeholder="e.g. INV-2026-001"/>
+                        <div class="form-error" th:if="${#fields.hasErrors('invoiceNumber')}"
+                             th:errors="*{invoiceNumber}"></div>
+
+                        <label class="form-label">Invoice Date</label>
+                        <input type="date" class="form-control" th:field="*{invoiceDate}"/>
+                        <div class="form-error" th:if="${#fields.hasErrors('invoiceDate')}"
+                             th:errors="*{invoiceDate}"></div>
+
+                        <label class="form-label">Party Name / GSTIN</label>
+                        <div class="autocomplete-wrapper">
+                            <input type="text" id="partyInput" class="form-control"
+                                   th:field="*{partyName}"
+                                   placeholder="Search party…" autocomplete="off"
+                                   style="margin-bottom:0"/>
+                            <div class="autocomplete-list" id="partyDropdown"></div>
+                        </div>
+                        <div class="form-error" style="margin-top:6px"
+                             th:if="${#fields.hasErrors('partyName')}"
+                             th:errors="*{partyName}"></div>
+                        <div style="margin-bottom:14px"></div>
+
+                        <label class="form-label">Amount (INR)</label>
+                        <input type="number" step="0.01" min="0.01" class="form-control"
+                               th:field="*{amount}" placeholder="0.00"/>
+                        <div class="form-error" th:if="${#fields.hasErrors('amount')}"
+                             th:errors="*{amount}"></div>
+
+                        <label class="form-label">Description <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted2)">(optional)</span></label>
+                        <textarea class="form-control" th:field="*{description}"
+                                  rows="3" placeholder="Goods/services description…"
+                                  style="resize:vertical"></textarea>
+                        <div class="form-error" th:if="${#fields.hasErrors('description')}"
+                             th:errors="*{description}"></div>
+
+                        <button type="submit" class="btn btn-primary">➕ Add Invoice</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <!-- Notification Log -->
+        <div class="card" style="margin-top:24px">
+            <div class="section-header">
+                <span class="section-title">📲 WhatsApp Notification Log <span style="font-size:12px;font-weight:400;color:var(--muted)">(last 30)</span></span>
+            </div>
+
+            <div th:if="${#lists.isEmpty(recentNotifications)}" class="empty-state">
+                <div class="empty-icon">📵</div>
+                <div style="font-size:14px">No reminders sent yet. Use <strong>Send Reminders Now</strong> above.</div>
+            </div>
+
+            <div th:if="${!#lists.isEmpty(recentNotifications)}" class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Party</th>
+                            <th>Phone</th>
+                            <th>Outstanding</th>
+                            <th>Status</th>
+                            <th>Triggered By</th>
+                            <th>When</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="n : ${recentNotifications}">
+                            <td>
+                                <span class="party-name"
+                                      th:text="${n.partyName.contains('_') ? n.partyName.substring(0,n.partyName.indexOf('_')) : n.partyName}"></span>
+                            </td>
+                            <td class="text-muted" th:text="${n.phone}"></td>
+                            <td class="amount">₹<span th:text="${#numbers.formatDecimal(n.outstandingAmount,1,'COMMA',2,'POINT')}"></span></td>
+                            <td>
+                                <span th:if="${n.status.name() == 'SENT'}"    class="badge-sent">✅ Sent</span>
+                                <span th:if="${n.status.name() == 'DRY_RUN'}" class="badge-dryrun">🧪 Dry Run</span>
+                                <span th:if="${n.status.name() == 'FAILED'}"  class="badge-failed"
+                                      th:title="${n.errorMessage}">❌ Failed</span>
+                            </td>
+                            <td class="text-muted" th:text="${n.triggeredBy}"></td>
+                            <td class="text-muted"
+                                th:text="${#temporals.format(n.sentAt,'dd MMM yyyy, hh:mm a')}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // ── Invoice table search ──
+    document.getElementById('invSearch')?.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('#invTable tbody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+
+    // ── Party autocomplete ──
+    const partyInput    = document.getElementById('partyInput');
+    const partyDropdown = document.getElementById('partyDropdown');
+    let allParties = [];
+
+    if (partyInput) {
+        fetch('/api/parties/suggest?q=')
+            .then(r => r.json())
+            .then(data => { allParties = data; })
+            .catch(() => {});
+
+        partyInput.addEventListener('input', function() {
+            const q = this.value.toLowerCase().trim();
+            partyDropdown.innerHTML = '';
+            if (!q) { partyDropdown.style.display = 'none'; return; }
+            const matches = allParties.filter(p =>
+                p.combined.toLowerCase().includes(q) ||
+                (p.name && p.name.toLowerCase().includes(q)) ||
+                (p.gst  && p.gst.toLowerCase().includes(q))
+            ).slice(0, 12);
+            if (!matches.length) { partyDropdown.style.display = 'none'; return; }
+            matches.forEach(p => {
+                const li = document.createElement('div');
+                li.className = 'autocomplete-item';
+                li.innerHTML = '<span>' + p.name + '</span>' +
+                    (p.gst ? '<span class="item-gstin">' + p.gst + '</span>' : '');
+                li.addEventListener('mousedown', e => {
+                    e.preventDefault();
+                    partyInput.value = p.combined;
+                    partyDropdown.style.display = 'none';
+                });
+                partyDropdown.appendChild(li);
+            });
+            partyDropdown.style.display = 'block';
+        });
+
+        partyInput.addEventListener('blur', () => {
+            setTimeout(() => partyDropdown.style.display = 'none', 150);
+        });
+        partyInput.addEventListener('focus', function() {
+            if (this.value) this.dispatchEvent(new Event('input'));
+        });
+    }
+</script>
+</body>
+</html>
