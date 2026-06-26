@@ -87,6 +87,17 @@
         .search-input:focus{border-color:var(--accent)}
         .search-input::placeholder{color:var(--muted2)}
         .topbar-actions{display:flex;gap:10px;align-items:center}
+        .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px}
+        .filter-group{display:flex;flex-direction:column;gap:4px}
+        .filter-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);font-weight:600}
+        .filter-input{padding:8px 12px;background:var(--card);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s}
+        .filter-input:focus{border-color:var(--accent)}
+        .btn-filter{padding:8px 16px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;display:inline-flex;align-items:center;gap:5px;text-decoration:none}
+        .btn-filter-apply{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}
+        .btn-filter-apply:hover{opacity:0.88}
+        .btn-filter-clear{background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid var(--border)}
+        .btn-filter-clear:hover{background:rgba(255,255,255,0.09);color:var(--text)}
+        .filter-active-badge{padding:3px 9px;border-radius:20px;font-size:11px;background:rgba(108,142,255,0.15);color:var(--accent);font-weight:500}
     </style>
 </head>
 <body>
@@ -149,6 +160,25 @@
                 <div class="stat-value blue" th:text="${#lists.size(dayGroups)}">0</div>
             </div>
         </div>
+
+        <!-- Date Range Filter -->
+        <form method="get" action="/employee/entries" class="filter-bar">
+            <div class="filter-group">
+                <label class="filter-label">From Date</label>
+                <input type="date" name="from" class="filter-input" th:value="${from}"/>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">To Date</label>
+                <input type="date" name="to" class="filter-input" th:value="${to}"/>
+            </div>
+            <div class="filter-group" style="flex-direction:row;gap:8px;align-items:flex-end">
+                <button type="submit" class="btn-filter btn-filter-apply">🔍 Filter</button>
+                <a href="/employee/entries" class="btn-filter btn-filter-clear">✕ Clear</a>
+            </div>
+            <div th:if="${from != null or to != null}" style="align-self:flex-end">
+                <span class="filter-active-badge">● Filtered</span>
+            </div>
+        </form>
 
         <!-- Search -->
         <div class="search-bar">

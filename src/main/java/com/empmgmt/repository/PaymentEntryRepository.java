@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @Repository
 public interface PaymentEntryRepository extends JpaRepository<PaymentEntry, Long> {
@@ -34,8 +35,19 @@ public interface PaymentEntryRepository extends JpaRepository<PaymentEntry, Long
     @Query("SELECT p FROM PaymentEntry p WHERE p.employee.id = :employeeId ORDER BY p.createdAt DESC")
     List<PaymentEntry> findByEmployeeId(@Param("employeeId") Long employeeId);
 
-    @Query("SELECT p FROM PaymentEntry p WHERE p.employee.id = :employeeId AND p.entryDate BETWEEN :start AND :end ORDER BY p.entryDate DESC")
+    @Query("SELECT p FROM PaymentEntry p WHERE p.employee.id = :employeeId AND p.entryDate BETWEEN :start AND :end ORDER BY p.entryDate DESC, p.createdAt DESC")
     List<PaymentEntry> findByEmployeeIdAndDateRange(@Param("employeeId") Long employeeId,
                                                      @Param("start") LocalDate start,
                                                      @Param("end") LocalDate end);
+
+    @Query("SELECT p FROM PaymentEntry p WHERE p.entryDate BETWEEN :start AND :end ORDER BY p.entryDate DESC, p.createdAt DESC")
+    List<PaymentEntry> findAllByDateRange(@Param("start") LocalDate start,
+                                          @Param("end") LocalDate end);
+
+    /** Returns [partyName, sumAmount] pairs for all parties that have payment entries */
+    @Query("SELECT p.partyName, SUM(p.amount) FROM PaymentEntry p GROUP BY p.partyName")
+    List<Object[]> sumAmountGroupedByPartyName();
+
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM PaymentEntry p")
+    BigDecimal sumAllAmounts();
 }

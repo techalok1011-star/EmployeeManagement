@@ -6,6 +6,7 @@ import com.empmgmt.service.PaymentEntryService;
 import com.empmgmt.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -66,13 +67,20 @@ public class EmployeeController {
     // ─── View All Entries (day-wise) ──────────────────────────
 
     @GetMapping("/entries")
-    public String allEntries(Model model, Authentication auth) {
+    public String allEntries(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            Model model, Authentication auth) {
         String username = auth.getName();
+        boolean filtered = from != null || to != null;
         model.addAttribute("user", userService.getUserByUsername(username));
-        model.addAttribute("dayGroups", paymentEntryService.getEntriesGroupedByDayForEmployee(username));
+        model.addAttribute("dayGroups", filtered
+                ? paymentEntryService.getFilteredEntriesGroupedByDayForEmployee(username, from, to)
+                : paymentEntryService.getEntriesGroupedByDayForEmployee(username));
         model.addAttribute("summary", paymentEntryService.getDailySummaryForEmployee(username));
-        model.addAttribute("totalAllTime",
-                paymentEntryService.getEntriesForEmployee(username).size());
+        model.addAttribute("totalAllTime", paymentEntryService.getEntriesForEmployee(username).size());
+        model.addAttribute("from", from);
+        model.addAttribute("to", to);
         return "employee/entries";
     }
 

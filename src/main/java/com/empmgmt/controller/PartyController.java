@@ -3,13 +3,11 @@ package com.empmgmt.controller;
 import com.empmgmt.service.ExcelPartyService;
 import com.empmgmt.dto.PartySuggestionDTO;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
-import org.springframework.web.bind.annotation.PostMapping;
 import java.util.Map;
 
 @RestController
@@ -41,6 +39,32 @@ public class PartyController {
 	public Map<String, Object> cleanupInvalid() {
 		int deleted = excelPartyService.cleanupInvalidEntries();
 		return Map.of("deleted", deleted);
+	}
+
+	/**
+	 * Admin UI: upload an Excel file and import party names into DB.
+	 * Redirects back to admin dashboard with result message.
+	 */
+	@PostMapping("/upload-import")
+	public String uploadAndImport(@RequestParam("file") MultipartFile file,
+								  RedirectAttributes redirectAttributes) {
+		if (file.isEmpty()) {
+			redirectAttributes.addFlashAttribute("importError", "Please select an Excel file to upload.");
+			return "redirect:/admin/dashboard";
+		}
+		String filename = file.getOriginalFilename();
+		if (filename == null || (!filename.endsWith(".xlsx") && !filename.endsWith(".xls"))) {
+			redirectAttributes.addFlashAttribute("importError", "Only .xlsx or .xls files are supported.");
+			return "redirect:/admin/dashboard";
+		}
+		try {
+			int added = excelPartyService.importFromStream(file.getInputStream());
+			redirectAttributes.addFlashAttribute("importSuccess",
+				"✅ Import complete! " + added + " new parties added" + (added == 0 ? " (no new entries — all already exist)." : "."));
+		} catch (Exception e) {
+			redirectAttributes.addFlashAttribute("importError", "Import failed: " + e.getMessage());
+		}
+		return "redirect:/admin/dashboard";
 	}
 }
 

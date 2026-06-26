@@ -63,6 +63,8 @@
         .btn{padding:7px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
         .btn-ghost{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--border)}
         .btn-ghost:hover{background:rgba(255,255,255,0.09)}
+        .btn-csv{background:rgba(52,211,153,0.1);color:var(--green);border:1px solid rgba(52,211,153,0.25)}
+        .btn-csv:hover{background:rgba(52,211,153,0.2)}
         .summary-bar{display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap}
         .summary-pill{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;font-size:13px;font-weight:500}
         .summary-pill.creates{background:rgba(52,211,153,0.1);color:var(--green)}
@@ -86,6 +88,8 @@
         <a href="/admin/dashboard" class="nav-link"><span>📊</span> Dashboard</a>
         <a href="/admin/employees" class="nav-link"><span>👥</span> Employees</a>
         <a href="/admin/entries" class="nav-link"><span>📋</span> All Entries</a>
+        <a href="/admin/parties" class="nav-link"><span>🏢</span> Parties</a>
+        <a href="/admin/invoices" class="nav-link"><span>🧾</span> Invoices</a>
         <a href="/admin/history" class="nav-link active"><span>📜</span> Audit Log</a>
     </nav>
     <div class="sidebar-footer">
@@ -99,7 +103,10 @@
 <div class="main">
     <div class="topbar">
         <span class="topbar-title">📜 Transaction Audit Log</span>
-        <span class="text-muted" th:text="${#lists.size(logs)} + ' total records'"></span>
+        <div style="display:flex;align-items:center;gap:12px">
+            <span class="text-muted" th:text="${#lists.size(logs)} + ' total records'"></span>
+            <a href="/admin/export/audit-csv" class="btn btn-csv">📥 Export CSV</a>
+        </div>
     </div>
     <div class="content">
         <div class="card">

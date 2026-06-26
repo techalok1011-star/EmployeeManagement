@@ -48,7 +48,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/h2-console/**").permitAll()
                 .requestMatchers("/api/parties/suggest", "/api/parties").authenticated()
-                .requestMatchers("/api/parties/import", "/api/parties/cleanup").hasRole("ADMIN")
+                .requestMatchers("/api/parties/import", "/api/parties/cleanup", "/api/parties/upload-import").hasRole("ADMIN")
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/employee/**").hasRole("EMPLOYEE")
                 .anyRequest().authenticated()

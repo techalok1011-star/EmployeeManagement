@@ -2,6 +2,7 @@ package com.empmgmt.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "parties", indexes = {@Index(columnList = "combined")})
@@ -23,5 +24,17 @@ public class Party {
 
     @Column(name = "combined", length = 700, unique = true)
     private String combined; // name + '_' + gst or name
+
+    /** Total sales amount from Excel (sum across all invoices for this party) */
+    @Column(name = "total_amount", precision = 18, scale = 2)
+    private BigDecimal totalAmount;
+
+    /** WhatsApp phone number in E.164 format, e.g. 919876543210 */
+    @Column(name = "phone", length = 20)
+    private String phone;
+
+    /** Whether this party has opted in to receive WhatsApp reminders */
+    @Column(name = "whatsapp_opt_in", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
+    private boolean whatsappOptIn = false;
 }
 
