@@ -48,8 +48,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/h2-console/**").permitAll()
                 .requestMatchers("/api/parties/suggest", "/api/parties").authenticated()
-                .requestMatchers("/api/parties/import", "/api/parties/cleanup", "/api/parties/upload-import").hasRole("ADMIN")
-                .requestMatchers("/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/parties/import", "/api/parties/cleanup", "/api/parties/upload-import").hasAnyRole("ADMIN", "ACCOUNTANT")
+                .requestMatchers("/admin/**").hasAnyRole("ADMIN", "ACCOUNTANT")
                 .requestMatchers("/employee/**").hasRole("EMPLOYEE")
                 .anyRequest().authenticated()
             )
@@ -58,9 +58,14 @@ public class SecurityConfig {
                 .loginProcessingUrl("/login")
                 .successHandler((req, res, auth) -> {
                     var authorities = auth.getAuthorities();
-                    String redirect = authorities.stream()
-                        .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))
-                        ? "/admin/dashboard" : "/employee/dashboard";
+                    String redirect;
+                    if (authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
+                        redirect = "/admin/dashboard";
+                    } else if (authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_ACCOUNTANT"))) {
+                        redirect = "/admin/invoices";
+                    } else {
+                        redirect = "/employee/dashboard";
+                    }
                     res.sendRedirect(redirect);
                 })
                 .failureUrl("/login?error=true")

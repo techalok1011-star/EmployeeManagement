@@ -25,6 +25,10 @@ public class Party {
     @Column(name = "combined", length = 700, unique = true)
     private String combined; // name + '_' + gst or name
 
+    /** Trailing numeric ledger code from the source accounting system (e.g. Tally), if any. */
+    @Column(name = "trailing_number", length = 20)
+    private String trailingNumber;
+
     /** Total sales amount from Excel (sum across all invoices for this party) */
     @Column(name = "total_amount", precision = 18, scale = 2)
     private BigDecimal totalAmount;

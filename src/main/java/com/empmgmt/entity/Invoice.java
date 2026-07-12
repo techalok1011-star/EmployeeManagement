@@ -41,6 +41,19 @@ public class Invoice {
     @Column(length = 1000)
     private String description;
 
+    /** How the cement physically left / was collected for this invoice. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_mode", nullable = false, length = 20)
+    private DeliveryMode deliveryMode;
+
+    /** Truck/trolley registration number, or the collecting party's vehicle number — optional. */
+    @Column(name = "transport_number", length = 50)
+    private String transportNumber;
+
+    /** Voucher number from the source Sales Register (e.g. Tally), if this invoice was imported. */
+    @Column(name = "sales_vch_no", length = 20)
+    private String salesVchNo;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -56,5 +69,21 @@ public class Invoice {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+    }
+
+    public enum DeliveryMode {
+        TRUCK("Truck"),
+        SELF_PICKUP("Self Pickup"),
+        TROLLEY("Trolley");
+
+        private final String displayName;
+
+        DeliveryMode(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
     }
 }

@@ -18,13 +18,14 @@
             --accent2: #a78bfa;
             --gold: #f5c842;
             --green: #34d399;
+            --red: #f87171;
             --text: #e2e8f0;
             --muted: #8892a4;
         }
 
         body {
             font-family: 'DM Sans', sans-serif;
-            background: var(--ink);
+            background: radial-gradient(circle at 50% 0%, #171c28 0%, var(--ink) 60%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -33,25 +34,40 @@
             overflow: hidden;
         }
 
-        /* Ambient background orbs */
+        /* Ambient background orbs — slow drifting motion for a "living" backdrop */
         .bg-orb {
             position: absolute;
             border-radius: 50%;
             filter: blur(80px);
-            opacity: 0.12;
+            opacity: 0.14;
             pointer-events: none;
+            will-change: transform;
         }
-        .orb1 { width: 500px; height: 500px; background: var(--accent); top: -100px; left: -100px; }
-        .orb2 { width: 400px; height: 400px; background: var(--accent2); bottom: -80px; right: -80px; }
-        .orb3 { width: 300px; height: 300px; background: var(--gold); top: 50%; left: 50%; transform: translate(-50%,-50%); }
+        .orb1 { width: 520px; height: 520px; background: var(--accent); top: -120px; left: -120px; animation: drift1 16s ease-in-out infinite alternate; }
+        .orb2 { width: 420px; height: 420px; background: var(--accent2); bottom: -100px; right: -100px; animation: drift2 20s ease-in-out infinite alternate; }
+        .orb3 { width: 320px; height: 320px; background: var(--gold); top: 50%; left: 50%; transform: translate(-50%,-50%); animation: pulse 9s ease-in-out infinite; }
+
+        @keyframes drift1 {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(40px, 30px) scale(1.08); }
+        }
+        @keyframes drift2 {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(-30px, -40px) scale(1.1); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.10; transform: translate(-50%,-50%) scale(1); }
+            50%      { opacity: 0.18; transform: translate(-50%,-50%) scale(1.15); }
+        }
 
         .grid-overlay {
             position: absolute;
             inset: 0;
             background-image:
-                linear-gradient(rgba(108,142,255,0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(108,142,255,0.03) 1px, transparent 1px);
+                linear-gradient(rgba(108,142,255,0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(108,142,255,0.035) 1px, transparent 1px);
             background-size: 40px 40px;
+            mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 40%, transparent 90%);
         }
 
         .login-wrapper {
@@ -62,31 +78,56 @@
             padding: 20px;
         }
 
+        @keyframes riseIn {
+            from { opacity: 0; transform: translateY(18px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
         .brand {
             text-align: center;
             margin-bottom: 32px;
+            animation: riseIn 0.6s cubic-bezier(0.16,1,0.3,1) both;
         }
         .brand-logo {
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }
         .brand-icon {
-            width: 44px; height: 44px;
+            position: relative;
+            width: 48px; height: 48px;
             background: linear-gradient(135deg, var(--accent), var(--accent2));
-            border-radius: 12px;
+            border-radius: 14px;
             display: flex; align-items: center; justify-content: center;
-            font-size: 20px;
+            font-size: 21px;
+            box-shadow: 0 8px 24px rgba(108,142,255,0.35);
+        }
+        .brand-icon::after {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            border-radius: 18px;
+            border: 1px solid rgba(108,142,255,0.3);
+            animation: ringPulse 3s ease-out infinite;
+        }
+        @keyframes ringPulse {
+            0%   { transform: scale(0.9); opacity: 0.8; }
+            100% { transform: scale(1.35); opacity: 0; }
         }
         .brand-name {
             font-family: 'Syne', sans-serif;
-            font-size: 28px;
+            font-size: 29px;
             font-weight: 800;
             color: var(--text);
             letter-spacing: -0.5px;
         }
-        .brand-name span { color: var(--accent); }
+        .brand-name span {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
         .brand-tagline {
             color: var(--muted);
             font-size: 13px;
@@ -94,11 +135,29 @@
         }
 
         .card {
-            background: var(--card);
+            position: relative;
+            background: rgba(30,35,48,0.65);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
             border: 1px solid var(--border);
             border-radius: 20px;
             padding: 36px;
-            box-shadow: 0 25px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03);
+            box-shadow: 0 25px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.03);
+            overflow: hidden;
+            animation: riseIn 0.6s 0.1s cubic-bezier(0.16,1,0.3,1) both;
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--accent2), var(--gold));
+            background-size: 200% 100%;
+            animation: shimmerBar 5s linear infinite;
+        }
+        @keyframes shimmerBar {
+            0%   { background-position: 0% 0; }
+            100% { background-position: 200% 0; }
         }
 
         .card-title {
@@ -122,9 +181,16 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            animation: riseIn 0.35s cubic-bezier(0.16,1,0.3,1) both;
         }
-        .alert-error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+        .alert-error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; animation: shake 0.4s; }
         .alert-success { background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.3); color: #6ee7b7; }
+        @keyframes shake {
+            10%, 90% { transform: translateX(-1px); }
+            20%, 80% { transform: translateX(2px); }
+            30%, 50%, 70% { transform: translateX(-4px); }
+            40%, 60% { transform: translateX(4px); }
+        }
 
         .form-group { margin-bottom: 20px; }
         label {
@@ -136,7 +202,14 @@
             letter-spacing: 0.8px;
             margin-bottom: 8px;
         }
-        .input-wrap { position: relative; }
+        .input-wrap {
+            position: relative;
+            border-radius: 10px;
+            transition: box-shadow 0.2s;
+        }
+        .input-wrap:focus-within {
+            box-shadow: 0 0 0 3px rgba(108,142,255,0.15);
+        }
         .input-icon {
             position: absolute;
             left: 14px;
@@ -145,26 +218,45 @@
             color: var(--muted);
             font-size: 16px;
             pointer-events: none;
+            transition: color 0.2s;
         }
+        .input-wrap:focus-within .input-icon { color: var(--accent); }
+
         input[type="text"], input[type="password"] {
             width: 100%;
-            padding: 12px 14px 12px 42px;
+            padding: 12px 42px 12px 42px;
             background: var(--surface);
             border: 1.5px solid var(--border);
             border-radius: 10px;
             color: var(--text);
             font-family: 'DM Sans', sans-serif;
             font-size: 15px;
-            transition: border-color 0.2s, box-shadow 0.2s;
+            transition: border-color 0.2s;
             outline: none;
         }
-        input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(108,142,255,0.12);
-        }
+        input:focus { border-color: var(--accent); }
         input::placeholder { color: var(--muted); }
 
+        .toggle-pw {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 15px;
+            padding: 8px;
+            border-radius: 8px;
+            transition: color 0.2s, background 0.2s;
+            font-family: inherit;
+        }
+        .toggle-pw:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+
         .btn-login {
+            position: relative;
+            overflow: hidden;
             width: 100%;
             padding: 14px;
             background: linear-gradient(135deg, var(--accent), var(--accent2));
@@ -175,39 +267,50 @@
             font-size: 15px;
             font-weight: 600;
             cursor: pointer;
-            transition: opacity 0.2s, transform 0.15s;
+            transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
             margin-top: 8px;
             letter-spacing: 0.3px;
-        }
-        .btn-login:hover { opacity: 0.9; transform: translateY(-1px); }
-        .btn-login:active { transform: translateY(0); }
-
-        .demo-creds {
-            margin-top: 24px;
-            padding: 16px;
-            background: rgba(108,142,255,0.06);
-            border: 1px solid rgba(108,142,255,0.15);
-            border-radius: 10px;
-        }
-        .demo-title {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--accent);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 10px;
-        }
-        .cred-row {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 6px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.04);
-            font-size: 12.5px;
+            justify-content: center;
+            gap: 8px;
         }
-        .cred-row:last-child { border-bottom: none; }
-        .cred-role { color: var(--gold); font-weight: 500; min-width: 80px; }
-        .cred-info { color: var(--muted); font-family: monospace; font-size: 12px; }
+        .btn-login::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -60%;
+            width: 40%; height: 100%;
+            background: linear-gradient(115deg, transparent, rgba(255,255,255,0.35), transparent);
+            transform: skewX(-20deg);
+            transition: left 0.6s ease;
+        }
+        .btn-login:hover::after { left: 130%; }
+        .btn-login:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(108,142,255,0.35); }
+        .btn-login:active { transform: translateY(0); }
+        .btn-login:disabled { opacity: 0.75; cursor: default; }
+
+        .spinner {
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: none;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .footer-note {
+            text-align: center;
+            margin-top: 22px;
+            color: var(--muted);
+            font-size: 12px;
+            letter-spacing: 0.3px;
+            animation: riseIn 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+        }
     </style>
 </head>
 <body>
@@ -236,7 +339,7 @@
                 ✓ <span th:text="${logoutMsg}"></span>
             </div>
 
-            <form th:action="@{/login}" method="post">
+            <form th:action="@{/login}" method="post" id="loginForm">
                 <div class="form-group">
                     <label for="username">Username</label>
                     <div class="input-wrap">
@@ -249,32 +352,36 @@
                     <div class="input-wrap">
                         <span class="input-icon">🔒</span>
                         <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                        <button type="button" class="toggle-pw" id="togglePw" aria-label="Show password">👁</button>
                     </div>
                 </div>
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                <button type="submit" class="btn-login">Sign In →</button>
+                <button type="submit" class="btn-login" id="loginBtn">
+                    <span class="spinner" id="loginSpinner"></span>
+                    <span id="loginBtnText">Sign In →</span>
+                </button>
             </form>
-
-            <div class="demo-creds">
-                <div class="demo-title">🧪 Demo Credentials</div>
-                <div class="cred-row">
-                    <span class="cred-role">👑 Admin</span>
-                    <span class="cred-info">admin / admin123</span>
-                </div>
-                <div class="cred-row">
-                    <span class="cred-role">👤 Emp 1</span>
-                    <span class="cred-info">rahul.sharma / emp123</span>
-                </div>
-                <div class="cred-row">
-                    <span class="cred-role">👤 Emp 2</span>
-                    <span class="cred-info">priya.patel / emp123</span>
-                </div>
-                <div class="cred-row">
-                    <span class="cred-role">👤 Emp 3</span>
-                    <span class="cred-info">amit.kumar / emp123</span>
-                </div>
-            </div>
         </div>
+
+        <div class="footer-note">PayTrack &middot; Role-based access for admins &amp; employees</div>
     </div>
+
+    <script>
+        const pwInput = document.getElementById('password');
+        const toggleBtn = document.getElementById('togglePw');
+        toggleBtn.addEventListener('click', () => {
+            const show = pwInput.type === 'password';
+            pwInput.type = show ? 'text' : 'password';
+            toggleBtn.textContent = show ? '🙈' : '👁';
+            toggleBtn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', () => {
+            const btn = document.getElementById('loginBtn');
+            document.getElementById('loginSpinner').style.display = 'inline-block';
+            document.getElementById('loginBtnText').textContent = 'Signing in…';
+            btn.disabled = true;
+        });
+    </script>
 </body>
 </html>

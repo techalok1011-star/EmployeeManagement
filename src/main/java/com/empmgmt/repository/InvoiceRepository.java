@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -14,6 +15,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     List<Invoice> findAllByOrderByInvoiceDateDescCreatedAtDesc();
 
     List<Invoice> findByPartyNameOrderByInvoiceDateDescCreatedAtDesc(String partyName);
+
+    List<Invoice> findByInvoiceDateBetween(LocalDate start, LocalDate end);
 
     boolean existsByInvoiceNumber(String invoiceNumber);
 

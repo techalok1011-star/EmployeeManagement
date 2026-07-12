@@ -1,5 +1,6 @@
 package com.empmgmt.dto;
 
+import com.empmgmt.entity.Invoice;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
@@ -32,6 +33,12 @@ public class InvoiceDTO {
 
         @Size(max = 1000, message = "Description must not exceed 1000 characters")
         private String description;
+
+        @NotNull(message = "Delivery mode is required")
+        private Invoice.DeliveryMode deliveryMode;
+
+        @Size(max = 50, message = "Transport number must not exceed 50 characters")
+        private String transportNumber;
     }
 
     @Data
@@ -45,6 +52,9 @@ public class InvoiceDTO {
         private String partyName;
         private BigDecimal amount;
         private String description;
+        private String deliveryMode;
+        private String transportNumber;
+        private String salesVchNo;
         private String createdAt;
     }
 }

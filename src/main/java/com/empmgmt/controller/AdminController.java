@@ -32,6 +32,7 @@ import org.springframework.data.domain.Sort;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 @Controller
@@ -68,6 +69,7 @@ public class AdminController {
     @GetMapping("/employees")
     public String listEmployees(Model model) {
         model.addAttribute("employees", userService.getAllEmployees());
+        model.addAttribute("accountants", userService.getAllAccountants());
         model.addAttribute("newEmployee", new UserDTO.CreateRequest());
         return "admin/employees";
     }
@@ -79,11 +81,13 @@ public class AdminController {
                               RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
             model.addAttribute("employees", userService.getAllEmployees());
+            model.addAttribute("accountants", userService.getAllAccountants());
             return "admin/employees";
         }
         try {
             userService.createEmployee(request);
-            redirectAttributes.addFlashAttribute("successMsg", "Employee created successfully!");
+            String roleLabel = request.getRole() == com.empmgmt.entity.User.Role.ACCOUNTANT ? "Accountant" : "Employee";
+            redirectAttributes.addFlashAttribute("successMsg", roleLabel + " created successfully!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
         }
@@ -244,17 +248,28 @@ public class AdminController {
 
     // ─── Invoices & Outstanding ────────────────────────────────
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @GetMapping("/invoices")
-    public String invoices(Model model, Authentication auth) {
-        model.addAttribute("invoices", invoiceService.getAllInvoices());
+    public String invoices(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            Model model, Authentication auth) {
+        boolean filtered = from != null || to != null;
+        model.addAttribute("invoices", filtered
+                ? invoiceService.getInvoicesByDateRange(from, to)
+                : invoiceService.getAllInvoices());
+        model.addAttribute("from", from);
+        model.addAttribute("to", to);
         model.addAttribute("outstandingSummary", invoiceService.getPartyOutstandingSummary());
         model.addAttribute("newInvoice", new InvoiceDTO.Request());
+        model.addAttribute("deliveryModes", com.empmgmt.entity.Invoice.DeliveryMode.values());
         invoiceService.getInvoicePageStats().forEach(model::addAttribute);
         model.addAttribute("recentNotifications", notificationLogRepository.findTop30ByOrderBySentAtDesc());
         model.addAttribute("adminName", auth.getName());
         return "admin/invoices";
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/invoices/add")
     public String addInvoice(@Valid @ModelAttribute("newInvoice") InvoiceDTO.Request request,
                              BindingResult result,
@@ -264,6 +279,7 @@ public class AdminController {
         if (result.hasErrors()) {
             model.addAttribute("invoices", invoiceService.getAllInvoices());
             model.addAttribute("outstandingSummary", invoiceService.getPartyOutstandingSummary());
+            model.addAttribute("deliveryModes", com.empmgmt.entity.Invoice.DeliveryMode.values());
             invoiceService.getInvoicePageStats().forEach(model::addAttribute);
             model.addAttribute("recentNotifications", notificationLogRepository.findTop30ByOrderBySentAtDesc());
             model.addAttribute("adminName", auth.getName());
@@ -278,6 +294,7 @@ public class AdminController {
         return "redirect:/admin/invoices";
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/invoices/{id}/delete")
     public String deleteInvoice(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {
@@ -289,8 +306,49 @@ public class AdminController {
         return "redirect:/admin/invoices";
     }
 
+    // ─── Party Ledger (Statement of Account) ──────────────────
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @GetMapping("/ledger")
+    public String partyLedger(@RequestParam String partyName, Model model, Authentication auth) {
+        model.addAttribute("ledger", invoiceService.getPartyLedger(partyName));
+        model.addAttribute("adminName", auth.getName());
+        return "admin/party-ledger";
+    }
+
+    /** Every party's statement of account on one page — mirrors the Excel "Party Ledger" sheet. */
+    @GetMapping("/full-ledger")
+    public String fullLedger(Model model, Authentication auth) {
+        var ledgers = invoiceService.getAllPartyLedgers();
+        model.addAttribute("ledgers", ledgers);
+        model.addAttribute("adminName", auth.getName());
+        return "admin/full-ledger";
+    }
+
+    // ─── Aging Report ──────────────────────────────────────────
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @GetMapping("/aging")
+    public String agingReport(Model model, Authentication auth) {
+        var agingList = invoiceService.getAgingReport();
+
+        Map<String, java.math.BigDecimal> bucketTotals = new java.util.LinkedHashMap<>();
+        for (String bucket : List.of("0-30", "31-60", "61-90", "90+")) {
+            bucketTotals.put(bucket, java.math.BigDecimal.ZERO);
+        }
+        for (var row : agingList) {
+            bucketTotals.merge(row.getBucket(), row.getOutstanding(), java.math.BigDecimal::add);
+        }
+
+        model.addAttribute("agingList", agingList);
+        model.addAttribute("bucketTotals", bucketTotals);
+        model.addAttribute("adminName", auth.getName());
+        return "admin/aging";
+    }
+
     // ─── Party Management ─────────────────────────────────────
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @GetMapping("/parties")
     public String listParties(Model model, Authentication auth,
                               @RequestParam(required = false) String q) {
@@ -304,6 +362,7 @@ public class AdminController {
         return "admin/parties";
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/parties/add")
     public String addParty(@Valid @ModelAttribute("newParty") PartyDTO.Request request,
                            BindingResult result,
@@ -340,6 +399,7 @@ public class AdminController {
         return "redirect:/admin/parties";
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @GetMapping("/parties/{id}/edit")
     public String editPartyForm(@PathVariable Long id, Model model, Authentication auth) {
         Party party = partyRepository.findById(id)
@@ -356,6 +416,7 @@ public class AdminController {
         return "admin/edit-party";
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/parties/{id}/edit")
     public String editParty(@PathVariable Long id,
                             @Valid @ModelAttribute("editRequest") PartyDTO.Request request,
@@ -388,6 +449,7 @@ public class AdminController {
         return "redirect:/admin/parties";
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/parties/{id}/delete")
     public String deleteParty(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         partyRepository.deleteById(id);
@@ -395,6 +457,7 @@ public class AdminController {
         return "redirect:/admin/parties";
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/parties/{id}/phone")
     public String updatePartyPhone(@PathVariable Long id,
                                    @RequestParam(required = false) String phone,
@@ -411,10 +474,11 @@ public class AdminController {
 
     // ─── Manual Notification Trigger ─────────────────────────
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/notifications/send")
     public String sendNotificationsNow(Authentication auth, RedirectAttributes redirectAttributes) {
         try {
-            var logs = notificationService.sendDailyReminders("ADMIN:" + auth.getName());
+            var logs = notificationService.sendDailyReminders(triggeredByLabel(auth));
             long sent    = logs.stream().filter(l -> l.getStatus() == com.empmgmt.entity.NotificationLog.Status.SENT).count();
             long dryRun  = logs.stream().filter(l -> l.getStatus() == com.empmgmt.entity.NotificationLog.Status.DRY_RUN).count();
             long failed  = logs.stream().filter(l -> l.getStatus() == com.empmgmt.entity.NotificationLog.Status.FAILED).count();
@@ -424,5 +488,182 @@ public class AdminController {
             redirectAttributes.addFlashAttribute("errorMsg", "Send failed: " + e.getMessage());
         }
         return "redirect:/admin/invoices";
+    }
+
+    // ─── Notification Analytics ───────────────────────────────
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @GetMapping("/notifications")
+    public String notificationAnalytics(Model model, Authentication auth) {
+        model.addAttribute("stats", notificationService.getStats());
+        model.addAttribute("recentNotifications", notificationLogRepository.findTop30ByOrderBySentAtDesc());
+        model.addAttribute("dailyReminderEnabled", notificationService.isDailyReminderEnabled());
+        model.addAttribute("adminName", auth.getName());
+        return "admin/notifications";
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @PostMapping("/notifications/toggle-schedule")
+    public String toggleSchedule(Authentication auth, RedirectAttributes redirectAttributes) {
+        boolean nowEnabled = notificationService.toggleDailyReminder(auth.getName());
+        redirectAttributes.addFlashAttribute("successMsg",
+                "Daily 5 PM reminders are now " + (nowEnabled ? "ON ✅" : "OFF ⛔"));
+        return "redirect:/admin/notifications";
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @PostMapping("/notifications/resend-failed")
+    public String resendFailed(Authentication auth, RedirectAttributes redirectAttributes) {
+        try {
+            var logs = notificationService.resendFailed(triggeredByLabel(auth));
+            if (logs.isEmpty()) {
+                redirectAttributes.addFlashAttribute("successMsg", "No recently-failed parties to resend to.");
+            } else {
+                long sent   = logs.stream().filter(l -> l.getStatus() == com.empmgmt.entity.NotificationLog.Status.SENT).count();
+                long failed = logs.stream().filter(l -> l.getStatus() == com.empmgmt.entity.NotificationLog.Status.FAILED).count();
+                redirectAttributes.addFlashAttribute("successMsg",
+                        "Resend complete — SENT: " + sent + "  FAILED: " + failed + " (of " + logs.size() + " retried)");
+            }
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", "Resend failed: " + e.getMessage());
+        }
+        return "redirect:/admin/notifications";
+    }
+
+    // ─── Employee Collections (read-only, for Accountant + Admin) ─────────
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @GetMapping("/employee-collections")
+    public String employeeCollections(Model model, Authentication auth) {
+        var summaries = paymentEntryService.getEmployeeCollectionSummaries();
+
+        java.math.BigDecimal todayTotal = summaries.stream()
+                .map(com.empmgmt.dto.EmployeeCollectionSummaryDTO::getTodayAmount)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        java.math.BigDecimal monthTotal = summaries.stream()
+                .map(com.empmgmt.dto.EmployeeCollectionSummaryDTO::getMonthAmount)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        java.math.BigDecimal allTimeTotal = summaries.stream()
+                .map(com.empmgmt.dto.EmployeeCollectionSummaryDTO::getAllTimeAmount)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        model.addAttribute("summaries", summaries);
+        model.addAttribute("todayTotal", todayTotal);
+        model.addAttribute("monthTotal", monthTotal);
+        model.addAttribute("allTimeTotal", allTimeTotal);
+        model.addAttribute("adminName", auth.getName());
+        return "admin/employee-collections";
+    }
+
+    // ─── Executive Dashboard ───────────────────────────────────
+
+    @GetMapping("/executive")
+    public String executiveDashboard(Model model, Authentication auth) {
+        model.addAttribute("summary", invoiceService.getExecutiveSummary());
+        model.addAttribute("adminName", auth.getName());
+        return "admin/executive-dashboard";
+    }
+
+    // ─── Collections Dashboard ─────────────────────────────────
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @GetMapping("/collections")
+    public String collectionsDashboard(Model model, Authentication auth) {
+        var worklist = notificationService.getCollectionsWorklist();
+
+        java.math.BigDecimal totalToCollect = worklist.stream()
+                .map(com.empmgmt.dto.CollectionItemDTO::getOutstanding)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        long highPriorityCount = worklist.stream()
+                .filter(w -> w.getBucket().equals("61-90") || w.getBucket().equals("90+"))
+                .count();
+        java.math.BigDecimal highPriorityAmount = worklist.stream()
+                .filter(w -> w.getBucket().equals("61-90") || w.getBucket().equals("90+"))
+                .map(com.empmgmt.dto.CollectionItemDTO::getOutstanding)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        long neverContactedCount = worklist.stream().filter(w -> w.getLastReminderSentAt() == null).count();
+        long contactedRecentCount = worklist.stream()
+                .filter(w -> w.getLastReminderSentAt() != null
+                        && w.getLastReminderSentAt().isAfter(java.time.LocalDateTime.now().minusDays(7)))
+                .count();
+
+        model.addAttribute("worklist", worklist);
+        model.addAttribute("totalToCollect", totalToCollect);
+        model.addAttribute("highPriorityCount", highPriorityCount);
+        model.addAttribute("highPriorityAmount", highPriorityAmount);
+        model.addAttribute("neverContactedCount", neverContactedCount);
+        model.addAttribute("contactedRecentCount", contactedRecentCount);
+        model.addAttribute("adminName", auth.getName());
+        return "admin/collections";
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @PostMapping("/collections/remind")
+    public String sendSingleReminder(@RequestParam String partyName,
+                                     @RequestParam(required = false, defaultValue = "/admin/collections") String redirectTo,
+                                     Authentication auth,
+                                     RedirectAttributes redirectAttributes) {
+        try {
+            var result = notificationService.sendSingleReminder(partyName, triggeredByLabel(auth));
+            if (result.getStatus() == com.empmgmt.entity.NotificationLog.Status.SENT) {
+                redirectAttributes.addFlashAttribute("successMsg", "✅ Reminder sent to " + partyName);
+            } else if (result.getStatus() == com.empmgmt.entity.NotificationLog.Status.DRY_RUN) {
+                redirectAttributes.addFlashAttribute("successMsg", "🧪 Dry-run logged for " + partyName + " (whatsapp.mode=LOG_ONLY)");
+            } else {
+                redirectAttributes.addFlashAttribute("errorMsg", "❌ Send failed for " + partyName + ": " + result.getErrorMessage());
+            }
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        // Only ever redirect to a known in-app page — never trust an arbitrary URL from the client.
+        boolean safe = redirectTo.equals("/admin/collections") || redirectTo.equals("/admin/payment-behavior");
+        return "redirect:" + (safe ? redirectTo : "/admin/collections");
+    }
+
+    // ─── Party Payment Behavior ────────────────────────────────
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @GetMapping("/payment-behavior")
+    public String paymentBehavior(Model model, Authentication auth) {
+        var behavior = invoiceService.getPartyPaymentBehavior();
+
+        long reliableCount = behavior.stream()
+                .filter(b -> b.getBehaviorLabel().equals("Paid Up") || b.getBehaviorLabel().equals("Regular"))
+                .count();
+        long slowCount = behavior.stream()
+                .filter(b -> b.getBehaviorLabel().equals("Slow") || b.getBehaviorLabel().equals("Very Slow")
+                        || b.getBehaviorLabel().equals("Chronic Late"))
+                .count();
+        java.util.List<Double> knownDelays = behavior.stream()
+                .map(com.empmgmt.dto.PartyPaymentBehaviorDTO::getAvgDaysToPay)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toList());
+        double companyAvgDays = knownDelays.isEmpty() ? 0.0
+                : knownDelays.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+
+        java.util.List<String> behaviorOrder = java.util.List.of(
+                "Paid Up", "Regular", "New", "Slow", "Very Slow", "Chronic Late");
+        java.util.Map<String, Long> countsByLabel = behavior.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        com.empmgmt.dto.PartyPaymentBehaviorDTO::getBehaviorLabel, java.util.stream.Collectors.counting()));
+        java.util.List<Long> behaviorCounts = behaviorOrder.stream()
+                .map(label -> countsByLabel.getOrDefault(label, 0L))
+                .collect(java.util.stream.Collectors.toList());
+
+        model.addAttribute("behavior", behavior);
+        model.addAttribute("reliableCount", reliableCount);
+        model.addAttribute("slowCount", slowCount);
+        model.addAttribute("companyAvgDays", companyAvgDays);
+        model.addAttribute("behaviorLabels", behaviorOrder);
+        model.addAttribute("behaviorCounts", behaviorCounts);
+        model.addAttribute("adminName", auth.getName());
+        return "admin/payment-behavior";
+    }
+
+    /** "ADMIN:<username>" or "ACCOUNTANT:<username>" — used as the NotificationLog.triggeredBy label. */
+    private String triggeredByLabel(Authentication auth) {
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        return (isAdmin ? "ADMIN:" : "ACCOUNTANT:") + auth.getName();
     }
 }

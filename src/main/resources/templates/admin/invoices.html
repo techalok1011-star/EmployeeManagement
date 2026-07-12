@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -56,6 +56,10 @@
         .amount-credit{font-weight:600;color:var(--accent)}
         .text-muted{color:var(--muted);font-size:12px}
         .inv-no{font-family:'Syne',sans-serif;font-size:12.5px;font-weight:700;color:var(--accent2)}
+        .delivery-badge{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block}
+        .delivery-truck{background:rgba(108,142,255,0.15);color:var(--accent)}
+        .delivery-trolley{background:rgba(245,200,66,0.15);color:var(--gold)}
+        .delivery-pickup{background:rgba(52,211,153,0.15);color:var(--green)}
         .party-name{font-weight:500}
         .gstin{font-size:11px;color:var(--muted);font-family:monospace}
         .badge-credit{background:rgba(108,142,255,0.15);color:var(--accent);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
@@ -96,6 +100,17 @@
         .search-input{width:100%;padding:10px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color 0.2s;margin-bottom:14px}
         .search-input:focus{border-color:var(--accent)}
         .search-input::placeholder{color:var(--muted2)}
+        .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px}
+        .filter-group{display:flex;flex-direction:column;gap:4px}
+        .filter-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);font-weight:600}
+        .filter-input{padding:8px 12px;background:var(--card);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s}
+        .filter-input:focus{border-color:var(--accent)}
+        .btn-filter{padding:8px 16px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;display:inline-flex;align-items:center;gap:5px;text-decoration:none}
+        .btn-filter-apply{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}
+        .btn-filter-apply:hover{opacity:0.88}
+        .btn-filter-clear{background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid var(--border)}
+        .btn-filter-clear:hover{background:rgba(255,255,255,0.09);color:var(--text)}
+        .filter-active-badge{padding:3px 9px;border-radius:20px;font-size:11px;background:rgba(108,142,255,0.15);color:var(--accent);font-weight:500}
     </style>
 </head>
 <body>
@@ -107,16 +122,24 @@
     <div class="sidebar-user">
         <div class="sidebar-user-label">Signed in as</div>
         <div class="sidebar-user-name" th:text="${adminName}">Admin</div>
-        <span class="sidebar-user-role">👑 Admin</span>
+        <span class="sidebar-user-role" sec:authorize="hasRole('ADMIN')">👑 Admin</span>
+        <span class="sidebar-user-role" sec:authorize="hasRole('ACCOUNTANT')" style="background:rgba(108,142,255,0.15);color:var(--accent)">🧮 Accountant</span>
     </div>
     <nav class="sidebar-nav">
         <span class="nav-section-label">Administration</span>
-        <a href="/admin/dashboard" class="nav-link"><span>📊</span> Dashboard</a>
-        <a href="/admin/employees" class="nav-link"><span>👥</span> Employees</a>
-        <a href="/admin/entries" class="nav-link"><span>📋</span> All Entries</a>
+        <a href="/admin/dashboard" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>📊</span> Dashboard</a>
+        <a href="/admin/executive" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>💼</span> Executive</a>
+        <a href="/admin/employees" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>👥</span> Employees</a>
+        <a href="/admin/entries" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>📋</span> All Entries</a>
         <a href="/admin/parties" class="nav-link"><span>🏢</span> Parties</a>
+        <a href="/admin/employee-collections" class="nav-link"><span>💰</span> Employee Collections</a>
         <a href="/admin/invoices" class="nav-link active"><span>🧾</span> Invoices</a>
-        <a href="/admin/history" class="nav-link"><span>📜</span> Audit Log</a>
+        <a href="/admin/full-ledger" class="nav-link"><span>📚</span> Full Ledger</a>
+        <a href="/admin/aging" class="nav-link"><span>⏳</span> Aging Report</a>
+        <a href="/admin/payment-behavior" class="nav-link"><span>🏅</span> Payment Behavior</a>
+        <a href="/admin/collections" class="nav-link"><span>🎯</span> Collections</a>
+        <a href="/admin/notifications" class="nav-link"><span>📲</span> Notifications</a>
+        <a href="/admin/history" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>📜</span> Audit Log</a>
     </nav>
     <div class="sidebar-footer">
         <form th:action="@{/logout}" method="post">
@@ -176,6 +199,25 @@
                         <span class="section-title">Invoice List</span>
                     </div>
 
+                    <!-- Date Range Filter -->
+                    <form method="get" action="/admin/invoices" class="filter-bar">
+                        <div class="filter-group">
+                            <label class="filter-label">From Date</label>
+                            <input type="date" name="from" class="filter-input" th:value="${from}"/>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">To Date</label>
+                            <input type="date" name="to" class="filter-input" th:value="${to}"/>
+                        </div>
+                        <div class="filter-group" style="flex-direction:row;gap:8px;align-items:flex-end">
+                            <button type="submit" class="btn-filter btn-filter-apply">🔍 Filter</button>
+                            <a href="/admin/invoices" class="btn-filter btn-filter-clear">✕ Clear</a>
+                        </div>
+                        <div th:if="${from != null or to != null}" style="align-self:flex-end">
+                            <span class="filter-active-badge">● Filtered</span>
+                        </div>
+                    </form>
+
                     <div th:if="${#lists.isEmpty(invoices)}" class="empty-state">
                         <div class="empty-icon">🧾</div>
                         <div style="font-size:15px;font-weight:600;margin-bottom:6px">No invoices yet</div>
@@ -191,10 +233,12 @@
                                     <tr>
                                         <th>#</th>
                                         <th>Invoice No.</th>
+                                        <th>Sales Vch No.</th>
                                         <th>Date</th>
                                         <th>Party Name / GSTIN</th>
                                         <th>Amount (INR)</th>
                                         <th>Description</th>
+                                        <th>Delivery</th>
                                         <th></th>
                                     </tr>
                                 </thead>
@@ -202,6 +246,7 @@
                                     <tr th:each="inv, iStat : ${invoices}">
                                         <td class="text-muted" th:text="${iStat.count}"></td>
                                         <td><span class="inv-no" th:text="${inv.invoiceNumber}"></span></td>
+                                        <td class="text-muted" th:text="${inv.salesVchNo != null ? inv.salesVchNo : '—'}"></td>
                                         <td class="text-muted"
                                             th:text="${#temporals.format(inv.invoiceDate,'dd MMM yyyy')}"></td>
                                         <td>
@@ -211,6 +256,14 @@
                                         </td>
                                         <td class="amount">₹<span th:text="${#numbers.formatDecimal(inv.amount,1,'COMMA',2,'POINT')}"></span></td>
                                         <td class="text-muted" th:text="${inv.description != null ? inv.description : '—'}"></td>
+                                        <td>
+                                            <span class="delivery-badge"
+                                                  th:classappend="${inv.deliveryMode == 'Truck' ? 'delivery-truck' : (inv.deliveryMode == 'Trolley' ? 'delivery-trolley' : 'delivery-pickup')}"
+                                                  th:text="${inv.deliveryMode}"></span>
+                                            <div class="text-muted" style="margin-top:3px;font-family:monospace"
+                                                 th:if="${!#strings.isEmpty(inv.transportNumber)}"
+                                                 th:text="${inv.transportNumber}"></div>
+                                        </td>
                                         <td>
                                             <form th:action="@{/admin/invoices/{id}/delete(id=${inv.id})}"
                                                   method="post"
@@ -243,6 +296,7 @@
                             <thead>
                                 <tr>
                                     <th>Party / GSTIN</th>
+                                    <th>Trailing No.</th>
                                     <th>Total Invoiced</th>
                                     <th>Total Paid</th>
                                     <th>Outstanding</th>
@@ -254,9 +308,12 @@
                             <tbody>
                                 <tr th:each="row : ${outstandingSummary}">
                                     <td>
-                                        <div class="party-name" th:text="${row.displayName}"></div>
+                                        <a class="party-name" style="color:var(--text);text-decoration:none;border-bottom:1px dashed var(--muted2)"
+                                           th:href="@{/admin/ledger(partyName=${row.partyName})}"
+                                           th:text="${row.displayName}" title="View ledger"></a>
                                         <span class="gstin" th:if="${!#strings.isEmpty(row.gstin)}" th:text="${row.gstin}"></span>
                                     </td>
+                                    <td class="text-muted" th:text="${!#strings.isEmpty(row.trailingNumber) ? row.trailingNumber : '—'}"></td>
                                     <td class="amount">₹<span th:text="${#numbers.formatDecimal(row.totalInvoiced,1,'COMMA',2,'POINT')}"></span></td>
                                     <td class="amount">₹<span th:text="${#numbers.formatDecimal(row.totalPaid,1,'COMMA',2,'POINT')}"></span></td>
                                     <td>
@@ -351,6 +408,19 @@
                                   style="resize:vertical"></textarea>
                         <div class="form-error" th:if="${#fields.hasErrors('description')}"
                              th:errors="*{description}"></div>
+
+                        <label class="form-label">How Did The Cement Go?</label>
+                        <select class="form-control" th:field="*{deliveryMode}">
+                            <option th:each="mode : ${deliveryModes}" th:value="${mode}" th:text="${mode.displayName}"></option>
+                        </select>
+                        <div class="form-error" th:if="${#fields.hasErrors('deliveryMode')}"
+                             th:errors="*{deliveryMode}"></div>
+
+                        <label class="form-label">Truck / Trolley / Vehicle No. <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted2)">(optional)</span></label>
+                        <input type="text" class="form-control" th:field="*{transportNumber}"
+                               placeholder="e.g. MH12AB1234"/>
+                        <div class="form-error" th:if="${#fields.hasErrors('transportNumber')}"
+                             th:errors="*{transportNumber}"></div>
 
                         <button type="submit" class="btn btn-primary">➕ Add Invoice</button>
                     </form>

@@ -34,6 +34,10 @@ public class PaymentEntry {
     @Column(length = 500)
     private String remarks;
 
+    /** Voucher number from the source Receipt Register (e.g. Tally), if this payment was imported. */
+    @Column(name = "receipt_vch_no", length = 20)
+    private String receiptVchNo;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", nullable = false)
     private User employee;

@@ -69,23 +69,39 @@ public class WhatsAppService {
         // ── Build Meta Cloud API request ──
         String url = props.getApiUrl() + "/" + props.getPhoneNumberId() + "/messages";
 
+//        Map<String, Object> body = Map.of(
+//            "messaging_product", "whatsapp",
+//            "to", phone,
+//            "type", "template",
+//            "template", Map.of(
+//                "name", props.getTemplateName(),
+//                "language", Map.of("code", props.getTemplateLanguage()),
+//                "components", List.of(Map.of(
+//                    "type", "body",
+//                    "parameters", List.of(
+//                        Map.of("type", "text", "text", partyDisplay),
+//                        Map.of("type", "text", "text", amountStr),
+//                        Map.of("type", "text", "text", dateStr)
+//                    )
+//                ))
+//            )
+//        );
+
         Map<String, Object> body = Map.of(
-            "messaging_product", "whatsapp",
-            "to", phone,
-            "type", "template",
-            "template", Map.of(
-                "name", props.getTemplateName(),
-                "language", Map.of("code", props.getTemplateLanguage()),
-                "components", List.of(Map.of(
-                    "type", "body",
-                    "parameters", List.of(
-                        Map.of("type", "text", "text", partyDisplay),
-                        Map.of("type", "text", "text", amountStr),
-                        Map.of("type", "text", "text", dateStr)
-                    )
-                ))
-            )
+                "messaging_product", "whatsapp",
+                "to", phone,
+                "type", "template",
+                "template", Map.of(
+                        "name", props.getTemplateName(),
+                        "language", Map.of(
+                                "code", props.getTemplateLanguage()
+                        )
+                )
         );
+
+        log.info("Access Token Present: {}", props.getAccessToken() != null);
+        log.info("Access Token Length: {}",
+                props.getAccessToken() == null ? 0 : props.getAccessToken().length());
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

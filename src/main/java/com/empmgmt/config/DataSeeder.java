@@ -6,6 +6,7 @@ import com.empmgmt.repository.PaymentEntryRepository;
 import com.empmgmt.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -22,16 +23,25 @@ public class DataSeeder implements CommandLineRunner {
     private final PaymentEntryRepository paymentEntryRepository;
     private final PasswordEncoder passwordEncoder;
 
+    /** Override via application-local.properties (gitignored) — never commit real values here. */
+    @Value("${seed.admin-password:changeme-admin}")
+    private String adminPassword;
+
+    @Value("${seed.employee-password:changeme-employee}")
+    private String employeePassword;
+
     @Override
     public void run(String... args) {
         if (userRepository.count() > 0) {
             log.info("=== DATA ALREADY EXISTS, SKIPPING SEED ===");
             return;
         }
+        log.warn("=== SEEDING INITIAL USERS — change these passwords immediately after first login ===");
+
         // Create Admin
         User admin = User.builder()
                 .username("admin")
-                .password(passwordEncoder.encode("admin123"))
+                .password(passwordEncoder.encode(adminPassword))
                 .fullName("System Administrator")
                 .email("admin@company.com")
                 .role(User.Role.ADMIN)
@@ -42,7 +52,7 @@ public class DataSeeder implements CommandLineRunner {
         // Create Employees
         User emp1 = User.builder()
                 .username("rahul.sharma")
-                .password(passwordEncoder.encode("emp123"))
+                .password(passwordEncoder.encode(employeePassword))
                 .fullName("Rahul Sharma")
                 .email("rahul@company.com")
                 .role(User.Role.EMPLOYEE)
@@ -52,7 +62,7 @@ public class DataSeeder implements CommandLineRunner {
 
         User emp2 = User.builder()
                 .username("priya.patel")
-                .password(passwordEncoder.encode("emp123"))
+                .password(passwordEncoder.encode(employeePassword))
                 .fullName("Priya Patel")
                 .email("priya@company.com")
                 .role(User.Role.EMPLOYEE)
@@ -62,7 +72,7 @@ public class DataSeeder implements CommandLineRunner {
 
         User emp3 = User.builder()
                 .username("amit.kumar")
-                .password(passwordEncoder.encode("emp123"))
+                .password(passwordEncoder.encode(employeePassword))
                 .fullName("Amit Kumar")
                 .email("amit@company.com")
                 .role(User.Role.EMPLOYEE)
@@ -100,9 +110,7 @@ public class DataSeeder implements CommandLineRunner {
                 .entryDate(today).employee(emp3).build());
 
         log.info("=== DATA SEEDED SUCCESSFULLY ===");
-        log.info("Admin  - username: admin     | password: admin123");
-        log.info("Emp 1  - username: rahul.sharma | password: emp123");
-        log.info("Emp 2  - username: priya.patel  | password: emp123");
-        log.info("Emp 3  - username: amit.kumar   | password: emp123");
+        log.info("Usernames created: admin, rahul.sharma, priya.patel, amit.kumar");
+        log.info("Passwords were set from seed.admin-password / seed.employee-password (see application-local.properties)");
     }
 }

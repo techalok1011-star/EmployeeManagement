@@ -14,6 +14,7 @@ public class PartyOutstandingDTO {
     private String partyName;   // combined key (name + '_' + gstin, or just name)
     private String displayName; // human-readable portion before the first '_'
     private String gstin;       // may be null / empty
+    private String trailingNumber; // trailing ledger code from source accounting system, may be null
 
     private BigDecimal totalInvoiced;  // sum of all invoice amounts for this party
     private BigDecimal totalPaid;      // sum of all payment-entry amounts for this party

@@ -21,6 +21,8 @@ public interface PaymentEntryRepository extends JpaRepository<PaymentEntry, Long
 
     List<PaymentEntry> findAllByOrderByCreatedAtDesc();
 
+    List<PaymentEntry> findByPartyNameOrderByEntryDateDescCreatedAtDesc(String partyName);
+
     List<PaymentEntry> findByEntryDateOrderByCreatedAtDesc(LocalDate date);
 
     @Query("SELECT SUM(p.amount) FROM PaymentEntry p WHERE p.employee = :employee AND p.entryDate = :date")
@@ -50,4 +52,12 @@ public interface PaymentEntryRepository extends JpaRepository<PaymentEntry, Long
 
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM PaymentEntry p")
     BigDecimal sumAllAmounts();
+
+    /** Returns [employeeId, sumAmount, count] triples, all-time, one row per employee with entries. */
+    @Query("SELECT p.employee.id, SUM(p.amount), COUNT(p) FROM PaymentEntry p GROUP BY p.employee.id")
+    List<Object[]> sumAndCountGroupedByEmployee();
+
+    /** Returns [employeeId, sumAmount, count] triples for entries within the given date range. */
+    @Query("SELECT p.employee.id, SUM(p.amount), COUNT(p) FROM PaymentEntry p WHERE p.entryDate BETWEEN :start AND :end GROUP BY p.employee.id")
+    List<Object[]> sumAndCountGroupedByEmployeeInRange(@Param("start") LocalDate start, @Param("end") LocalDate end);
 }

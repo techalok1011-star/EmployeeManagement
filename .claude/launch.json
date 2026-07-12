@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "spring-boot",
+      "runtimeExecutable": "mvn",
+      "runtimeArgs": ["spring-boot:run", "-Dspring-boot.run.arguments=--server.port=8090"],
+      "port": 8090
+    }
+  ]
+}

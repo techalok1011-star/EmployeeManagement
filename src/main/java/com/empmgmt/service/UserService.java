@@ -33,13 +33,17 @@ public class UserService {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
+        User.Role role = request.getRole() != null ? request.getRole() : User.Role.EMPLOYEE;
+        if (role == User.Role.ADMIN) {
+            throw new RuntimeException("Admin accounts cannot be created through this form.");
+        }
 
         User user = User.builder()
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
                 .email(request.getEmail())
-                .role(request.getRole() != null ? request.getRole() : User.Role.EMPLOYEE)
+                .role(role)
                 .active(true)
                 .build();
 
@@ -50,6 +54,12 @@ public class UserService {
     @Transactional(readOnly = true)
     public List<UserDTO.Response> getAllEmployees() {
         return userRepository.findByRole(User.Role.EMPLOYEE)
+                .stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserDTO.Response> getAllAccountants() {
+        return userRepository.findByRole(User.Role.ACCOUNTANT)
                 .stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 

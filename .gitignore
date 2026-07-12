@@ -19,3 +19,6 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Local secrets (never commit — real WhatsApp token, etc.)
+application-local.properties

@@ -136,6 +136,12 @@ public class ExcelPartyService {
                         String gst  = gstColIdx >= 0 ? fmt.formatCellValue(row.getCell(gstColIdx)).trim() : "";
 
                         if (name.isEmpty() || name.matches("^\\d+$") || name.equalsIgnoreCase("Party Name")) continue;
+                        // Guards against column-detection picking up the wrong sheet column (e.g. an
+                        // "Invoice No." column like "GST0009") and importing it as a party name.
+                        if (name.matches("(?i)^[A-Z]{2,6}\\d{2,8}$")) {
+                            log.warn("  Skipping suspicious 'party name' that looks like a document/invoice number: {}", name);
+                            continue;
+                        }
 
                         String combined = gst.isEmpty() ? name : name + "_" + gst;
                         combinedToGst.put(combined, gst);

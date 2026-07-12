@@ -15,5 +15,7 @@ public interface PartyRepository extends JpaRepository<Party, Long> {
     List<Party> findTop50ByCombinedContainingIgnoreCase(String combined);
     List<Party> findByCombinedIn(Collection<String> combined);
     List<Party> findByWhatsappOptInTrueAndPhoneNotNull();
+    long countByPhoneIsNotNull();
+    long countByWhatsappOptInTrueAndPhoneIsNotNull();
 }
 

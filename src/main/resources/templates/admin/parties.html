@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -90,16 +90,24 @@
     <div class="sidebar-user">
         <div class="sidebar-user-label">Signed in as</div>
         <div class="sidebar-user-name" th:text="${adminName}">Admin</div>
-        <span class="sidebar-user-role">👑 Admin</span>
+        <span class="sidebar-user-role" sec:authorize="hasRole('ADMIN')">👑 Admin</span>
+        <span class="sidebar-user-role" sec:authorize="hasRole('ACCOUNTANT')" style="background:rgba(108,142,255,0.15);color:var(--accent)">🧮 Accountant</span>
     </div>
     <nav class="sidebar-nav">
         <span class="nav-section-label">Administration</span>
-        <a href="/admin/dashboard" class="nav-link"><span>📊</span> Dashboard</a>
-        <a href="/admin/employees" class="nav-link"><span>👥</span> Employees</a>
-        <a href="/admin/entries" class="nav-link"><span>📋</span> All Entries</a>
+        <a href="/admin/dashboard" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>📊</span> Dashboard</a>
+        <a href="/admin/executive" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>💼</span> Executive</a>
+        <a href="/admin/employees" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>👥</span> Employees</a>
+        <a href="/admin/entries" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>📋</span> All Entries</a>
         <a href="/admin/parties" class="nav-link active"><span>🏢</span> Parties</a>
+        <a href="/admin/employee-collections" class="nav-link"><span>💰</span> Employee Collections</a>
         <a href="/admin/invoices" class="nav-link"><span>🧾</span> Invoices</a>
-        <a href="/admin/history" class="nav-link"><span>📜</span> Audit Log</a>
+        <a href="/admin/full-ledger" class="nav-link"><span>📚</span> Full Ledger</a>
+        <a href="/admin/aging" class="nav-link"><span>⏳</span> Aging Report</a>
+        <a href="/admin/payment-behavior" class="nav-link"><span>🏅</span> Payment Behavior</a>
+        <a href="/admin/collections" class="nav-link"><span>🎯</span> Collections</a>
+        <a href="/admin/notifications" class="nav-link"><span>📲</span> Notifications</a>
+        <a href="/admin/history" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>📜</span> Audit Log</a>
     </nav>
     <div class="sidebar-footer">
         <form th:action="@{/logout}" method="post">
@@ -149,6 +157,7 @@
                                 <tr>
                                     <th>#</th>
                                     <th>Party Name</th>
+                                    <th>Trailing No.</th>
                                     <th>GSTIN</th>
                                     <th>Phone</th>
                                     <th>WhatsApp</th>
@@ -161,6 +170,11 @@
                                     <td class="text-muted" th:text="${iStat.count}"></td>
                                     <td>
                                         <div class="party-name" th:text="${p.name}"></div>
+                                    </td>
+                                    <td>
+                                        <span class="gstin" th:if="${p.trailingNumber != null and !p.trailingNumber.isEmpty()}"
+                                              th:text="${p.trailingNumber}"></span>
+                                        <span class="text-muted" th:if="${p.trailingNumber == null or p.trailingNumber.isEmpty()}">—</span>
                                     </td>
                                     <td>
                                         <span class="gstin" th:if="${p.gst != null and !p.gst.isEmpty()}"

@@ -44,6 +44,7 @@ public class PaymentEntryDTO {
         private String modeOfPayment;
         private LocalDate entryDate;
         private String remarks;
+        private String receiptVchNo;
         private String employeeName;
         private String employeeUsername;
         private String createdAt;

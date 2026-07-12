@@ -1,5 +1,6 @@
 package com.empmgmt.service;
 
+import com.empmgmt.dto.EmployeeCollectionSummaryDTO;
 import com.empmgmt.dto.PaymentEntryDTO;
 import com.empmgmt.dto.TransactionLogDTO;
 import com.empmgmt.entity.PaymentEntry;
@@ -269,6 +270,45 @@ public class PaymentEntryService {
         return stats;
     }
 
+    /**
+     * How much each employee has brought in — today, month-to-date, and all-time.
+     * Read-only summary; does not expose individual entries (that stays admin-only
+     * via {@link #getAllEntries()} / {@link #getEntriesForEmployeeById(Long)}).
+     */
+    @Transactional(readOnly = true)
+    public List<EmployeeCollectionSummaryDTO> getEmployeeCollectionSummaries() {
+        LocalDate today = LocalDate.now();
+        LocalDate monthStart = today.withDayOfMonth(1);
+
+        Map<Long, Object[]> allTimeByEmployee = paymentEntryRepository.sumAndCountGroupedByEmployee().stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> row));
+        Map<Long, Object[]> monthByEmployee = paymentEntryRepository
+                .sumAndCountGroupedByEmployeeInRange(monthStart, today).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> row));
+
+        return userRepository.findByRole(User.Role.EMPLOYEE).stream()
+                .map(emp -> {
+                    Object[] allTime = allTimeByEmployee.get(emp.getId());
+                    Object[] month = monthByEmployee.get(emp.getId());
+                    BigDecimal todayAmount = paymentEntryRepository.sumAmountByEmployeeAndDate(emp, today);
+                    long todayCount = paymentEntryRepository.countByEmployeeAndDate(emp, today);
+
+                    return EmployeeCollectionSummaryDTO.builder()
+                            .employeeId(emp.getId())
+                            .fullName(emp.getFullName())
+                            .username(emp.getUsername())
+                            .todayAmount(todayAmount != null ? todayAmount : BigDecimal.ZERO)
+                            .todayCount(todayCount)
+                            .monthAmount(month != null ? (BigDecimal) month[1] : BigDecimal.ZERO)
+                            .monthCount(month != null ? (Long) month[2] : 0L)
+                            .allTimeAmount(allTime != null ? (BigDecimal) allTime[1] : BigDecimal.ZERO)
+                            .allTimeCount(allTime != null ? (Long) allTime[2] : 0L)
+                            .build();
+                })
+                .sorted(Comparator.comparing(EmployeeCollectionSummaryDTO::getAllTimeAmount).reversed())
+                .collect(Collectors.toList());
+    }
+
     // ─────────────────────────────────────────────────────────
     // UPDATE
     // ─────────────────────────────────────────────────────────
@@ -423,6 +463,7 @@ public class PaymentEntryService {
                 .modeOfPayment(entry.getModeOfPayment().getDisplayName())
                 .entryDate(entry.getEntryDate())
                 .remarks(entry.getRemarks())
+                .receiptVchNo(entry.getReceiptVchNo())
                 .employeeName(entry.getEmployee().getFullName())
                 .employeeUsername(entry.getEmployee().getUsername())
                 .createdAt(entry.getCreatedAt() != null
