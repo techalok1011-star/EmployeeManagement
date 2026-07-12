@@ -31,6 +31,9 @@ public class PaymentEntryDTO {
 
         @Size(max = 500, message = "Remarks must not exceed 500 characters")
         private String remarks;
+
+        @Size(max = 20, message = "Receipt Vch No. must not exceed 20 characters")
+        private String receiptVchNo;
     }
 
     @Data

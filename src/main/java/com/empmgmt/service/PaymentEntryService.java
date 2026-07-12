@@ -63,6 +63,8 @@ public class PaymentEntryService {
                 .modeOfPayment(request.getModeOfPayment())
                 .entryDate(request.getEntryDate())
                 .remarks(request.getRemarks())
+                .receiptVchNo(request.getReceiptVchNo() != null && !request.getReceiptVchNo().isBlank()
+                        ? request.getReceiptVchNo().trim() : null)
                 .employee(employee)
                 .build();
 
@@ -328,6 +330,8 @@ public class PaymentEntryService {
         entry.setModeOfPayment(request.getModeOfPayment());
         entry.setEntryDate(request.getEntryDate());
         entry.setRemarks(request.getRemarks());
+        entry.setReceiptVchNo(request.getReceiptVchNo() != null && !request.getReceiptVchNo().isBlank()
+                ? request.getReceiptVchNo().trim() : null);
         entry.setEdited(true);
         entry.setEditedBy("ADMIN");
         entry.setEditedAt(java.time.LocalDateTime.now());
@@ -362,6 +366,8 @@ public class PaymentEntryService {
         entry.setModeOfPayment(request.getModeOfPayment());
         entry.setEntryDate(request.getEntryDate());
         entry.setRemarks(request.getRemarks());
+        entry.setReceiptVchNo(request.getReceiptVchNo() != null && !request.getReceiptVchNo().isBlank()
+                ? request.getReceiptVchNo().trim() : null);
         entry.setEdited(true);
         entry.setEditedBy("EMPLOYEE");
         entry.setEditedAt(java.time.LocalDateTime.now());

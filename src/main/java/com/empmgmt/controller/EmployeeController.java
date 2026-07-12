@@ -107,6 +107,7 @@ public class EmployeeController {
             req.setAmount(entry.getAmount());
             req.setRemarks(entry.getRemarks());
             req.setEntryDate(entry.getEntryDate());
+            req.setReceiptVchNo(entry.getReceiptVchNo());
             model.addAttribute("entry", entry);
             model.addAttribute("editRequest", req);
             model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());

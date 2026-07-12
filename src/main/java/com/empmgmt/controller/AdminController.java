@@ -149,6 +149,7 @@ public class AdminController {
         req.setAmount(entry.getAmount());
         req.setRemarks(entry.getRemarks());
         req.setEntryDate(entry.getEntryDate());
+        req.setReceiptVchNo(entry.getReceiptVchNo());
         model.addAttribute("editRequest", req);
         return "admin/edit-entry";
     }
@@ -317,6 +318,7 @@ public class AdminController {
     }
 
     /** Every party's statement of account on one page — mirrors the Excel "Party Ledger" sheet. */
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @GetMapping("/full-ledger")
     public String fullLedger(Model model, Authentication auth) {
         var ledgers = invoiceService.getAllPartyLedgers();
@@ -388,6 +390,8 @@ public class AdminController {
                     .name(request.getName().trim())
                     .gst(gstin)
                     .combined(combined)
+                    .trailingNumber(request.getTrailingNumber() != null && !request.getTrailingNumber().isBlank()
+                            ? request.getTrailingNumber().trim() : null)
                     .phone(request.getPhone() != null && !request.getPhone().isBlank()
                             ? request.getPhone().trim() : null)
                     .whatsappOptIn(request.isWhatsappOptIn())
@@ -407,6 +411,7 @@ public class AdminController {
         PartyDTO.Request req = PartyDTO.Request.builder()
                 .name(party.getName())
                 .gstin(party.getGst())
+                .trailingNumber(party.getTrailingNumber())
                 .phone(party.getPhone())
                 .whatsappOptIn(party.isWhatsappOptIn())
                 .build();
@@ -440,6 +445,8 @@ public class AdminController {
             party.setName(request.getName().trim());
             party.setGst(gstin);
             party.setCombined(combined);
+            party.setTrailingNumber(request.getTrailingNumber() != null && !request.getTrailingNumber().isBlank()
+                    ? request.getTrailingNumber().trim() : null);
             party.setPhone(request.getPhone() != null && !request.getPhone().isBlank()
                     ? request.getPhone().trim() : null);
             party.setWhatsappOptIn(request.isWhatsappOptIn());

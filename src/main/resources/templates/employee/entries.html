@@ -212,6 +212,7 @@
                     <thead>
                         <tr>
                             <th>Party Name</th>
+                            <th>Receipt Vch No.</th>
                             <th>Amount</th>
                             <th>Mode</th>
                             <th>Remarks</th>
@@ -227,6 +228,7 @@
                                 <span th:if="${entry.editedBy == 'EMPLOYEE'}" class="badge badge-edited-emp">✏ Edited</span>
                                 <span th:if="${entry.editedBy == 'ADMIN'}" class="badge badge-edited-admin">👑 Admin Edited</span>
                             </td>
+                            <td class="text-muted" th:text="${entry.receiptVchNo != null ? entry.receiptVchNo : '—'}"></td>
                             <td class="amount">₹<span th:text="${#numbers.formatDecimal(entry.amount,1,'COMMA',2,'POINT')}"></span></td>
                             <td>
                                 <span class="badge"

@@ -21,6 +21,9 @@ public class PartyDTO {
         @Size(max = 128, message = "GSTIN must not exceed 128 characters")
         private String gstin;   // optional
 
+        @Size(max = 20, message = "Trailing number must not exceed 20 characters")
+        private String trailingNumber;  // ledger code from source accounting system, optional
+
         @Size(max = 20, message = "Phone must not exceed 20 characters")
         private String phone;   // E.164, optional
 

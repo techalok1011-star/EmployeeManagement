@@ -143,6 +143,7 @@
                             <th>Today</th>
                             <th>This Month</th>
                             <th>All Time</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -163,6 +164,10 @@
                             <td>
                                 <div class="amount">₹<span th:text="${#numbers.formatDecimal(s.allTimeAmount,1,'COMMA',2,'POINT')}"></span></div>
                                 <div class="text-muted" th:text="${s.allTimeCount} + ' entries'"></div>
+                            </td>
+                            <td>
+                                <a th:href="@{/admin/entries(employeeId=${s.employeeId})}"
+                                   style="color:var(--accent);text-decoration:none;font-size:12.5px;white-space:nowrap">View Entries →</a>
                             </td>
                         </tr>
                     </tbody>

@@ -184,6 +184,10 @@
                     </div>
                 </div>
 
+                <label class="form-label">Receipt Vch No. <span style="font-size:10px;font-weight:400;text-transform:none;color:var(--muted)">(optional)</span></label>
+                <input type="text" class="form-control" th:field="*{receiptVchNo}" placeholder="e.g. from the paper receipt"/>
+                <div class="form-error" th:if="${#fields.hasErrors('receiptVchNo')}" th:errors="*{receiptVchNo}"></div>
+
                 <label class="form-label">Remarks <span style="color:var(--red)">*</span> <span style="font-size:10px;font-weight:400;text-transform:none;color:var(--muted)">(Required when editing)</span></label>
                 <input type="text" class="form-control" th:field="*{remarks}"
                        placeholder="Reason for edit (e.g. Corrected amount, mode changed...)" required/>

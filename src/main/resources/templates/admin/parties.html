@@ -237,6 +237,12 @@
                         <div class="form-error" th:if="${#fields.hasErrors('gstin')}"
                              th:errors="*{gstin}"></div>
 
+                        <label class="form-label">Trailing Number <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted2)">(ledger code from Tally/other source, optional)</span></label>
+                        <input type="text" class="form-control" th:field="*{trailingNumber}"
+                               placeholder="e.g. 78"/>
+                        <div class="form-error" th:if="${#fields.hasErrors('trailingNumber')}"
+                             th:errors="*{trailingNumber}"></div>
+
                         <label class="form-label">WhatsApp Phone <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted2)">(E.164, optional)</span></label>
                         <input type="tel" class="form-control" th:field="*{phone}"
                                placeholder="e.g. 919876543210"/>

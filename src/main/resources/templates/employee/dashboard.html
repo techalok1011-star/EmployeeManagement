@@ -189,6 +189,10 @@
                         </div>
                     </div>
 
+                    <label class="form-label">Receipt Vch No. <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
+                    <input type="text" class="form-control" th:field="*{receiptVchNo}" placeholder="e.g. from the paper receipt"/>
+                    <div class="form-error" th:if="${#fields.hasErrors('receiptVchNo')}" th:errors="*{receiptVchNo}"></div>
+
                     <label class="form-label">Remarks (Optional)</label>
                     <input type="text" class="form-control" th:field="*{remarks}" placeholder="Any additional notes..."/>
 
@@ -214,6 +218,7 @@
                         <thead>
                             <tr>
                                 <th>Party</th>
+                                <th>Receipt Vch No.</th>
                                 <th>Amount</th>
                                 <th>Mode</th>
                                 <th>Time</th>
@@ -226,6 +231,7 @@
                                     <span th:if="${entry.editedBy == 'EMPLOYEE'}" style="background:rgba(251,146,60,0.18);color:#fb923c;padding:1px 6px;border-radius:5px;font-size:10px">✏ Edited</span>
                                     <span th:if="${entry.editedBy == 'ADMIN'}" style="background:rgba(167,139,250,0.2);color:#a78bfa;padding:1px 6px;border-radius:5px;font-size:10px">👑 Admin Edited</span>
                                 </td>
+                                <td class="text-muted" th:text="${entry.receiptVchNo != null ? entry.receiptVchNo : '—'}"></td>
                                 <td class="amount">₹<span th:text="${#numbers.formatDecimal(entry.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
                                 <td>
                                     <span class="badge"
