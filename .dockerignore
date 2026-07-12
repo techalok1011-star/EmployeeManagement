@@ -1,0 +1,7 @@
+target/
+.git/
+.idea/
+*.iml
+.claude/
+src/main/resources/application-local.properties
+*.log
