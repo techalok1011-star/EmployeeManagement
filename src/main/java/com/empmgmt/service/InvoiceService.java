@@ -14,8 +14,12 @@ import com.empmgmt.repository.PartyRepository;
 import com.empmgmt.repository.PaymentEntryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import static com.empmgmt.config.CacheConfig.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -42,6 +46,7 @@ public class InvoiceService {
     // CREATE
     // ─────────────────────────────────────────────────────────
 
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
     public InvoiceDTO.Response createInvoice(InvoiceDTO.Request request) {
         if (invoiceRepository.existsByInvoiceNumber(request.getInvoiceNumber().trim())) {
             throw new IllegalArgumentException(
@@ -91,6 +96,7 @@ public class InvoiceService {
     // DELETE
     // ─────────────────────────────────────────────────────────
 
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
     public void deleteInvoice(Long id) {
         if (!invoiceRepository.existsById(id)) {
             throw new NoSuchElementException("Invoice not found: " + id);
@@ -106,6 +112,7 @@ public class InvoiceService {
      * Returns one row per party that appears in invoices OR payments, sorted
      * by outstanding amount descending (largest debt first).
      */
+    @Cacheable(PARTY_OUTSTANDING)
     @Transactional(readOnly = true)
     public List<PartyOutstandingDTO> getPartyOutstandingSummary() {
 
@@ -162,6 +169,7 @@ public class InvoiceService {
     /**
      * Aggregate stats for the invoices page header bar.
      */
+    @Cacheable(INVOICE_STATS)
     @Transactional(readOnly = true)
     public Map<String, Object> getInvoicePageStats() {
         BigDecimal totalInvoiced = invoiceRepository.sumAllAmounts();
@@ -187,6 +195,7 @@ public class InvoiceService {
      *
      * @param combinedPartyName Party.combined key (name, or name_gstin)
      */
+    @Cacheable(value = PARTY_LEDGER, key = "#combinedPartyName")
     @Transactional(readOnly = true)
     public PartyLedgerDTO.Response getPartyLedger(String combinedPartyName) {
         List<Invoice> invoices = invoiceRepository.findByPartyNameOrderByInvoiceDateDescCreatedAtDesc(combinedPartyName);
@@ -264,6 +273,7 @@ public class InvoiceService {
      * Built from two bulk queries (all invoices, all payments) grouped in memory,
      * rather than one query pair per party.
      */
+    @Cacheable(ALL_PARTY_LEDGERS)
     @Transactional(readOnly = true)
     public List<PartyLedgerDTO.Response> getAllPartyLedgers() {
         Map<String, List<Invoice>> invoicesByParty = invoiceRepository.findAllByOrderByInvoiceDateDescCreatedAtDesc()
@@ -342,6 +352,7 @@ public class InvoiceService {
      * no per-invoice payment link in the schema, so this is the standard
      * approximation used for aging without one.
      */
+    @Cacheable(AGING_REPORT)
     @Transactional(readOnly = true)
     public List<PartyAgingDTO> getAgingReport() {
         LocalDate today = LocalDate.now();
@@ -403,6 +414,7 @@ public class InvoiceService {
      * when it is available. Sorted worst-standing-first so chronic late payers
      * surface immediately.
      */
+    @Cacheable(PAYMENT_BEHAVIOR)
     @Transactional(readOnly = true)
     public List<PartyPaymentBehaviorDTO> getPartyPaymentBehavior() {
         LocalDate today = LocalDate.now();
