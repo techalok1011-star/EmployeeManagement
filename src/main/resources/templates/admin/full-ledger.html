@@ -67,6 +67,10 @@
         .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
         .empty-icon{font-size:44px;margin-bottom:12px}
         .count-badge{background:rgba(108,142,255,0.12);color:var(--accent);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
+        .party-entries-container{padding:14px 22px}
+        .btn-show-entries{background:rgba(108,142,255,0.1);color:var(--accent);border:1px solid rgba(108,142,255,0.25);padding:7px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;transition:background 0.15s}
+        .btn-show-entries:hover{background:rgba(108,142,255,0.2)}
+        .party-entries-content{margin-top:10px}
         .no-match{text-align:center;padding:40px;color:var(--muted);display:none}
     </style>
 </head>
@@ -150,54 +154,66 @@
                 </div>
             </div>
 
-            <div th:if="${#lists.isEmpty(ledger.entries)}" class="empty-state" style="padding:24px">
-                <div style="font-size:13px">No transactions recorded.</div>
-            </div>
-
-            <div th:if="${!#lists.isEmpty(ledger.entries)}" class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Reference</th>
-                            <th>Sales Vch No.</th>
-                            <th>Receipt Vch No.</th>
-                            <th>Description</th>
-                            <th>Debit</th>
-                            <th>Credit</th>
-                            <th>Balance</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="e : ${ledger.entries}">
-                            <td class="text-muted" th:text="${#temporals.format(e.date,'dd MMM yyyy')}"></td>
-                            <td>
-                                <span class="badge-invoice" th:if="${e.type == 'INVOICE'}">🧾 Invoice</span>
-                                <span class="badge-payment" th:if="${e.type == 'PAYMENT'}">💰 Payment</span>
-                            </td>
-                            <td th:text="${e.reference != null ? e.reference : '—'}"></td>
-                            <td class="text-muted" th:text="${e.salesVchNo != null ? e.salesVchNo : '—'}"></td>
-                            <td class="text-muted" th:text="${e.receiptVchNo != null ? e.receiptVchNo : '—'}"></td>
-                            <td class="text-muted">
-                                <div th:text="${e.description != null and !e.description.isEmpty() ? e.description : '—'}"></div>
-                                <div th:if="${e.deliveryInfo != null}" style="font-size:10.5px;color:var(--accent2);margin-top:2px" th:text="'🚚 ' + ${e.deliveryInfo}"></div>
-                            </td>
-                            <td>
-                                <span class="amount-debit" th:if="${e.debit != null}">₹<span th:text="${#numbers.formatDecimal(e.debit,1,'COMMA',2,'POINT')}"></span></span>
-                                <span class="text-muted" th:if="${e.debit == null}">—</span>
-                            </td>
-                            <td>
-                                <span class="amount-credit" th:if="${e.credit != null}">₹<span th:text="${#numbers.formatDecimal(e.credit,1,'COMMA',2,'POINT')}"></span></span>
-                                <span class="text-muted" th:if="${e.credit == null}">—</span>
-                            </td>
-                            <td class="amount-balance">₹<span th:text="${#numbers.formatDecimal(e.balance,1,'COMMA',2,'POINT')}"></span></td>
-                        </tr>
-                    </tbody>
-                </table>
+            <!-- Collapsed by default - fetched on demand via /admin/full-ledger/party so the
+                 initial page load doesn't render all parties' full transaction history at once. -->
+            <div class="party-entries-container">
+                <button type="button" class="btn-show-entries" th:attr="data-party=${ledger.partyName}" onclick="toggleEntries(this)">▾ Show Transactions</button>
+                <div class="party-entries-content" style="display:none"></div>
             </div>
         </div>
 
+    </div>
+
+    <!-- Fragment rendered standalone by GET /admin/full-ledger/party?partyName=... (not part of the main page render above) -->
+    <div th:fragment="partyTable">
+        <div th:if="${ledger == null}" class="empty-state" style="padding:24px">
+            <div style="font-size:13px">Party not found.</div>
+        </div>
+        <div th:if="${ledger != null and #lists.isEmpty(ledger.entries)}" class="empty-state" style="padding:24px">
+            <div style="font-size:13px">No transactions recorded.</div>
+        </div>
+        <div th:if="${ledger != null and !#lists.isEmpty(ledger.entries)}" class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Reference</th>
+                        <th>Sales Vch No.</th>
+                        <th>Receipt Vch No.</th>
+                        <th>Description</th>
+                        <th>Debit</th>
+                        <th>Credit</th>
+                        <th>Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="e : ${ledger.entries}">
+                        <td class="text-muted" th:text="${#temporals.format(e.date,'dd MMM yyyy')}"></td>
+                        <td>
+                            <span class="badge-invoice" th:if="${e.type == 'INVOICE'}">🧾 Invoice</span>
+                            <span class="badge-payment" th:if="${e.type == 'PAYMENT'}">💰 Payment</span>
+                        </td>
+                        <td th:text="${e.reference != null ? e.reference : '—'}"></td>
+                        <td class="text-muted" th:text="${e.salesVchNo != null ? e.salesVchNo : '—'}"></td>
+                        <td class="text-muted" th:text="${e.receiptVchNo != null ? e.receiptVchNo : '—'}"></td>
+                        <td class="text-muted">
+                            <div th:text="${e.description != null and !e.description.isEmpty() ? e.description : '—'}"></div>
+                            <div th:if="${e.deliveryInfo != null}" style="font-size:10.5px;color:var(--accent2);margin-top:2px" th:text="'🚚 ' + ${e.deliveryInfo}"></div>
+                        </td>
+                        <td>
+                            <span class="amount-debit" th:if="${e.debit != null}">₹<span th:text="${#numbers.formatDecimal(e.debit,1,'COMMA',2,'POINT')}"></span></span>
+                            <span class="text-muted" th:if="${e.debit == null}">—</span>
+                        </td>
+                        <td>
+                            <span class="amount-credit" th:if="${e.credit != null}">₹<span th:text="${#numbers.formatDecimal(e.credit,1,'COMMA',2,'POINT')}"></span></span>
+                            <span class="text-muted" th:if="${e.credit == null}">—</span>
+                        </td>
+                        <td class="amount-balance">₹<span th:text="${#numbers.formatDecimal(e.balance,1,'COMMA',2,'POINT')}"></span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 <script>
@@ -214,6 +230,25 @@
         });
         noMatch.style.display = (q && visibleCount === 0) ? 'block' : 'none';
     });
+
+    function toggleEntries(btn) {
+        const content = btn.nextElementSibling;
+        const isHidden = content.style.display === 'none';
+        if (isHidden) {
+            if (!content.dataset.loaded) {
+                content.innerHTML = '<div style="padding:16px" class="text-muted">Loading…</div>';
+                fetch('/admin/full-ledger/party?partyName=' + encodeURIComponent(btn.getAttribute('data-party')))
+                    .then(r => r.text())
+                    .then(html => { content.innerHTML = html; content.dataset.loaded = 'true'; })
+                    .catch(() => { content.innerHTML = '<div style="padding:16px" class="text-muted">Failed to load — try again.</div>'; });
+            }
+            content.style.display = 'block';
+            btn.textContent = '▴ Hide Transactions';
+        } else {
+            content.style.display = 'none';
+            btn.textContent = '▾ Show Transactions';
+        }
+    }
 </script>
 </body>
 </html>

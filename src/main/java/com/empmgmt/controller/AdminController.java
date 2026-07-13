@@ -327,6 +327,24 @@ public class AdminController {
         return "admin/full-ledger";
     }
 
+    /**
+     * One party's transaction table, fetched lazily (collapsed by default on the Full Ledger
+     * page) so the initial page load doesn't render all 174 parties' full history at once -
+     * expensive on a CPU-constrained free-tier instance. Reads from the already-cached
+     * {@link InvoiceService#getAllPartyLedgers()} list (called via the injected bean, so it
+     * goes through the Spring proxy and actually hits the cache) - zero extra DB round trips.
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @GetMapping("/full-ledger/party")
+    public String fullLedgerPartyDetail(@RequestParam String partyName, Model model) {
+        var ledger = invoiceService.getAllPartyLedgers().stream()
+                .filter(p -> p.getPartyName().equals(partyName))
+                .findFirst()
+                .orElse(null);
+        model.addAttribute("ledger", ledger);
+        return "admin/full-ledger :: partyTable";
+    }
+
     // ─── Aging Report ──────────────────────────────────────────
 
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
