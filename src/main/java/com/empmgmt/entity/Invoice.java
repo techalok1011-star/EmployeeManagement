@@ -38,6 +38,14 @@ public class Invoice {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
+    /** Number of cement bags sold - amount is derived as bags * ratePerBag. Null for pre-existing/imported invoices. */
+    @Column(name = "bags")
+    private Integer bags;
+
+    /** Rate per bag (INR) on the invoice date. Null for pre-existing/imported invoices. */
+    @Column(name = "rate_per_bag", precision = 10, scale = 2)
+    private BigDecimal ratePerBag;
+
     @Column(length = 1000)
     private String description;
 

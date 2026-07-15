@@ -236,6 +236,8 @@
                                         <th>Sales Vch No.</th>
                                         <th>Date</th>
                                         <th>Party Name / GSTIN</th>
+                                        <th>Bags</th>
+                                        <th>Rate/Bag</th>
                                         <th>Amount (INR)</th>
                                         <th>Description</th>
                                         <th>Delivery</th>
@@ -254,6 +256,8 @@
                                             <span class="gstin" th:if="${inv.partyName.contains('_')}"
                                                   th:text="${inv.partyName.substring(inv.partyName.indexOf('_')+1)}"></span>
                                         </td>
+                                        <td class="text-muted" th:text="${inv.bags != null ? inv.bags : '—'}"></td>
+                                        <td class="text-muted" th:text="${inv.ratePerBag != null ? '₹' + #numbers.formatDecimal(inv.ratePerBag,1,'COMMA',2,'POINT') : '—'}"></td>
                                         <td class="amount">₹<span th:text="${#numbers.formatDecimal(inv.amount,1,'COMMA',2,'POINT')}"></span></td>
                                         <td class="text-muted" th:text="${inv.description != null ? inv.description : '—'}"></td>
                                         <td>
@@ -396,11 +400,21 @@
                              th:errors="*{partyName}"></div>
                         <div style="margin-bottom:14px"></div>
 
-                        <label class="form-label">Amount (INR)</label>
-                        <input type="number" step="0.01" min="0.01" class="form-control"
-                               th:field="*{amount}" placeholder="0.00"/>
-                        <div class="form-error" th:if="${#fields.hasErrors('amount')}"
-                             th:errors="*{amount}"></div>
+                        <label class="form-label">Number of Bags</label>
+                        <input type="number" step="1" min="1" class="form-control" id="bagsInput"
+                               th:field="*{bags}" placeholder="e.g. 100" oninput="recalcAmount()"/>
+                        <div class="form-error" th:if="${#fields.hasErrors('bags')}"
+                             th:errors="*{bags}"></div>
+
+                        <label class="form-label">Rate per Bag (INR)</label>
+                        <input type="number" step="0.01" min="0.01" class="form-control" id="rateInput"
+                               th:field="*{ratePerBag}" placeholder="e.g. 225.50" oninput="recalcAmount()"/>
+                        <div class="form-error" th:if="${#fields.hasErrors('ratePerBag')}"
+                             th:errors="*{ratePerBag}"></div>
+
+                        <label class="form-label">Amount (Auto-calculated)</label>
+                        <input type="text" class="form-control" id="amountDisplay" disabled
+                               placeholder="0.00" style="opacity:0.75;cursor:not-allowed"/>
 
                         <label class="form-label">Description <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted2)">(optional)</span></label>
                         <textarea class="form-control" th:field="*{description}"
@@ -477,6 +491,15 @@
 </div>
 
 <script>
+    // ── Auto-calculate Amount = Bags x Rate/Bag (display only - server computes the real value) ──
+    function recalcAmount() {
+        const bags = parseFloat(document.getElementById('bagsInput').value);
+        const rate = parseFloat(document.getElementById('rateInput').value);
+        const display = document.getElementById('amountDisplay');
+        display.value = (!isNaN(bags) && !isNaN(rate)) ? (bags * rate).toFixed(2) : '';
+    }
+    recalcAmount(); // handle validation-error re-render where bags/rate already have values
+
     // ── Invoice table search ──
     document.getElementById('invSearch')?.addEventListener('input', function() {
         const q = this.value.toLowerCase();

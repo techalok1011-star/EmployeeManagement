@@ -52,11 +52,14 @@ public class InvoiceService {
             throw new IllegalArgumentException(
                     "Invoice number '" + request.getInvoiceNumber() + "' already exists.");
         }
+        BigDecimal amount = request.getRatePerBag().multiply(BigDecimal.valueOf(request.getBags()));
         Invoice saved = invoiceRepository.save(Invoice.builder()
                 .invoiceNumber(request.getInvoiceNumber().trim())
                 .invoiceDate(request.getInvoiceDate())
                 .partyName(request.getPartyName())
-                .amount(request.getAmount())
+                .amount(amount)
+                .bags(request.getBags())
+                .ratePerBag(request.getRatePerBag())
                 .description(request.getDescription())
                 .deliveryMode(request.getDeliveryMode())
                 .transportNumber(request.getTransportNumber() != null && !request.getTransportNumber().isBlank()
@@ -599,6 +602,8 @@ public class InvoiceService {
                 .deliveryMode(inv.getDeliveryMode() != null ? inv.getDeliveryMode().getDisplayName() : "")
                 .transportNumber(inv.getTransportNumber())
                 .salesVchNo(inv.getSalesVchNo())
+                .bags(inv.getBags())
+                .ratePerBag(inv.getRatePerBag())
                 .createdAt(inv.getCreatedAt() != null ? inv.getCreatedAt().format(FMT) : "")
                 .build();
     }

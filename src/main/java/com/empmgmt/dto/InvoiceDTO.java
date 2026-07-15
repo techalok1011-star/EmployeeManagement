@@ -26,10 +26,17 @@ public class InvoiceDTO {
         @Size(max = 700, message = "Party name must not exceed 700 characters")
         private String partyName;
 
-        @NotNull(message = "Amount is required")
-        @DecimalMin(value = "0.01", message = "Amount must be greater than 0")
-        @Digits(integer = 13, fraction = 2, message = "Invalid amount format")
+        /** Derived server-side as bags * ratePerBag - not bound to a form field, not validated directly. */
         private BigDecimal amount;
+
+        @NotNull(message = "Number of bags is required")
+        @Min(value = 1, message = "Bags must be at least 1")
+        private Integer bags;
+
+        @NotNull(message = "Rate per bag is required")
+        @DecimalMin(value = "0.01", message = "Rate must be greater than 0")
+        @Digits(integer = 8, fraction = 2, message = "Invalid rate format")
+        private BigDecimal ratePerBag;
 
         @Size(max = 1000, message = "Description must not exceed 1000 characters")
         private String description;
@@ -51,6 +58,8 @@ public class InvoiceDTO {
         private LocalDate invoiceDate;
         private String partyName;
         private BigDecimal amount;
+        private Integer bags;
+        private BigDecimal ratePerBag;
         private String description;
         private String deliveryMode;
         private String transportNumber;
