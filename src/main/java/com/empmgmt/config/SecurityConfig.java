@@ -46,7 +46,8 @@ public class SecurityConfig {
         http
             .authenticationProvider(authenticationProvider())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/css/**", "/js/**", "/images/**", "/h2-console/**").permitAll()
+                .requestMatchers("/css/**", "/js/**", "/images/**", "/h2-console/**",
+                        "/manifest.json", "/sw.js", "/icons/**").permitAll()
                 .requestMatchers("/api/parties/suggest", "/api/parties").authenticated()
                 .requestMatchers("/api/parties/import", "/api/parties/cleanup", "/api/parties/upload-import").hasAnyRole("ADMIN", "ACCOUNTANT")
                 .requestMatchers("/admin/**").hasAnyRole("ADMIN", "ACCOUNTANT")
