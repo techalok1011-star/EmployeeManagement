@@ -178,7 +178,7 @@
                                             row.style.cursor = 'pointer';
                                             row.style.borderBottom = '1px solid rgba(255,255,255,0.02)';
                                             row.innerHTML = '<div style="font-weight:600">' + escapeHtml(item.name) + '</div>' +
-                                                            '<div style="font-size:12px;color:var(--muted);">' + (item.gst ? escapeHtml(item.gst) : '') + '</div>';
+                                                            '<div style="font-size:12px;color:var(--muted);">' + (item.trailingNumber ? 'No. ' + escapeHtml(item.trailingNumber) : '') + '</div>';
                                             row.addEventListener('mousedown', function(e){
                                                 input.value = item.combined || (item.name + (item.gst ? '_' + item.gst : ''));
                                                 suggestBox.style.display='none';

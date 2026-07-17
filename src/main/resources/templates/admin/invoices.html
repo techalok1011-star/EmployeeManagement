@@ -387,7 +387,7 @@
                         <div class="form-error" th:if="${#fields.hasErrors('invoiceDate')}"
                              th:errors="*{invoiceDate}"></div>
 
-                        <label class="form-label">Party Name / GSTIN</label>
+                        <label class="form-label">Party Name / Trailing No.</label>
                         <div class="autocomplete-wrapper">
                             <input type="text" id="partyInput" class="form-control"
                                    th:field="*{partyName}"
@@ -524,16 +524,15 @@
             partyDropdown.innerHTML = '';
             if (!q) { partyDropdown.style.display = 'none'; return; }
             const matches = allParties.filter(p =>
-                p.combined.toLowerCase().includes(q) ||
                 (p.name && p.name.toLowerCase().includes(q)) ||
-                (p.gst  && p.gst.toLowerCase().includes(q))
+                (p.trailingNumber && p.trailingNumber.toLowerCase().includes(q))
             ).slice(0, 12);
             if (!matches.length) { partyDropdown.style.display = 'none'; return; }
             matches.forEach(p => {
                 const li = document.createElement('div');
                 li.className = 'autocomplete-item';
                 li.innerHTML = '<span>' + p.name + '</span>' +
-                    (p.gst ? '<span class="item-gstin">' + p.gst + '</span>' : '');
+                    (p.trailingNumber ? '<span class="item-gstin">No. ' + p.trailingNumber + '</span>' : '');
                 li.addEventListener('mousedown', e => {
                     e.preventDefault();
                     partyInput.value = p.combined;

@@ -204,20 +204,28 @@ public class ExcelPartyService {
         if (q == null || q.isBlank()) {
             results = partyRepository.findAll().stream().map(Party::getCombined).limit(limit).collect(Collectors.toList());
         } else {
-            results = partyRepository.findTop50ByCombinedContainingIgnoreCase(q).stream().map(Party::getCombined).limit(limit).collect(Collectors.toList());
+            results = partyRepository.findTop50ByNameContainingIgnoreCaseOrTrailingNumberContainingIgnoreCase(q, q)
+                    .stream().map(Party::getCombined).limit(limit).collect(Collectors.toList());
         }
         return results;
     }
 
-    /** Return structured suggestions (name, gst, combined) for UI consumption. */
+    /**
+     * Structured suggestions (name, gst, combined, trailingNumber) for UI autocomplete.
+     * Matches against party name OR trailing number only — deliberately NOT against GST,
+     * so a GST substring never surfaces an unrelated party by accident.
+     */
     public List<com.empmgmt.dto.PartySuggestionDTO> searchStructured(String q, int limit) {
         List<Party> list;
         if (q == null || q.isBlank()) {
             list = partyRepository.findAll().stream().limit(limit).collect(Collectors.toList());
         } else {
-            list = partyRepository.findTop50ByCombinedContainingIgnoreCase(q).stream().limit(limit).collect(Collectors.toList());
+            list = partyRepository.findTop50ByNameContainingIgnoreCaseOrTrailingNumberContainingIgnoreCase(q, q)
+                    .stream().limit(limit).collect(Collectors.toList());
         }
-        return list.stream().map(p -> new com.empmgmt.dto.PartySuggestionDTO(p.getName(), p.getGst(), p.getCombined())).collect(Collectors.toList());
+        return list.stream()
+                .map(p -> new com.empmgmt.dto.PartySuggestionDTO(p.getName(), p.getGst(), p.getCombined(), p.getTrailingNumber()))
+                .collect(Collectors.toList());
     }
 
     /** Ensure a party record exists for the given combined string (name or name_gstin). */
