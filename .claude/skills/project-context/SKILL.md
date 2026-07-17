@@ -10,13 +10,14 @@ Payment-collection / outstanding-balance tracking system for a business with
 sales parties, invoices, and payment entries logged by employees. The repo/
 package is named `EmployeeManagement` but the app brands itself **"PayTrack"**
 in generated PDFs/UI text - there is no separate "Employee" entity, employees
-are just `User` rows with `role=EMPLOYEE` (or `ACCOUNTANT`).
+are just `User` rows with `role` = `EMPLOYEE`, `ACCOUNTANT`, `MANAGER`, or
+`ADMIN` (`MANAGER` added 2026-07-18, see its own section below).
 
 **Do not trust `ARCHITECTURE.md` / `USER_GUIDE.md` at the repo root** - they
 describe an early, much simpler version (Users/PaymentEntry/TransactionLog
 only) and were never updated as Party/Invoice/WhatsApp/export/analytics
 features were added. Verify against `src/main/java/com/empmgmt/` instead.
-Last full re-verification against source: 2026-07-15.
+Last full re-verification against source: 2026-07-18.
 
 **The app is now deployed and live** at
 `https://employeemanagement-q6h3.onrender.com` (Render, free tier, Docker
@@ -123,9 +124,9 @@ thing to understand before touching invoices/payments/parties:
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `users` | id, username(unique), password(BCrypt), full_name, email, role, active, created_at | `role` CHECK constraint: `ADMIN,EMPLOYEE,ACCOUNTANT` |
+| `users` | id, username(unique), password(BCrypt), full_name, email, role, active, created_at | `role` CHECK constraint: `ADMIN,EMPLOYEE,ACCOUNTANT,MANAGER` (MANAGER added 2026-07-18) |
 | `parties` | id, name, gst, **combined(unique)**, **trailing_number**, total_amount, phone, whatsapp_opt_in | `total_amount` = sum from Excel import, not live-recomputed. `trailing_number` (added 2026-07-12): the party's ledger code from the source Tally system, e.g. `78` for `CHANDRJEET B. M (JAIGAHA) 78` - nullable, most of the original 85 parties don't have one |
-| `invoices` | id, invoice_number(unique), invoice_date, party_name, amount, description, delivery_mode, transport_number, **sales_vch_no**, **bags**, **rate_per_bag** | `delivery_mode` CHECK: `TRUCK,SELF_PICKUP,TROLLEY` (only `TRUCK` used in current data). `sales_vch_no` (added 2026-07-12): Tally Sales Register voucher number, only populated for imported rows (`invoice_number` prefix `TALLY-S-<vchNo>` for those). `bags`/`rate_per_bag` (added 2026-07-15, nullable - the 1,355 Tally-imported rows have neither): on the Add Invoice form, admins now enter number-of-bags + rate/bag instead of a raw amount; `amount` is computed server-side (`InvoiceService.createInvoice()`, `amount = ratePerBag × bags`) and is **not** independently editable - the form's Amount field is a disabled, JS-updated display only, never submitted |
+| `invoices` | id, invoice_number(unique), invoice_date, party_name, amount, description, delivery_mode, transport_number, **sales_vch_no**, **bags**, **rate_per_bag**, **created_by** | `delivery_mode` CHECK: `TRUCK,SELF_PICKUP,TROLLEY` (only `TRUCK` used in current data). `sales_vch_no` (added 2026-07-12): Tally Sales Register voucher number, only populated for imported rows (`invoice_number` prefix `TALLY-S-<vchNo>` for those). `bags`/`rate_per_bag` (added 2026-07-15, nullable - the 1,355 Tally-imported rows have neither): on the Add Invoice form, admins/accountants/managers now enter number-of-bags + rate/bag instead of a raw amount; `amount` is computed server-side (`InvoiceService.createInvoice()`, `amount = ratePerBag × bags`) and is **not** independently editable - the form's Amount field is a disabled, JS-updated display only, never submitted. `created_by` (added 2026-07-18, nullable varchar(50) - null for pre-existing/imported rows): username of whoever added the invoice (admin/accountant/manager) - powers `InvoiceService.getInvoicesCreatedBy()`/`getInvoicesCreatedByOnDate()`, which is how a Manager's dashboard scopes to "their" invoices (there's still no FK, just a plain string) |
 | `payment_entries` | id, party_name, amount, mode_of_payment, entry_date, remarks, edited, edited_by, edited_at, employee_id(FK→users), **receipt_vch_no** | `mode_of_payment` CHECK: `CASH,CHEQUE,BANK_TRANSFER,UPI,NEFT,RTGS,DD`. Only real FK in the whole schema is `employee_id`. `receipt_vch_no` (added 2026-07-12): Tally Receipt Register voucher number for imported rows - **not unique**, Tally itself ran two parallel voucher-number series that collide with each other |
 | `transaction_logs` | id, action, entry_id(no FK, just a Long), employee_name, employee_username, party_name, amount, mode_of_payment, entry_date, remarks, performed_by, notes, performed_at | Audit trail, denormalized snapshot per event, not linked by FK |
 | `notification_logs` | id, party_name, phone, outstanding_amount, status, error_message, triggered_by, sent_at | `status` CHECK: `SENT,FAILED,DRY_RUN`. `triggered_by` = `"SCHEDULER"` or `"ADMIN:<user>"`/`"ACCOUNTANT:<user>"` |
@@ -133,7 +134,7 @@ thing to understand before touching invoices/payments/parties:
 
 ### Entities/enums (`entity/` package)
 
-- `User.Role`: `ADMIN, EMPLOYEE, ACCOUNTANT`
+- `User.Role`: `ADMIN, EMPLOYEE, ACCOUNTANT, MANAGER`
 - `Invoice.DeliveryMode`: `TRUCK("Truck"), SELF_PICKUP("Self Pickup"), TROLLEY("Trolley")`
 - `PaymentEntry.ModeOfPayment`: `CASH, CHEQUE, BANK_TRANSFER, UPI, NEFT, RTGS, DD`
 - `NotificationLog.Status`: `SENT, FAILED, DRY_RUN`
@@ -269,10 +270,10 @@ gains a new constant.
   deployed instance never sends real WhatsApp messages to real parties by
   accident.
 - **Cold start**: free Render instances sleep after ~15 min idle; first
-  request after that is slow (the container has to boot). No keep-alive
-  ping is configured yet - was discussed (an external cron hitting a
-  DB-touching health endpoint) but never built; ask before assuming this
-  exists.
+  request after that is slow (the container has to boot). **Keep-alive is
+  now built** (added 2026-07-18, see its own section above) - a GitHub
+  Actions workflow pings `GET /health` every ~10 min but only 06:00-22:00
+  IST, so the instance is *deliberately* still allowed to sleep overnight.
 - **Known deployment gotchas already hit and fixed** (useful if a future
   redeploy breaks the same way):
   - Render can misdetect the runtime as Node if the service was created
@@ -297,9 +298,13 @@ row (admin-toggleable at `/admin/notifications`).
 
 ## Endpoints (grouped by controller)
 
-- **`AuthController`**: `/login`, `/` (redirect).
+- **`AuthController`**: `/login`, `/` (redirect), `/health` (permitAll,
+  keep-alive target - see its section above).
 - **`EmployeeController`** (`/employee/**`, role EMPLOYEE): dashboard, add/
   edit/delete own today-only entries, list, history.
+- **`ManagerController`** (`/manager/**`, role MANAGER - added 2026-07-18):
+  dashboard (add invoice + today's invoices), all-invoices list. See its
+  own section above.
 - **`AdminController`** (`/admin/**`, role ADMIN; several sub-paths widened
   to ADMIN+ACCOUNTANT): dashboard, employees CRUD, entries CRUD+export
   (excel/pdf/audit-csv) - `/admin/entries` supports `from`/`to`/`employeeId`
@@ -307,7 +312,8 @@ row (admin-toggleable at `/admin/notifications`).
   supports `from`/`to` date-range filtering on the Invoice List since
   2026-07-12, independent of the lifetime stats bar and the notification log
   section which stay unfiltered), **ledger** (`/admin/ledger?partyName=`,
-  single party, newest-first), **full-ledger** (`/admin/full-ledger`, added
+  single party, newest-first - has an "➕ Add Payment" tab, see the
+  ACCOUNTANT role section above), **full-ledger** (`/admin/full-ledger`, added
   2026-07-12 - every party's statement on one page, oldest-first per party,
   mirrors the ShivShakti Excel workbook's "Party Ledger" sheet layout, has a
   client-side search box filtering visible party sections), **aging**
@@ -368,6 +374,137 @@ row points at whichever admin/accountant added it (same convention as the Tally
 import's placeholder `employee_id=admin` rows), so `employeeName`/`employeeUsername`
 in `PaymentEntryDTO.Response` is how you can tell an entry was staff-added rather
 than logged by the employee it might be filed under a party for.
+
+## MANAGER role (added 2026-07-18)
+
+A fourth role alongside ADMIN/EMPLOYEE/ACCOUNTANT, scoped to **only** adding
+and viewing invoices - mirrors the EMPLOYEE dashboard's "add today's stuff
+from your phone" UX but for invoices instead of payments.
+
+- New `ManagerController` (`/manager/**`, `@PreAuthorize("hasRole('MANAGER')")`,
+  class-level - unlike `AdminController` there's no need for per-method
+  overrides since every method in this controller is manager-only anyway):
+  `GET /manager/dashboard` (add-invoice form + "Today's Invoices" list,
+  scoped via `InvoiceService.getInvoicesCreatedByOnDate(username, today)`),
+  `POST /manager/invoices/add`, `GET /manager/invoices` (all-time, this
+  manager's invoices only, via `getInvoicesCreatedBy(username)`).
+- **Own PWA manifest**: `static/manager-manifest.json` (`start_url:
+  /manager/dashboard`, separate from `static/manifest.json`'s
+  `/employee/dashboard`) - **necessary**, not cosmetic: if a Manager
+  installed the shared employee manifest to their home screen, tapping the
+  icon would hit `/employee/dashboard`, and since `/employee/**` requires
+  `hasRole('EMPLOYEE')` specifically (not `hasAnyRole`), a Manager would get
+  a 403 on their own home-screen shortcut. `SecurityConfig`'s `permitAll()`
+  list needs `/manager-manifest.json` alongside `/manifest.json` for the
+  same reason `/manifest.json` needs to be there (see PWA section below).
+- `SecurityConfig`: `/manager/**` → `hasRole('MANAGER')`; login
+  `successHandler` has a `ROLE_MANAGER` branch → `/manager/dashboard` (added
+  **before** the final `else` which still falls through to
+  `/employee/dashboard` - a MANAGER user would otherwise silently redirect
+  into a role they don't have and immediately 403).
+- `UserService.getAllManagers()` (`findByRole(MANAGER)`) powers a "Managers"
+  table on `admin/employees.html` (same enable/disable/reset-password
+  actions as the existing Accountants table) and a `MANAGER` option in that
+  page's role `<select>`. `UserService.createEmployee()` needed **no** code
+  change - it only explicitly blocks creating `ADMIN`, so `MANAGER` passed
+  straight through once the enum + form option existed.
+- **Invoice auto-numbering** (`InvoiceService.getNextInvoiceNumber()`):
+  suggests `INV-<year>-<seq>` (zero-padded to 3 digits, sequence resets each
+  year, derived from the max existing suffix under that year's prefix) and
+  pre-fills the Invoice Number field on both `admin/invoices.html` and
+  `manager/dashboard.html` - field stays a normal editable text input, not
+  locked. Two people grabbing the same suggestion at the same instant just
+  hits `createInvoice()`'s existing `existsByInvoiceNumber` check (see
+  concurrency note below) rather than silently colliding.
+- Verified end-to-end (login redirect, 403 on `/admin/**` and
+  `/employee/**`, add-invoice, `created_by` correctly stamped, manifest
+  `start_url`) via a temporary test `MANAGER` account, deleted after.
+
+## Party autocomplete: name/trailing-number search, no GST (fixed 2026-07-18)
+
+- **Server-side matching** (`ExcelPartyService.search()` /
+  `.searchStructured()`, backing `GET /api/parties` and
+  `GET /api/parties/suggest`) used to match only against `Party.combined`
+  (`name + '_' + gst`) via `PartyRepository.findTop50ByCombinedContainingIgnoreCase`
+  - which meant a GST substring could accidentally surface a party, and
+  `trailingNumber` wasn't searchable at all despite being displayed
+  elsewhere in the app. Now uses a dedicated
+  `findTop50ByNameContainingIgnoreCaseOrTrailingNumberContainingIgnoreCase`
+  query - matches name OR trailing number, **never** GST.
+  `PartySuggestionDTO` gained a `trailingNumber` field so the client can
+  show why a result matched.
+- **Two pages do their own client-side re-filter** on top of the server
+  result rather than trusting server matching directly:
+  `admin/invoices.html` and `manager/dashboard.html` both prefetch the
+  *entire* party list once (`fetch('/api/parties/suggest?q=...')`) into a
+  JS array, then filter it locally on every keystroke (for instant, no-
+  round-trip suggestions). Their own filter predicate had the identical
+  GST-leak bug (`p.combined.includes(q)` re-introduces GST since `combined`
+  contains it) and had to be fixed the same way - don't assume fixing the
+  server query alone covers these two pages.
+- **Silent 20-result cap bit us twice in the same investigation**: that
+  prefetch fetch omitted `&limit=`, which silently defaults to 20
+  server-side (`PartyController.suggest`'s `@RequestParam(defaultValue =
+  "20")`) - so only the first 20 of 244 parties were ever cached, and
+  anything typed only searched within those 20. Fixed by adding
+  `&limit=5000` to both prefetch calls. **Any future "prefetch everything
+  once" pattern against `/api/parties/suggest` needs an explicit large
+  `limit`** - the endpoint's default is tuned for real per-keystroke
+  searches (where 20 results is plenty), not bulk fetches.
+- The other three suggestion UIs (`employee/dashboard.html`,
+  `employee/edit-entry.html`, `admin/edit-entry.html`) are purely
+  server-driven (re-fetch on every keystroke, no client cache) - they only
+  needed their dropdown's secondary line switched from showing `gst` to
+  showing `trailingNumber`, no matching-logic changes.
+- Party count at time of this fix: 244 (`SELECT COUNT(*) FROM parties`) -
+  re-query if this matters, it grows via `ExcelPartyService.ensureExists()`
+  whenever a new party name is typed into any form.
+
+## Concurrency: what's actually protected vs. not (as of 2026-07-18)
+
+Came up as a direct question, worth keeping the answer somewhere durable
+rather than re-deriving it:
+
+- Standard Spring Boot/Tomcat thread-per-request handling, all
+  controllers/services are stateless singleton beans - concurrent users
+  never cross-contaminate. Nothing custom needed or done here.
+- Two "check-then-act" races exist: `ExcelPartyService.ensureExists()`
+  (check `Party.combined` doesn't exist, then insert) and
+  `InvoiceService.createInvoice()` (check `invoice_number` doesn't exist,
+  then insert). Both are backed by real DB unique constraints
+  (`parties.combined`, `invoices.invoice_number`), so **a race can never
+  actually create duplicate data** even if two requests pass the check in
+  the same instant - the DB is the real safety net, not the check.
+- `ensureExists()` already catches the resulting constraint-violation
+  exception gracefully (logs at debug, swallows it - see its `try/catch`).
+  `createInvoice()` does **not** - a genuine simultaneous collision (e.g.
+  two people submitting the exact same auto-suggested invoice number at
+  the same instant) would propagate a raw Postgres constraint-violation
+  message into the flash `errorMsg` instead of the clean "already exists"
+  message the normal pre-check path produces. No data corruption, just an
+  ugly message in a rare edge case - left as-is by explicit user decision,
+  not fixed.
+- No `@Version` / optimistic locking on any entity - two people editing
+  the *same row* at the *same instant* is last-write-wins with no conflict
+  warning. Accepted as reasonable for this app's small-team, low-
+  concurrency usage rather than a real risk; revisit if the user base grows.
+
+## Keep-alive (added 2026-07-18) - the "Still open" note below about this is now stale, kept for history
+
+- **New `GET /health`** (`AuthController`, `permitAll` in `SecurityConfig`)
+  - deliberately touches neither DB nor session, just proves the JVM/
+  servlet container is up.
+- **`.github/workflows/keep-alive.yml`**: pings `/health` every ~10 minutes
+  but **only during 00:30-16:30 UTC (06:00-22:00 IST)** - three separate
+  `cron:` entries to hit that exact half-hour-aligned window (cron can't
+  express "every 10 min from :30 to :30" as one expression). Outside that
+  window there's simply no scheduled entry, so the free Render instance is
+  **allowed to idle-sleep overnight by design** (explicit user choice, not
+  an oversight) - it wakes on the first 6 AM ping or an earlier real
+  visitor. Also has `workflow_dispatch: {}` for manual triggering/testing
+  from the GitHub Actions tab.
+- Render's free-tier ~750 instance-hours/month easily covers a ~16h/day
+  active window, so this doesn't risk exceeding the free plan.
 
 ## Current data snapshot (point-in-time, end of day 2026-07-12 - re-query live, don't trust these numbers as still current)
 
@@ -491,12 +628,15 @@ Import" section below) - the original demo invoices/payments are gone.
   there for anything this skill doesn't cover yet, rather than assuming the
   feature set is frozen at what's written above.
 
-## Still open / not yet done (as of 2026-07-15)
+## Still open / not yet done (updated 2026-07-18)
 
-- No keep-alive health-check endpoint for the Render free-tier cold-start
-  problem - discussed, not built.
 - PWA/responsive treatment not yet applied to the 16 admin-facing
-  templates - only login + the 4 employee pages have it.
+  templates - only login + the 4 employee pages (and now `manager/*`, see
+  MANAGER role section) have it.
 - `SINGH BUILDNG MATERIAL (LALGANG)` (DB id 59) party-matching ambiguity
   from the Tally import - still unresolved, see "Tally import" section
   above.
+- `InvoiceService.createInvoice()`'s check-then-act race on
+  `invoice_number` doesn't catch the resulting DB constraint-violation
+  exception the way `ExcelPartyService.ensureExists()` does - see
+  "Concurrency" section above. Explicitly left as-is by user decision.
