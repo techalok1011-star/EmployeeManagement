@@ -16,7 +16,13 @@ are just `User` rows with `role=EMPLOYEE` (or `ACCOUNTANT`).
 describe an early, much simpler version (Users/PaymentEntry/TransactionLog
 only) and were never updated as Party/Invoice/WhatsApp/export/analytics
 features were added. Verify against `src/main/java/com/empmgmt/` instead.
-Last full re-verification against source: 2026-07-12.
+Last full re-verification against source: 2026-07-15.
+
+**The app is now deployed and live** at
+`https://employeemanagement-q6h3.onrender.com` (Render, free tier, Docker
+runtime) backed by a Neon serverless Postgres (region `us-east-1`) - see the
+"Deployment" section below before assuming "the database" means only the
+local one.
 
 **Major data event, 2026-07-12**: the original demo/seed `invoices` (446
 rows) and `payment_entries` (15 rows) were deliberately deleted in full and
@@ -65,6 +71,29 @@ what's real vs. placeholder, etc).
   the tracked `application.properties`; that's been fixed by externalizing to
   the local file). Still worth a glance before any commit that touches
   `application.properties`, in case that regresses.
+- **`seed.admin-password`/`seed.employee-password` only apply once, to an
+  empty `users` table.** Since real data (including real users) was migrated
+  in, `DataSeeder` never runs again - these values are stale/irrelevant for
+  telling anyone's actual current password. Known-working local credentials:
+  `admin`/`admin123` (unchanged since seed). Real employees' passwords are
+  **not recoverable** - they're BCrypt hashes in the DB, one-way. If a user
+  needs access, either ask them (if self-set) or use the existing
+  `POST /admin/employees/{id}/reset-password` action on `/admin/employees`
+  to set a new one - don't try to guess or derive the old one.
+- **Template-only edits need a rebuild, not just a restart.**
+  `spring.thymeleaf.cache=false` only disables Thymeleaf's own template
+  cache, not the underlying classpath resource copy - editing a `.html`
+  under `src/main/resources/templates` and just restarting the already-
+  running jar/process serves the **stale** copy from `target/classes`.
+  Always run `mvn -q compile` (which re-triggers `process-resources`) before
+  restarting, for template-only changes.
+- **Node.js path gotcha (Windows, recurring)**: passing a Bash-tool-style
+  mount path (`/c/Users/...`) to `node -e "..."` resolves wrong (becomes
+  `C:\c\Users\...` or gets mangled against cwd) - Node on Windows needs the
+  native form (`C:\\Users\\...` inside a script, or a Windows-style path
+  argument). Safest fix: write the script to a `.js` file with the Write
+  tool and run `node script.js`, rather than inlining `-e` with a bash-style
+  path.
 
 ## Data model
 
@@ -96,7 +125,7 @@ thing to understand before touching invoices/payments/parties:
 |---|---|---|
 | `users` | id, username(unique), password(BCrypt), full_name, email, role, active, created_at | `role` CHECK constraint: `ADMIN,EMPLOYEE,ACCOUNTANT` |
 | `parties` | id, name, gst, **combined(unique)**, **trailing_number**, total_amount, phone, whatsapp_opt_in | `total_amount` = sum from Excel import, not live-recomputed. `trailing_number` (added 2026-07-12): the party's ledger code from the source Tally system, e.g. `78` for `CHANDRJEET B. M (JAIGAHA) 78` - nullable, most of the original 85 parties don't have one |
-| `invoices` | id, invoice_number(unique), invoice_date, party_name, amount, description, delivery_mode, transport_number, **sales_vch_no** | `delivery_mode` CHECK: `TRUCK,SELF_PICKUP,TROLLEY` (only `TRUCK` used in current data). `sales_vch_no` (added 2026-07-12): Tally Sales Register voucher number, only populated for imported rows (`invoice_number` prefix `TALLY-S-<vchNo>` for those) |
+| `invoices` | id, invoice_number(unique), invoice_date, party_name, amount, description, delivery_mode, transport_number, **sales_vch_no**, **bags**, **rate_per_bag** | `delivery_mode` CHECK: `TRUCK,SELF_PICKUP,TROLLEY` (only `TRUCK` used in current data). `sales_vch_no` (added 2026-07-12): Tally Sales Register voucher number, only populated for imported rows (`invoice_number` prefix `TALLY-S-<vchNo>` for those). `bags`/`rate_per_bag` (added 2026-07-15, nullable - the 1,355 Tally-imported rows have neither): on the Add Invoice form, admins now enter number-of-bags + rate/bag instead of a raw amount; `amount` is computed server-side (`InvoiceService.createInvoice()`, `amount = ratePerBag × bags`) and is **not** independently editable - the form's Amount field is a disabled, JS-updated display only, never submitted |
 | `payment_entries` | id, party_name, amount, mode_of_payment, entry_date, remarks, edited, edited_by, edited_at, employee_id(FK→users), **receipt_vch_no** | `mode_of_payment` CHECK: `CASH,CHEQUE,BANK_TRANSFER,UPI,NEFT,RTGS,DD`. Only real FK in the whole schema is `employee_id`. `receipt_vch_no` (added 2026-07-12): Tally Receipt Register voucher number for imported rows - **not unique**, Tally itself ran two parallel voucher-number series that collide with each other |
 | `transaction_logs` | id, action, entry_id(no FK, just a Long), employee_name, employee_username, party_name, amount, mode_of_payment, entry_date, remarks, performed_by, notes, performed_at | Audit trail, denormalized snapshot per event, not linked by FK |
 | `notification_logs` | id, party_name, phone, outstanding_amount, status, error_message, triggered_by, sent_at | `status` CHECK: `SENT,FAILED,DRY_RUN`. `triggered_by` = `"SCHEDULER"` or `"ADMIN:<user>"`/`"ACCOUNTANT:<user>"` |
@@ -188,6 +217,78 @@ gains a new constant.
 - **`UserService`** - employee/accountant account management (blocks
   creating ADMIN via this path), BCrypt password handling.
 
+## Performance: caching + compression (added 2026-07-15)
+
+- **`config/CacheConfig.java`** - Caffeine in-memory cache (single-instance
+  app, no Redis needed), 5-minute TTL / 500-entry cap, six named caches:
+  `partyOutstanding`, `allPartyLedgers`, `partyLedger`, `agingReport`,
+  `paymentBehavior`, `invoiceStats` (constants `PARTY_OUTSTANDING` etc. in
+  that class - always reference the constant, not a string literal).
+- `InvoiceService`'s read-heavy financial summary methods
+  (`getPartyOutstandingSummary`, `getInvoicePageStats`, `getPartyLedger`,
+  `getAllPartyLedgers`, `getAgingReport`, `getPartyPaymentBehavior`) are all
+  `@Cacheable`. **Every** mutation in `InvoiceService` and
+  `PaymentEntryService` (create/update/delete, both admin and employee
+  paths) carries `@CacheEvict(cacheNames = {...all six...}, allEntries =
+  true)` - this is the actual staleness guard, the 5-minute TTL is just a
+  backstop. **If you add a new invoice/payment mutation method, it needs
+  this same `@CacheEvict` or the outstanding figures will silently go
+  stale** until the TTL expires.
+- `server.compression.enabled=true` (gzip) in `application.properties`,
+  plus a lazy-loading restructure of `/admin/full-ledger`: the main page
+  renders only party names/totals, and each party's transaction table is
+  fetched on demand via a Thymeleaf fragment
+  (`AdminController.fullLedgerPartyDetail()` →
+  `admin/full-ledger :: partyTable`, `toggleEntries()` JS in the template).
+  This was the fix for the page taking 12-19s / 8.2MB on Render's free
+  0.1-vCPU tier - now ~289KB initial load. **If `/admin/full-ledger` (or
+  any other page) gets heavy again, this fragment-on-demand pattern is the
+  established fix, not just "add more caching."**
+
+## Deployment (Render + Neon, added 2026-07-15)
+
+- **Live URL**: `https://employeemanagement-q6h3.onrender.com`. Render free
+  web service (`render.yaml` blueprint, `runtime: docker`, 0.1 vCPU) backed
+  by Neon serverless Postgres (`us-east-1`, requires `sslmode=require` and
+  an SNI-capable client - use `psql` v14+ if connecting manually, not the
+  older v13 client tools that live alongside v18 on this machine).
+  Migrated real data (not a fresh seed) - same Tally-imported invoices/
+  payments/parties as local, kept in sync only by manually re-running any
+  local DB change against Neon too (no automatic sync).
+- **Deploy = `git push origin main`.** Render auto-redeploys on push to
+  `main`; poll `https://employeemanagement-q6h3.onrender.com/login` (or
+  another public route) after a push, first cold build can take a few
+  minutes. Since the DB is Neon (shared, real), never run *any* write
+  against it (even a test row) without asking the user first for that
+  specific action, even if a similar write was already approved earlier in
+  the same session - this was a hard guardrail block earlier and is the
+  durable norm now. When a test write to Neon is approved, verify then
+  clean it up (`DELETE ...`) immediately, same discipline as local testing.
+- **`WHATSAPP_MODE=LOG_ONLY` on Render** (`render.yaml`) - deliberately
+  different from local's `LIVE` in `application.properties`, so the
+  deployed instance never sends real WhatsApp messages to real parties by
+  accident.
+- **Cold start**: free Render instances sleep after ~15 min idle; first
+  request after that is slow (the container has to boot). No keep-alive
+  ping is configured yet - was discussed (an external cron hitting a
+  DB-touching health endpoint) but never built; ask before assuming this
+  exists.
+- **Known deployment gotchas already hit and fixed** (useful if a future
+  redeploy breaks the same way):
+  - Render can misdetect the runtime as Node if the service was created
+    before `Dockerfile`/`render.yaml` were pushed - fix is deleting and
+    recreating the service via **New → Blueprint** (not "Web Service"), so
+    it reads `render.yaml` and sets `runtime: docker` from the start.
+  - "Dockerfile not found" even with `dockerfilePath`/`dockerContext` set
+    correctly in `render.yaml` - check the Render service's **Settings →
+    Build → Root Directory** is blank, not `src` or anything else.
+  - `SPRING_DATASOURCE_URL` on Render must be prefixed `jdbc:postgresql://`
+    - pasting Neon's raw connection string (`postgresql://...`, no `jdbc:`)
+    causes `Driver org.postgresql.Driver claims to not accept jdbcUrl`.
+- Secrets (Neon connection string, WhatsApp token, seed passwords) live
+  only as Render env vars (`sync: false` in `render.yaml`) - never hardcode
+  them into this skill, the repo, or any committed file.
+
 ## Scheduled jobs
 
 Exactly one: `NotificationScheduler.runDailyReminders()`, cron
@@ -212,9 +313,14 @@ row (admin-toggleable at `/admin/notifications`).
   client-side search box filtering visible party sections), **aging**
   (`/admin/aging`), **parties CRUD** (`/admin/parties*`, including
   phone/opt-in toggle), **notifications** (`/admin/notifications`,
-  send/toggle-schedule/resend-failed), employee-collections, executive
-  dashboard, collections worklist + one-off remind, payment-behavior
-  analytics.
+  send/toggle-schedule/resend-failed), **employee-collections**
+  (`/admin/employee-collections` - stays aggregate-only per-employee
+  totals; drilling into one employee's individual entries is a "View
+  Entries" link to the existing filtered `/admin/entries?employeeId=X`
+  page rather than an inline expandable/dropdown row - chosen because it
+  reuses the existing entries page's search/export instead of duplicating
+  that UI), executive dashboard, collections worklist + one-off remind,
+  payment-behavior analytics.
 - **`PartyController`** (`@RestController /api/parties`): search
   (`GET /api/parties`, any authenticated role), structured suggest
   (`GET /api/parties/suggest`), import/cleanup/upload-import (ADMIN/
@@ -226,6 +332,42 @@ row (admin-toggleable at `/admin/notifications`).
 Views are server-rendered Thymeleaf under `src/main/resources/templates/`
 (`admin/*.html`, `employee/*.html`), one template per controller method
 above, no separate frontend/SPA.
+
+## ACCOUNTANT role gotcha: admin/* templates aren't uniformly role-aware (2026-07-17)
+
+`SecurityConfig`'s URL matcher (`/admin/**` → `hasAnyRole('ADMIN','ACCOUNTANT')`) only
+gates *access*, not what the page *shows*. Individual `admin/*.html` templates each
+decide their own sidebar/nav visibility via `sec:authorize`, and that decision was
+made independently per template - some (`invoices.html`, `party-ledger.html`,
+`employee-collections.html`) were built role-aware from the start (dynamic
+`${adminName}`, `sec:authorize="hasRole('ADMIN')"` on admin-only nav links, a
+separate `🧮 Accountant` badge). Others (`entries.html`, as of before this fix) were
+built when the page was still ADMIN-only and hardcoded `"Administrator"` / `"👑 Admin"`
+with **no** gating on any nav link at all - so once a controller method's
+`@PreAuthorize` was widened to let ACCOUNTANT in, the accountant would see themselves
+mislabeled as Admin with the full admin nav (Dashboard/Executive/Employees/Audit Log)
+exposed. **When widening any `admin/*` endpoint to ACCOUNTANT, check that specific
+template's sidebar for hardcoded identity/nav - don't assume the URL-level
+`hasAnyRole` guarantees a correct-looking page.** Also relatedly:
+`AdminController`'s class-level `@PreAuthorize("hasRole('ADMIN')")` means every method
+defaults to ADMIN-only unless it carries its own `@PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")`
+override - `GET /admin/entries` was missing this override entirely until fixed (the
+`employee-collections.html` → "View Entries" link pointed accountants straight into
+a 403).
+
+Also as of this date, ACCOUNTANT (not just ADMIN) can add a payment entry directly
+from a party's ledger: `/admin/ledger?partyName=...` now has an "➕ Add Payment" tab
+(alongside the existing "📒 Statement of Account" tab) for recording a collection
+that's missing from the statement - e.g. a discrepancy caught while reviewing it.
+Backed by `PaymentEntryService.createEntryByStaff()` / `POST /admin/ledger/add-payment` -
+deliberately *not* routed through the employee day-entry flow: unlike
+`createEntry()` (employee path, forced to today's date), this allows **any** date,
+and remarks are mandatory (mirrors the mandatory-remarks rule on admin edits) so the
+reason for the out-of-band entry is on record. The `employee_id` FK on the resulting
+row points at whichever admin/accountant added it (same convention as the Tally
+import's placeholder `employee_id=admin` rows), so `employeeName`/`employeeUsername`
+in `PaymentEntryDTO.Response` is how you can tell an entry was staff-added rather
+than logged by the employee it might be filed under a party for.
 
 ## Current data snapshot (point-in-time, end of day 2026-07-12 - re-query live, don't trust these numbers as still current)
 
@@ -290,6 +432,48 @@ Import" section below) - the original demo invoices/payments are gone.
   user first - the trailing number is the important, deliberately-preserved
   part.
 
+## PWA + mobile responsiveness (added 2026-07-15)
+
+- Goal: employees install the site to their phone home screen (like a
+  native app) and use it without a cramped fixed-sidebar layout. Chose PWA
+  over a native Android app (no Android SDK/emulator available to build or
+  verify one; PWA reuses the existing server-rendered app as-is).
+- **New static assets**: `static/manifest.json` (name "PayTrack",
+  `start_url: /employee/dashboard`, standalone display), `static/sw.js`
+  (deliberately minimal service worker - caches only the icons + manifest,
+  **never** HTML/data pages, to avoid ever serving stale financial figures
+  offline), `static/icons/icon-192.png` / `icon-512.png` /
+  `icon-512-maskable.png` (generated via a `pngjs`-based Node script, not
+  checked in as source - just the PNG output).
+- **`SecurityConfig.java`**'s `permitAll()` matcher list must include
+  `/manifest.json`, `/sw.js`, `/icons/**` - forgetting this makes Spring
+  Security 302-redirect them to `/login`, silently breaking installability
+  even though the files exist and are otherwise correct. Already fixed;
+  watch for this regressing if the matcher list is ever refactored.
+- **Off-canvas responsive sidebar** pattern (CSS `transform:
+  translateX(-100%)` + `.open` class + a `.sidebar-overlay` click-to-close
+  div + a `.menu-toggle` hamburger button + `toggleSidebar()` JS,
+  `@media(max-width:768px)`), plus the manifest `<link>`/theme-color
+  `<meta>`/apple-touch-icon `<link>` and SW-registration script - all
+  copy-pasted identically across the templates listed below. If adding
+  this to a new template, copy the exact block from one of these rather
+  than reinventing it.
+- **Currently applied to**: `login.html` and the 4 employee-facing
+  templates (`employee/dashboard.html`, `employee/entries.html`,
+  `employee/edit-entry.html`, `employee/history.html`) - these are what
+  employees actually use day-to-day. **Not yet applied** to any of the 16
+  admin-facing templates (`admin/*.html`) - deliberately deferred, only do
+  this if asked, since admins were assumed to be on desktop.
+- Verified by creating a temporary test `EMPLOYEE` user + one test payment
+  entry through the running app (via `/admin/employees/add` and the
+  employee entry form), logging in as that user, curling all 4 pages
+  post-login to confirm HTTP 200 with no Thymeleaf/exception markers, then
+  deleting the test user/entry/log rows afterward - necessary because real
+  employees' passwords are unknown/unrecoverable (see above), so there was
+  no other way to actually exercise an authenticated employee session.
+  Reuse this same create-test-employee-then-delete approach for any future
+  employee-only-page verification.
+
 ## Where to look next
 
 - Root-level ad hoc scripts `cleanup_parties.ps1` / `test_cleanup.ps1` hit
@@ -300,3 +484,19 @@ Import" section below) - the original demo invoices/payments are gone.
   before assuming this runs; it was not on the machine this skill was built
   on, see the [[register-reconciliation]] skill's Node-only workaround for
   the same constraint).
+- `git log --oneline` on `main` is a reliable, dense summary of everything
+  built since the Tally import (`be798cf`) through the PWA/responsive work
+  (`a65a4b2` as of 2026-07-15) - caching, compression/lazy-loading, Docker/
+  Render deploy config, bags×rate auto-calc, PWA - read commit messages
+  there for anything this skill doesn't cover yet, rather than assuming the
+  feature set is frozen at what's written above.
+
+## Still open / not yet done (as of 2026-07-15)
+
+- No keep-alive health-check endpoint for the Render free-tier cold-start
+  problem - discussed, not built.
+- PWA/responsive treatment not yet applied to the 16 admin-facing
+  templates - only login + the 4 employee pages have it.
+- `SINGH BUILDNG MATERIAL (LALGANG)` (DB id 59) party-matching ambiguity
+  from the Tally import - still unresolved, see "Tally import" section
+  above.
