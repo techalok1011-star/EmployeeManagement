@@ -62,6 +62,10 @@ public class Invoice {
     @Column(name = "sales_vch_no", length = 20)
     private String salesVchNo;
 
+    /** Username of the ADMIN/ACCOUNTANT/MANAGER who added this invoice. Null for pre-existing/imported invoices. */
+    @Column(name = "created_by", length = 50)
+    private String createdBy;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

@@ -73,6 +73,7 @@ public class AdminController {
     public String listEmployees(Model model) {
         model.addAttribute("employees", userService.getAllEmployees());
         model.addAttribute("accountants", userService.getAllAccountants());
+        model.addAttribute("managers", userService.getAllManagers());
         model.addAttribute("newEmployee", new UserDTO.CreateRequest());
         return "admin/employees";
     }
@@ -85,11 +86,17 @@ public class AdminController {
         if (result.hasErrors()) {
             model.addAttribute("employees", userService.getAllEmployees());
             model.addAttribute("accountants", userService.getAllAccountants());
+            model.addAttribute("managers", userService.getAllManagers());
             return "admin/employees";
         }
         try {
             userService.createEmployee(request);
-            String roleLabel = request.getRole() == com.empmgmt.entity.User.Role.ACCOUNTANT ? "Accountant" : "Employee";
+            String roleLabel;
+            switch (request.getRole() != null ? request.getRole() : com.empmgmt.entity.User.Role.EMPLOYEE) {
+                case ACCOUNTANT: roleLabel = "Accountant"; break;
+                case MANAGER: roleLabel = "Manager"; break;
+                default: roleLabel = "Employee";
+            }
             redirectAttributes.addFlashAttribute("successMsg", roleLabel + " created successfully!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
@@ -292,7 +299,7 @@ public class AdminController {
             return "admin/invoices";
         }
         try {
-            invoiceService.createInvoice(request);
+            invoiceService.createInvoice(request, auth.getName());
             redirectAttributes.addFlashAttribute("successMsg", "Invoice added successfully!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());

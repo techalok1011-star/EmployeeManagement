@@ -47,7 +47,7 @@ public class InvoiceService {
     // ─────────────────────────────────────────────────────────
 
     @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
-    public InvoiceDTO.Response createInvoice(InvoiceDTO.Request request) {
+    public InvoiceDTO.Response createInvoice(InvoiceDTO.Request request, String createdBy) {
         if (invoiceRepository.existsByInvoiceNumber(request.getInvoiceNumber().trim())) {
             throw new IllegalArgumentException(
                     "Invoice number '" + request.getInvoiceNumber() + "' already exists.");
@@ -64,6 +64,7 @@ public class InvoiceService {
                 .deliveryMode(request.getDeliveryMode())
                 .transportNumber(request.getTransportNumber() != null && !request.getTransportNumber().isBlank()
                         ? request.getTransportNumber().trim() : null)
+                .createdBy(createdBy)
                 .build());
         return toResponse(saved);
     }
@@ -93,6 +94,20 @@ public class InvoiceService {
     public InvoiceDTO.Response getInvoiceById(Long id) {
         return toResponse(invoiceRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Invoice not found: " + id)));
+    }
+
+    /** All invoices added by one user (e.g. a Manager), newest first — not role-filtered, just by creator. */
+    @Transactional(readOnly = true)
+    public List<InvoiceDTO.Response> getInvoicesCreatedBy(String username) {
+        return invoiceRepository.findByCreatedByOrderByInvoiceDateDescCreatedAtDesc(username)
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    /** One user's invoices for a single date, newest first — powers a Manager's "Today's Invoices" view. */
+    @Transactional(readOnly = true)
+    public List<InvoiceDTO.Response> getInvoicesCreatedByOnDate(String username, LocalDate date) {
+        return invoiceRepository.findByCreatedByAndInvoiceDateOrderByCreatedAtDesc(username, date)
+                .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     // ─────────────────────────────────────────────────────────
@@ -604,6 +619,7 @@ public class InvoiceService {
                 .salesVchNo(inv.getSalesVchNo())
                 .bags(inv.getBags())
                 .ratePerBag(inv.getRatePerBag())
+                .createdBy(inv.getCreatedBy())
                 .createdAt(inv.getCreatedAt() != null ? inv.getCreatedAt().format(FMT) : "")
                 .build();
     }

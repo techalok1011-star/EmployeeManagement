@@ -190,6 +190,7 @@
                     <select class="form-control" th:field="*{role}">
                         <option value="EMPLOYEE">Employee — payment entries only</option>
                         <option value="ACCOUNTANT">Accountant — invoices, parties &amp; reminders</option>
+                        <option value="MANAGER">Manager — invoices via mobile</option>
                     </select>
 
                     <button type="submit" class="btn btn-primary">👤 Create User</button>
@@ -239,6 +240,61 @@
                                                 th:text="${acc.active}?'Disable':'Enable'"></button>
                                     </form>
                                     <form th:action="@{/admin/employees/{id}/reset-password(id=${acc.id})}" method="post"
+                                          style="display:inline" class="reset-pw-form">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <input type="hidden" name="newPassword" class="new-pw-value"/>
+                                        <button type="button" class="btn btn-ghost btn-sm reset-pw-btn">🔑 Reset</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Managers Table -->
+        <div class="card" style="margin-top:24px">
+            <div class="section-header">
+                <div class="section-title">📦 Managers (<span th:text="${#lists.size(managers)}">0</span>)</div>
+            </div>
+            <div th:if="${#lists.isEmpty(managers)}" class="text-muted" style="padding:12px 0">
+                No manager accounts yet — create one using the form above.
+            </div>
+            <div th:if="${!#lists.isEmpty(managers)}" class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Manager</th>
+                            <th>Username</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="mgr : ${managers}">
+                            <td>
+                                <div style="display:flex;align-items:center;gap:10px">
+                                    <span class="emp-initials" th:text="${mgr.fullName.substring(0,1)}">M</span>
+                                    <div>
+                                        <div style="font-weight:500;font-size:14px" th:text="${mgr.fullName}"></div>
+                                        <div class="text-muted" th:text="${mgr.email}"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-muted" th:text="'@' + ${mgr.username}"></td>
+                            <td>
+                                <span class="badge" th:classappend="${mgr.active}?'badge-active':'badge-inactive'" th:text="${mgr.active}?'Active':'Inactive'"></span>
+                            </td>
+                            <td>
+                                <div class="actions">
+                                    <form th:action="@{/admin/employees/{id}/toggle(id=${mgr.id})}" method="post" style="display:inline">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button type="submit" class="btn btn-sm"
+                                                th:classappend="${mgr.active}?'btn-danger':'btn-ghost'"
+                                                th:text="${mgr.active}?'Disable':'Enable'"></button>
+                                    </form>
+                                    <form th:action="@{/admin/employees/{id}/reset-password(id=${mgr.id})}" method="post"
                                           style="display:inline" class="reset-pw-form">
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                         <input type="hidden" name="newPassword" class="new-pw-value"/>

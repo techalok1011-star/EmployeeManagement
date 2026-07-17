@@ -47,11 +47,12 @@ public class SecurityConfig {
             .authenticationProvider(authenticationProvider())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/h2-console/**",
-                        "/manifest.json", "/sw.js", "/icons/**").permitAll()
+                        "/manifest.json", "/manager-manifest.json", "/sw.js", "/icons/**").permitAll()
                 .requestMatchers("/api/parties/suggest", "/api/parties").authenticated()
                 .requestMatchers("/api/parties/import", "/api/parties/cleanup", "/api/parties/upload-import").hasAnyRole("ADMIN", "ACCOUNTANT")
                 .requestMatchers("/admin/**").hasAnyRole("ADMIN", "ACCOUNTANT")
                 .requestMatchers("/employee/**").hasRole("EMPLOYEE")
+                .requestMatchers("/manager/**").hasRole("MANAGER")
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form
@@ -64,6 +65,8 @@ public class SecurityConfig {
                         redirect = "/admin/dashboard";
                     } else if (authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_ACCOUNTANT"))) {
                         redirect = "/admin/invoices";
+                    } else if (authorities.stream().anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"))) {
+                        redirect = "/manager/dashboard";
                     } else {
                         redirect = "/employee/dashboard";
                     }

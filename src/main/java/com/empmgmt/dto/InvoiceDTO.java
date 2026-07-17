@@ -64,6 +64,7 @@ public class InvoiceDTO {
         private String deliveryMode;
         private String transportNumber;
         private String salesVchNo;
+        private String createdBy;
         private String createdAt;
     }
 }

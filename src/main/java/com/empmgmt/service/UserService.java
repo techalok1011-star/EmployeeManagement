@@ -64,6 +64,12 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public List<UserDTO.Response> getAllManagers() {
+        return userRepository.findByRole(User.Role.MANAGER)
+                .stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public UserDTO.Response getUserById(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));

@@ -48,6 +48,6 @@ public class User {
     }
 
     public enum Role {
-        ADMIN, EMPLOYEE, ACCOUNTANT
+        ADMIN, EMPLOYEE, ACCOUNTANT, MANAGER
     }
 }
