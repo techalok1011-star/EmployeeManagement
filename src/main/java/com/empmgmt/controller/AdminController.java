@@ -25,12 +25,15 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import org.springframework.data.domain.Sort;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -127,12 +130,13 @@ public class AdminController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Long employeeId,
-            Model model) {
+            Model model, Authentication auth) {
         boolean filtered = from != null || to != null || employeeId != null;
         model.addAttribute("entries", filtered
                 ? paymentEntryService.getFilteredEntriesForAdmin(from, to, employeeId)
                 : paymentEntryService.getAllEntries());
         model.addAttribute("employees", userService.getAllEmployees());
+        model.addAttribute("adminName", auth.getName());
         model.addAttribute("from", from);
         model.addAttribute("to", to);
         model.addAttribute("selectedEmployeeId", employeeId);
@@ -315,7 +319,40 @@ public class AdminController {
     public String partyLedger(@RequestParam String partyName, Model model, Authentication auth) {
         model.addAttribute("ledger", invoiceService.getPartyLedger(partyName));
         model.addAttribute("adminName", auth.getName());
+        PaymentEntryDTO.Request newPayment = new PaymentEntryDTO.Request();
+        newPayment.setEntryDate(LocalDate.now());
+        model.addAttribute("newPayment", newPayment);
+        model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
         return "admin/party-ledger";
+    }
+
+    /**
+     * Lets Admin/Accountant record a collection directly from a party's ledger —
+     * for a payment that's missing from the statement (a discrepancy caught while
+     * reviewing it), not routed through the normal employee day-entry flow.
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @PostMapping("/ledger/add-payment")
+    public String addLedgerPayment(@Valid @ModelAttribute("newPayment") PaymentEntryDTO.Request request,
+                                   BindingResult result,
+                                   Authentication auth,
+                                   RedirectAttributes redirectAttributes) {
+        String encodedParty = URLEncoder.encode(
+                request.getPartyName() == null ? "" : request.getPartyName(), StandardCharsets.UTF_8);
+        if (result.hasErrors()) {
+            String firstError = result.getFieldErrors().stream()
+                    .map(FieldError::getDefaultMessage)
+                    .findFirst().orElse("Invalid payment details.");
+            redirectAttributes.addFlashAttribute("errorMsg", firstError);
+            return "redirect:/admin/ledger?partyName=" + encodedParty;
+        }
+        try {
+            paymentEntryService.createEntryByStaff(request, auth.getName());
+            redirectAttributes.addFlashAttribute("successMsg", "Payment entry added to ledger.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/admin/ledger?partyName=" + encodedParty;
     }
 
     /** Every party's statement of account on one page — mirrors the Excel "Party Ledger" sheet. */

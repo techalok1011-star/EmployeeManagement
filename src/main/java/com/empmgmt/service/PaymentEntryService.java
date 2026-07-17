@@ -79,6 +79,40 @@ public class PaymentEntryService {
         return mapToResponse(entry);
     }
 
+    /**
+     * Admin/Accountant can add a payment entry for any date directly from the
+     * Party Ledger — used to record a collection that's missing from the
+     * statement (a discrepancy found while reviewing it). Unlike the
+     * employee flow this is not restricted to today's date; remarks are
+     * mandatory so the reason for the out-of-band entry is on record.
+     */
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    public PaymentEntryDTO.Response createEntryByStaff(PaymentEntryDTO.Request request, String username) {
+        if (request.getRemarks() == null || request.getRemarks().isBlank()) {
+            throw new RuntimeException("Remarks are mandatory when adding a payment from the ledger");
+        }
+        User staff = findUserByUsername(username);
+
+        excelPartyService.ensureExists(request.getPartyName());
+
+        PaymentEntry entry = PaymentEntry.builder()
+                .partyName(request.getPartyName())
+                .amount(request.getAmount())
+                .modeOfPayment(request.getModeOfPayment())
+                .entryDate(request.getEntryDate())
+                .remarks(request.getRemarks())
+                .receiptVchNo(request.getReceiptVchNo() != null && !request.getReceiptVchNo().isBlank()
+                        ? request.getReceiptVchNo().trim() : null)
+                .employee(staff)
+                .build();
+
+        entry = paymentEntryRepository.save(entry);
+        log.info("✅ Payment entry SAVED to DB via ledger | id={} | party={} | amount={} | staff={} | date={}",
+                entry.getId(), entry.getPartyName(), entry.getAmount(), username, entry.getEntryDate());
+        logAction("CREATE", entry, username, "Entry added from Party Ledger");
+        return mapToResponse(entry);
+    }
+
     // ─────────────────────────────────────────────────────────
     // READ – Employee
     // ─────────────────────────────────────────────────────────
