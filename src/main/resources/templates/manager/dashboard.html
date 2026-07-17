@@ -269,7 +269,7 @@
     let allParties = [];
 
     if (partyInput) {
-        fetch('/api/parties/suggest?q=')
+        fetch('/api/parties/suggest?q=&limit=5000')
             .then(r => r.json())
             .then(data => { allParties = data; })
             .catch(() => {});
