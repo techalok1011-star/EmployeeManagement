@@ -43,6 +43,7 @@ public class ManagerController {
         addDashboardAttributes(model, username);
         InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
         newInvoice.setInvoiceDate(LocalDate.now());
+        newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
         model.addAttribute("newInvoice", newInvoice);
         model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
         model.addAttribute("today", LocalDate.now());

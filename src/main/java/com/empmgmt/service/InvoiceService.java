@@ -90,6 +90,30 @@ public class InvoiceService {
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
+    /**
+     * Suggests the next invoice number as INV-&lt;year&gt;-&lt;seq&gt;, sequence reset each
+     * year and zero-padded to 3 digits (INV-2026-001, INV-2026-002, ...). Only a
+     * suggestion pre-filled on the Add Invoice form — the field stays editable, and
+     * {@link #createInvoice} still enforces uniqueness independently, so a collision
+     * (e.g. two people adding an invoice at the same moment) just surfaces as the
+     * existing "already exists" validation error rather than silently overwriting.
+     */
+    @Transactional(readOnly = true)
+    public String getNextInvoiceNumber() {
+        String prefix = "INV-" + LocalDate.now().getYear() + "-";
+        int maxSeq = invoiceRepository.findByInvoiceNumberStartingWith(prefix).stream()
+                .map(inv -> inv.getInvoiceNumber().substring(prefix.length()))
+                .mapToInt(suffix -> {
+                    try {
+                        return Integer.parseInt(suffix);
+                    } catch (NumberFormatException e) {
+                        return 0;
+                    }
+                })
+                .max().orElse(0);
+        return prefix + String.format("%03d", maxSeq + 1);
+    }
+
     @Transactional(readOnly = true)
     public InvoiceDTO.Response getInvoiceById(Long id) {
         return toResponse(invoiceRepository.findById(id)

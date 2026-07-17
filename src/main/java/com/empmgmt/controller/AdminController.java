@@ -274,7 +274,9 @@ public class AdminController {
         model.addAttribute("from", from);
         model.addAttribute("to", to);
         model.addAttribute("outstandingSummary", invoiceService.getPartyOutstandingSummary());
-        model.addAttribute("newInvoice", new InvoiceDTO.Request());
+        InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
+        newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
+        model.addAttribute("newInvoice", newInvoice);
         model.addAttribute("deliveryModes", com.empmgmt.entity.Invoice.DeliveryMode.values());
         invoiceService.getInvoicePageStats().forEach(model::addAttribute);
         model.addAttribute("recentNotifications", notificationLogRepository.findTop30ByOrderBySentAtDesc());

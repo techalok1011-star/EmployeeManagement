@@ -22,6 +22,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     List<Invoice> findByCreatedByAndInvoiceDateOrderByCreatedAtDesc(String createdBy, LocalDate invoiceDate);
 
+    List<Invoice> findByInvoiceNumberStartingWith(String prefix);
+
     boolean existsByInvoiceNumber(String invoiceNumber);
 
     @Query("SELECT COALESCE(SUM(i.amount), 0) FROM Invoice i")

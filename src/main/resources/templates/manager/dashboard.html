@@ -172,7 +172,7 @@
                       id="addInvoiceForm" autocomplete="off">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
-                    <label class="form-label">Invoice Number</label>
+                    <label class="form-label">Invoice Number <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(auto-suggested, editable)</span></label>
                     <input type="text" class="form-control" th:field="*{invoiceNumber}" placeholder="e.g. INV-2026-001"/>
                     <div class="form-error" th:if="${#fields.hasErrors('invoiceNumber')}" th:errors="*{invoiceNumber}"></div>
 
