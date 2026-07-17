@@ -1,13 +1,27 @@
 package com.empmgmt.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 @Controller
 public class AuthController {
+
+    /**
+     * Keep-alive target for the external cron (see .github/workflows/keep-alive.yml) that
+     * pings the Render free-tier instance so it doesn't idle-sleep. Deliberately does not
+     * touch the DB/session - just proves the JVM/servlet container is up, matching what
+     * "is this instance awake" actually needs. permitAll in SecurityConfig.
+     */
+    @GetMapping("/health")
+    @ResponseBody
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("OK");
+    }
 
     @GetMapping("/login")
     public String loginPage(@RequestParam(value = "error", required = false) String error,
