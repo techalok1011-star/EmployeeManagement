@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -157,8 +157,8 @@
                 <span class="filter-active-badge">● Filtered</span>
             </div>
             <!-- Export buttons (carry current filter state) -->
-            <div class="export-divider"></div>
-            <div class="filter-group" style="flex-direction:row;gap:8px;align-items:flex-end">
+            <div class="export-divider" sec:authorize="hasRole('ADMIN')"></div>
+            <div class="filter-group" style="flex-direction:row;gap:8px;align-items:flex-end" sec:authorize="hasRole('ADMIN')">
                 <a th:href="@{/admin/export/excel(from=${from},to=${to},employeeId=${selectedEmployeeId})}"
                    class="btn-filter btn-filter-excel">📊 Excel</a>
                 <a th:href="@{/admin/export/pdf(from=${from},to=${to},employeeId=${selectedEmployeeId})}"
@@ -205,7 +205,7 @@
                             <td th:text="${#temporals.format(entry.entryDate,'dd MMM yyyy')}"></td>
                             <td class="text-muted" th:text="${entry.remarks!=null&&!entry.remarks.isEmpty()?entry.remarks:'—'}"></td>
                             <td>
-                                <div style="display:flex;gap:6px">
+                                <div style="display:flex;gap:6px" sec:authorize="hasRole('ADMIN')">
                                     <a th:href="@{/admin/entries/{id}/edit(id=${entry.id})}" class="btn btn-ghost">✏️ Edit</a>
                                     <form th:action="@{/admin/entries/{id}/delete(id=${entry.id})}" method="post" onsubmit="return confirm('Delete this entry?')">
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

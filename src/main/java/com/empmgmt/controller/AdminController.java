@@ -121,6 +121,7 @@ public class AdminController {
 
     // ─── Entry Management ─────────────────────────────────────
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @GetMapping("/entries")
     public String allEntries(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
