@@ -13,6 +13,7 @@ import com.empmgmt.event.InvoiceCreatedEvent;
 import com.empmgmt.repository.InvoiceRepository;
 import com.empmgmt.repository.PartyRepository;
 import com.empmgmt.repository.PaymentEntryRepository;
+import com.empmgmt.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -41,6 +42,8 @@ public class InvoiceService {
     private final PaymentEntryRepository paymentEntryRepository;
     private final PartyRepository partyRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final AuditLogService auditLogService;
+    private final UserRepository userRepository;
 
     private static final DateTimeFormatter FMT =
             DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a");
@@ -70,7 +73,17 @@ public class InvoiceService {
                 .createdBy(createdBy)
                 .build());
         eventPublisher.publishEvent(new InvoiceCreatedEvent(saved, createdBy));
+        logInvoiceAudit("CREATE", saved, createdBy,
+                "Invoice " + saved.getInvoiceNumber() + " (₹" + amount.toPlainString()
+                        + ") created for " + saved.getPartyName());
         return toResponse(saved);
+    }
+
+    private void logInvoiceAudit(String action, Invoice invoice, String performedBy, String description) {
+        String role = userRepository.findByUsername(performedBy)
+                .map(u -> u.getRole().name()).orElse(null);
+        auditLogService.log(action, "INVOICE", invoice.getId(), invoice.getPartyName(),
+                invoice.getAmount(), description, performedBy, role);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -143,11 +156,13 @@ public class InvoiceService {
     // ─────────────────────────────────────────────────────────
 
     @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
-    public void deleteInvoice(Long id) {
-        if (!invoiceRepository.existsById(id)) {
-            throw new NoSuchElementException("Invoice not found: " + id);
-        }
+    public void deleteInvoice(Long id, String performedBy) {
+        Invoice invoice = invoiceRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Invoice not found: " + id));
         invoiceRepository.deleteById(id);
+        logInvoiceAudit("DELETE", invoice, performedBy,
+                "Invoice " + invoice.getInvoiceNumber() + " (₹" + invoice.getAmount().toPlainString()
+                        + ") deleted for " + invoice.getPartyName());
     }
 
     // ─────────────────────────────────────────────────────────

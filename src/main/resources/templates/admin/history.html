@@ -161,6 +161,7 @@
                     <table id="auditTable">
                         <thead>
                             <tr>
+                                <th>Category</th>
                                 <th>Action</th>
                                 <th>Employee</th>
                                 <th>Party Name</th>
@@ -175,24 +176,33 @@
                         <tbody>
                             <tr th:each="log : ${logs}" th:data-action="${log.action}">
                                 <td>
+                                    <span class="text-muted"
+                                          th:text="${log.category == 'Invoice'} ? '🧾 Invoice' : (${log.category == 'Party'} ? '🏢 Party' : '💰 Payment Entry')"></span>
+                                </td>
+                                <td>
                                     <span class="badge"
                                           th:classappend="${log.action == 'CREATE'} ? 'badge-create' :
                                                           (${log.action == 'UPDATE'} ? 'badge-update' : 'badge-delete')"
                                           th:text="${log.action}"></span>
                                 </td>
                                 <td>
-                                    <span class="emp-pill" th:text="${log.employeeName}"></span>
-                                    <div class="text-muted" th:text="'@' + ${log.employeeUsername}"></div>
+                                    <span th:if="${log.employeeName != null}" class="emp-pill" th:text="${log.employeeName}"></span>
+                                    <div th:if="${log.employeeUsername != null}" class="text-muted" th:text="'@' + ${log.employeeUsername}"></div>
+                                    <span th:if="${log.employeeName == null}" class="text-muted">—</span>
                                 </td>
-                                <td style="font-weight:500" th:text="${log.partyName}"></td>
-                                <td class="amount">₹<span th:text="${#numbers.formatDecimal(log.amount,1,'COMMA',2,'POINT')}"></span></td>
-                                <td class="text-muted" th:text="${log.modeOfPayment}"></td>
+                                <td style="font-weight:500" th:text="${log.partyName != null ? log.partyName : '—'}"></td>
+                                <td>
+                                    <span th:if="${log.amount != null}" class="amount">₹<span th:text="${#numbers.formatDecimal(log.amount,1,'COMMA',2,'POINT')}"></span></span>
+                                    <span th:if="${log.amount == null}" class="text-muted">—</span>
+                                </td>
+                                <td class="text-muted" th:text="${log.modeOfPayment != null ? log.modeOfPayment : '—'}"></td>
                                 <td class="text-muted" th:text="${log.entryDate != null ? #temporals.format(log.entryDate,'dd MMM yyyy') : '—'}"></td>
                                 <td>
                                     <span style="font-size:13px;font-weight:500" th:text="${log.performedBy}"></span>
+                                    <div th:if="${log.performedByRole != null}" class="text-muted" th:text="${log.performedByRole}"></div>
                                 </td>
                                 <td class="notes-cell" th:text="${log.notes != null ? log.notes : '—'}"></td>
-                                <td class="text-muted" th:text="${log.performedAt}"></td>
+                                <td class="text-muted" th:text="${log.performedAtDisplay}"></td>
                             </tr>
                         </tbody>
                     </table>

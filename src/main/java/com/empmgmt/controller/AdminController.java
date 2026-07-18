@@ -9,6 +9,7 @@ import com.empmgmt.entity.PaymentEntry;
 import com.empmgmt.repository.NotificationLogRepository;
 import com.empmgmt.repository.PartyRepository;
 import com.empmgmt.service.AdminNotificationService;
+import com.empmgmt.service.AuditLogService;
 import com.empmgmt.service.ExportService;
 import com.empmgmt.service.InvoiceService;
 import com.empmgmt.service.OutstandingNotificationService;
@@ -54,6 +55,7 @@ public class AdminController {
     private final NotificationLogRepository notificationLogRepository;
     private final PartyRepository partyRepository;
     private final AdminNotificationService adminNotificationService;
+    private final AuditLogService auditLogService;
 
     // ─── Dashboard ────────────────────────────────────────────
 
@@ -257,7 +259,7 @@ public class AdminController {
 
     @GetMapping("/history")
     public String history(Model model, Authentication auth) {
-        model.addAttribute("logs", paymentEntryService.getAllTransactionLogs());
+        model.addAttribute("logs", auditLogService.getUnifiedFeed());
         model.addAttribute("adminName", auth.getName());
         return "admin/history";
     }
@@ -314,9 +316,9 @@ public class AdminController {
 
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/invoices/{id}/delete")
-    public String deleteInvoice(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+    public String deleteInvoice(@PathVariable Long id, Authentication auth, RedirectAttributes redirectAttributes) {
         try {
-            invoiceService.deleteInvoice(id);
+            invoiceService.deleteInvoice(id, auth.getName());
             redirectAttributes.addFlashAttribute("successMsg", "Invoice deleted.");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
@@ -519,7 +521,7 @@ public class AdminController {
                         "Party '" + combined + "' already exists.");
                 return "redirect:/admin/parties";
             }
-            partyRepository.save(Party.builder()
+            Party saved = partyRepository.save(Party.builder()
                     .name(request.getName().trim())
                     .gst(gstin)
                     .combined(combined)
@@ -529,6 +531,7 @@ public class AdminController {
                             ? request.getPhone().trim() : null)
                     .whatsappOptIn(request.isWhatsappOptIn())
                     .build());
+            logPartyAudit("CREATE", saved, auth.getName(), "Party '" + combined + "' created");
             redirectAttributes.addFlashAttribute("successMsg", "Party added successfully!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
@@ -568,6 +571,7 @@ public class AdminController {
             return "admin/edit-party";
         }
         partyRepository.findById(id).ifPresent(party -> {
+            String before = party.getCombined();
             String gstin    = request.getGstin() != null ? request.getGstin().trim() : "";
             String combined = gstin.isEmpty() ? request.getName().trim()
                                               : request.getName().trim() + "_" + gstin;
@@ -584,6 +588,7 @@ public class AdminController {
                     ? request.getPhone().trim() : null);
             party.setWhatsappOptIn(request.isWhatsappOptIn());
             partyRepository.save(party);
+            logPartyAudit("UPDATE", party, auth.getName(), "Party '" + before + "' updated to '" + combined + "'");
         });
         redirectAttributes.addFlashAttribute("successMsg", "Party updated successfully!");
         return "redirect:/admin/parties";
@@ -591,8 +596,11 @@ public class AdminController {
 
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/parties/{id}/delete")
-    public String deleteParty(@PathVariable Long id, RedirectAttributes redirectAttributes) {
-        partyRepository.deleteById(id);
+    public String deleteParty(@PathVariable Long id, Authentication auth, RedirectAttributes redirectAttributes) {
+        partyRepository.findById(id).ifPresent(party -> {
+            partyRepository.deleteById(id);
+            logPartyAudit("DELETE", party, auth.getName(), "Party '" + party.getCombined() + "' deleted");
+        });
         redirectAttributes.addFlashAttribute("successMsg", "Party deleted.");
         return "redirect:/admin/parties";
     }
@@ -602,14 +610,22 @@ public class AdminController {
     public String updatePartyPhone(@PathVariable Long id,
                                    @RequestParam(required = false) String phone,
                                    @RequestParam(defaultValue = "false") boolean whatsappOptIn,
+                                   Authentication auth,
                                    RedirectAttributes redirectAttributes) {
         partyRepository.findById(id).ifPresent(party -> {
             party.setPhone(phone != null && !phone.isBlank() ? phone.trim() : null);
             party.setWhatsappOptIn(whatsappOptIn);
             partyRepository.save(party);
+            logPartyAudit("UPDATE", party, auth.getName(), "Party '" + party.getCombined() + "' contact info updated");
         });
         redirectAttributes.addFlashAttribute("successMsg", "Party contact updated.");
         return "redirect:/admin/invoices";
+    }
+
+    private void logPartyAudit(String action, Party party, String performedBy, String description) {
+        String role = userService.getUserByUsername(performedBy).getRole();
+        auditLogService.log(action, "PARTY", party.getId(), party.getCombined(),
+                null, description, performedBy, role);
     }
 
     // ─── Manual Notification Trigger ─────────────────────────

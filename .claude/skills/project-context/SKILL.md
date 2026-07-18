@@ -120,7 +120,7 @@ thing to understand before touching invoices/payments/parties:
   `ExcelPartyService.ensureExists(combined)` / the existing controllers
   rather than hand-crafting the string.
 
-### Tables (9, schema `public`)
+### Tables (10, schema `public`)
 
 | Table | Key columns | Notes |
 |---|---|---|
@@ -130,6 +130,7 @@ thing to understand before touching invoices/payments/parties:
 | `payment_entries` | id, party_name, amount, mode_of_payment, entry_date, remarks, edited, edited_by, edited_at, employee_id(FK→users), **receipt_vch_no** | `mode_of_payment` CHECK: `CASH,CHEQUE,BANK_TRANSFER,UPI,NEFT,RTGS,DD`. Only real FK in the whole schema is `employee_id`. `receipt_vch_no` (added 2026-07-12): Tally Receipt Register voucher number for imported rows - **not unique**, Tally itself ran two parallel voucher-number series that collide with each other |
 | `transaction_logs` | id, action, entry_id(no FK, just a Long), employee_name, employee_username, party_name, amount, mode_of_payment, entry_date, remarks, performed_by, notes, performed_at | Audit trail, denormalized snapshot per event, not linked by FK |
 | `notification_logs` | id, party_name, phone, outstanding_amount, status, error_message, triggered_by, sent_at | `status` CHECK: `SENT,FAILED,DRY_RUN`. `triggered_by` = `"SCHEDULER"` or `"ADMIN:<user>"`/`"ACCOUNTANT:<user>"` |
+| `audit_logs` | id, action, entity_type, entity_id, party_name, amount, description, performed_by, performed_by_role, performed_at | Added 2026-07-18. Generic audit trail for Invoice/Party create-edit-delete (`transaction_logs` above still covers PaymentEntry actions on its own, unchanged). **Deliberately no CHECK constraint** on `action`/`entity_type` (plain Strings, no `@Enumerated`) - this table logs many action verbs and will keep growing, and a CHECK constraint would need a manual `ALTER TABLE` every time (see the enum gotcha below). |
 | `notification_settings` | id(always 1, singleton row), daily_reminder_enabled, updated_by, updated_at | Controls whether the 5pm scheduler actually fires |
 | `payment_receipts` | id, **payment_entry_id**(FK→payment_entries, unique), photo_data(**bytea**), content_type, latitude, longitude, captured_at | Added 2026-07-18. One row per entry that has a photographed receipt - deliberately a separate table, not columns on `payment_entries`, since that table is read on every cached ledger/summary query and a bytea column there would bloat all of them. `photo_data` **must** stay mapped via `@JdbcTypeCode(SqlTypes.VARBINARY)` + `columnDefinition="bytea"` - plain `@Lob` on a `byte[]` with Hibernate+Postgres silently maps to `oid` (large object) instead, which isn't auto-cleaned on row delete and doesn't play well with pooled/serverless Postgres connections (caught and fixed during initial implementation, before any real data existed). |
 | `admin_notifications` | id, type, message, party_name, amount, triggered_by, triggered_by_role, source_type, source_id, is_read, created_at, read_at | Added 2026-07-18. `type` CHECK: `COLLECTION_ADDED,INVOICE_ADDED` - same enum-CHECK-constraint gotcha as below applies to any future new type. Powers the admin activity feed/bell (see its own section). |
@@ -600,6 +601,48 @@ no WhatsApp/email push - that was an explicit scope decision.
   the unread-count endpoint are `hasRole('ADMIN')` only, not the usual
   `hasAnyRole('ADMIN','ACCOUNTANT')` widening) - matches the original request
   ("admin should be notified"), not extended to accountants.
+
+## Unified Audit Log (added 2026-07-18)
+
+`admin/history.html` (`GET /admin/history`, ADMIN-only) used to show only
+`transaction_logs` (PaymentEntry create/update/delete). It now shows a merged,
+chronologically-sorted feed of that **plus** Invoice and Party
+create/update/delete, driven by `AuditLogService.getUnifiedFeed()` which
+combines `TransactionLogRepository` + the new `AuditLogRepository` into one
+`List<AuditFeedDTO.Response>` sorted by the raw `performedAt` timestamp (not
+the formatted display string - string-sorting dates would be wrong).
+
+- **Logged**: invoice create (`InvoiceService.createInvoice()` - covers all
+  three call sites: admin/invoices.html, the ledger's Add Invoice tab, and
+  Manager's invoice form, since they all funnel through this one method) and
+  delete (`InvoiceService.deleteInvoice()`, which now takes a `performedBy`
+  param - **signature changed**, only one call site, `AdminController.deleteInvoice`,
+  already updated to pass `auth.getName()`); party create/update/delete
+  (`AdminController.addParty`/`editParty`/`updatePartyPhone`/`deleteParty` -
+  these have **no service layer**, they call `partyRepository` directly in
+  the controller, so the audit calls live right there via a small
+  `logPartyAudit()` helper, not in a `PartyService` that doesn't exist).
+- **Not logged** (deliberately out of scope): the bulk `ExcelPartyService
+  .cleanupInvalidEntries()` path (`POST /api/parties/cleanup`, no
+  `@PreAuthorize` at all currently - worth a look if this matters) and the
+  Excel-import party creation path (`ExcelPartyService.ensureExists()`) -
+  that fires constantly as a side effect of typing any new party name into
+  any form, logging it would be pure noise, not a deliberate audit-worthy action.
+- **Role is captured at the time of the action** (`AuditLog.performedByRole`,
+  looked up once via `UserRepository`/`UserService.getUserByUsername()` at
+  the moment of logging) - correct even if the user's role changes later.
+  Legacy `transaction_logs` rows have no role captured historically, so the
+  merged feed shows a role badge only for the new Invoice/Party rows; existing
+  PaymentEntry rows just show the username, same as before.
+- **Template**: added a Category column (💰 Payment Entry / 🧾 Invoice /
+  🏢 Party) and null-guards on Employee/Amount/Mode/Entry Date (those only
+  apply to some categories) - the existing search box, CREATE/UPDATE/DELETE
+  filter buttons, and summary-pill counts needed **zero JS changes**, since
+  `AuditLog.action` deliberately reuses the exact same `CREATE`/`UPDATE`/`DELETE`
+  vocabulary as `TransactionLog.action`.
+- **`AuditLog.action`/`entity_type` are plain Strings, not `@Enumerated`** -
+  deliberate, to sidestep the enum/CHECK-constraint gotcha below for a table
+  that's expected to grow with more logged action types over time.
 
 ## Concurrency: what's actually protected vs. not (as of 2026-07-18)
 
