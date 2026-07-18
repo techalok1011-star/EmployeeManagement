@@ -16,4 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping health endpoint
-        run: curl -fsS --max-time 20 https://employeemanagement-q6h3.onrender.com/health
+        # --max-time is generous (not 20s) because the very first ping after the
+        # overnight sleep window has to cold-start the whole JVM/Spring context on
+        # Render's free 0.1-vCPU tier, which routinely takes 30-60s+ - a short
+        # timeout here just fails a perfectly fine wake-up and spams failure email.
+        # --retry covers the rare case a single attempt still isn't enough.
+        run: curl -fsS --max-time 90 --retry 2 --retry-delay 10 https://employeemanagement-q6h3.onrender.com/health
