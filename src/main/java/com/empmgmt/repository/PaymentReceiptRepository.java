@@ -6,9 +6,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 @Repository
 public interface PaymentReceiptRepository extends JpaRepository<PaymentReceipt, Long> {
@@ -17,7 +18,14 @@ public interface PaymentReceiptRepository extends JpaRepository<PaymentReceipt, 
 
     boolean existsByPaymentEntryId(Long paymentEntryId);
 
-    /** Batched existence check - avoids N+1 when flagging a whole list of entries. */
-    @Query("SELECT r.paymentEntry.id FROM PaymentReceipt r WHERE r.paymentEntry.id IN :entryIds")
-    Set<Long> findPaymentEntryIdsWithReceipt(@Param("entryIds") Collection<Long> entryIds);
+    /** Projection for batched flagging - avoids N+1 when annotating a whole list of entries. */
+    interface ReceiptFlag {
+        Long getPaymentEntryId();
+        BigDecimal getLatitude();
+        BigDecimal getLongitude();
+    }
+
+    @Query("SELECT r.paymentEntry.id AS paymentEntryId, r.latitude AS latitude, r.longitude AS longitude " +
+           "FROM PaymentReceipt r WHERE r.paymentEntry.id IN :entryIds")
+    List<ReceiptFlag> findReceiptFlags(@Param("entryIds") Collection<Long> entryIds);
 }

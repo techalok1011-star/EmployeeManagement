@@ -205,6 +205,9 @@
                                 <span th:text="${entry.receiptVchNo != null ? entry.receiptVchNo : '—'}"></span>
                                 <a th:if="${entry.hasReceipt}" th:href="@{/admin/entries/{id}/receipt(id=${entry.id})}"
                                    target="_blank" title="View receipt photo" style="margin-left:6px;text-decoration:none;">📷</a>
+                                <a th:if="${entry.hasReceipt and entry.latitude != null and entry.longitude != null}"
+                                   th:href="'https://www.google.com/maps?q=' + ${entry.latitude} + ',' + ${entry.longitude}"
+                                   target="_blank" title="View location on map" style="margin-left:4px;text-decoration:none;">📍</a>
                             </td>
                             <td><span class="emp-pill" th:text="${entry.employeeName}"></span></td>
                             <td class="amount">₹<span th:text="${#numbers.formatDecimal(entry.amount,1,'COMMA',2,'POINT')}"></span></td>

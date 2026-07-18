@@ -269,17 +269,26 @@ public class PaymentEntryService {
     }
 
     /**
-     * Flags which entries in the list have an attached receipt photo, via a single
-     * batched query - not part of {@link #mapToResponse} itself, since most callers
-     * (employee's own list, ledgers, exports) never need this and shouldn't pay for
-     * an extra join/query on every entry.
+     * Flags which entries in the list have an attached receipt photo (and its geo-tag,
+     * if any), via a single batched query - not part of {@link #mapToResponse} itself,
+     * since most callers (employee's own list, ledgers, exports) never need this and
+     * shouldn't pay for an extra join/query on every entry.
      */
     @Transactional(readOnly = true)
     public List<PaymentEntryDTO.Response> withReceiptFlags(List<PaymentEntryDTO.Response> entries) {
         if (entries.isEmpty()) return entries;
         Set<Long> ids = entries.stream().map(PaymentEntryDTO.Response::getId).collect(Collectors.toSet());
-        Set<Long> withReceipt = paymentReceiptRepository.findPaymentEntryIdsWithReceipt(ids);
-        entries.forEach(e -> e.setHasReceipt(withReceipt.contains(e.getId())));
+        Map<Long, PaymentReceiptRepository.ReceiptFlag> byEntryId = paymentReceiptRepository
+                .findReceiptFlags(ids).stream()
+                .collect(Collectors.toMap(PaymentReceiptRepository.ReceiptFlag::getPaymentEntryId, f -> f));
+        entries.forEach(e -> {
+            PaymentReceiptRepository.ReceiptFlag flag = byEntryId.get(e.getId());
+            e.setHasReceipt(flag != null);
+            if (flag != null) {
+                e.setLatitude(flag.getLatitude());
+                e.setLongitude(flag.getLongitude());
+            }
+        });
         return entries;
     }
 

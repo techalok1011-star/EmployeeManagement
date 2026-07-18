@@ -58,6 +58,8 @@ public class PaymentEntryDTO {
         private String editedAt;
         /** Set via a batched lookup by the admin entries listing, not populated by mapToResponse() itself. */
         private boolean hasReceipt;
+        private BigDecimal latitude;
+        private BigDecimal longitude;
     }
 
     @Data
