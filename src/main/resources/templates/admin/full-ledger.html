@@ -72,6 +72,9 @@
         .btn-show-entries:hover{background:rgba(108,142,255,0.2)}
         .party-entries-content{margin-top:10px}
         .no-match{text-align:center;padding:40px;color:var(--muted);display:none}
+        .notif-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text);text-decoration:none;font-size:16px;cursor:pointer;transition:background 0.15s;flex-shrink:0}
+        .notif-bell:hover{background:rgba(255,255,255,0.09)}
+        .notif-badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:white;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1}
     </style>
 </head>
 <body>
@@ -113,7 +116,10 @@
 <div class="main">
     <div class="topbar">
         <span class="topbar-title">📚 Full Ledger — All Parties</span>
-        <span class="count-badge" th:text="${#lists.size(ledgers)} + ' parties'"></span>
+        <div style="display:flex;align-items:center;gap:12px">
+            <span class="count-badge" th:text="${#lists.size(ledgers)} + ' parties'"></span>
+            <a href="/admin/activity" class="notif-bell" title="Activity">🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span></a>
+        </div>
     </div>
 
     <div class="content">
@@ -249,6 +255,20 @@
             btn.textContent = '▾ Show Transactions';
         }
     }
+</script>
+<script>
+(function(){
+    var badge = document.getElementById('notifBadge');
+    if (!badge) return;
+    function poll(){
+        fetch('/admin/notifications/unread-count').then(function(r){return r.json();}).then(function(d){
+            if (d.count > 0) { badge.textContent = d.count > 99 ? '99+' : d.count; badge.style.display='flex'; }
+            else { badge.style.display='none'; }
+        }).catch(function(){});
+    }
+    poll();
+    setInterval(poll, 45000);
+})();
 </script>
 </body>
 </html>

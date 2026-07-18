@@ -56,6 +56,8 @@ public class PaymentEntryDTO {
         private boolean edited;
         private String editedBy;   // "EMPLOYEE" | "ADMIN" | null
         private String editedAt;
+        /** Set via a batched lookup by the admin entries listing, not populated by mapToResponse() itself. */
+        private boolean hasReceipt;
     }
 
     @Data

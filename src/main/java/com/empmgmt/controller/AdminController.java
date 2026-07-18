@@ -8,6 +8,7 @@ import com.empmgmt.entity.Party;
 import com.empmgmt.entity.PaymentEntry;
 import com.empmgmt.repository.NotificationLogRepository;
 import com.empmgmt.repository.PartyRepository;
+import com.empmgmt.service.AdminNotificationService;
 import com.empmgmt.service.ExportService;
 import com.empmgmt.service.InvoiceService;
 import com.empmgmt.service.OutstandingNotificationService;
@@ -52,6 +53,7 @@ public class AdminController {
     private final OutstandingNotificationService notificationService;
     private final NotificationLogRepository notificationLogRepository;
     private final PartyRepository partyRepository;
+    private final AdminNotificationService adminNotificationService;
 
     // ─── Dashboard ────────────────────────────────────────────
 
@@ -139,9 +141,10 @@ public class AdminController {
             @RequestParam(required = false) Long employeeId,
             Model model, Authentication auth) {
         boolean filtered = from != null || to != null || employeeId != null;
-        model.addAttribute("entries", filtered
+        var entries = filtered
                 ? paymentEntryService.getFilteredEntriesForAdmin(from, to, employeeId)
-                : paymentEntryService.getAllEntries());
+                : paymentEntryService.getAllEntries();
+        model.addAttribute("entries", paymentEntryService.withReceiptFlags(entries));
         model.addAttribute("employees", userService.getAllEmployees());
         model.addAttribute("adminName", auth.getName());
         model.addAttribute("from", from);
@@ -600,6 +603,36 @@ public class AdminController {
             redirectAttributes.addFlashAttribute("errorMsg", "Resend failed: " + e.getMessage());
         }
         return "redirect:/admin/notifications";
+    }
+
+    // ─── Activity Feed (Observer-pattern notifications) ────────
+
+    @GetMapping("/activity")
+    public String activityFeed(Model model, Authentication auth) {
+        model.addAttribute("notifications", adminNotificationService.getAllNotifications());
+        model.addAttribute("adminName", auth.getName());
+        adminNotificationService.markAllRead();
+        return "admin/activity";
+    }
+
+    @GetMapping("/notifications/unread-count")
+    @ResponseBody
+    public Map<String, Long> unreadNotificationCount() {
+        return Map.of("count", adminNotificationService.getUnreadCount());
+    }
+
+    // ─── Receipt Photo Viewing (Admin + Accountant) ────────────
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @GetMapping("/entries/{id}/receipt")
+    public ResponseEntity<byte[]> viewReceipt(@PathVariable Long id) {
+        return paymentEntryService.getReceiptByEntryId(id)
+                .map(receipt -> ResponseEntity.ok()
+                        .contentType(receipt.getContentType() != null
+                                ? MediaType.parseMediaType(receipt.getContentType())
+                                : MediaType.IMAGE_JPEG)
+                        .body(receipt.getPhotoData()))
+                .orElse(ResponseEntity.notFound().build());
     }
 
     // ─── Employee Collections (read-only, for Accountant + Admin) ─────────

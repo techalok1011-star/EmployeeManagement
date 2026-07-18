@@ -84,6 +84,9 @@
         .btn-filter-pdf:hover{background:rgba(248,113,113,0.2)}
         .filter-active-badge{padding:3px 9px;border-radius:20px;font-size:11px;background:rgba(108,142,255,0.15);color:var(--accent);font-weight:500}
         .export-divider{width:1px;height:32px;background:var(--border);align-self:flex-end;margin:0 4px}
+        .notif-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text);text-decoration:none;font-size:16px;cursor:pointer;transition:background 0.15s;flex-shrink:0}
+        .notif-bell:hover{background:rgba(255,255,255,0.09)}
+        .notif-badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:white;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1}
     </style>
 </head>
 <body>
@@ -124,8 +127,11 @@
 <div class="main">
     <div class="topbar">
         <span class="topbar-title">All Payment Entries</span>
-        <span style="font-size:13px;color:var(--muted)"
-              th:text="${#lists.size(entries)} + (${from != null or to != null or selectedEmployeeId != null} ? ' filtered entries' : ' total entries')"></span>
+        <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:13px;color:var(--muted)"
+                  th:text="${#lists.size(entries)} + (${from != null or to != null or selectedEmployeeId != null} ? ' filtered entries' : ' total entries')"></span>
+            <a href="/admin/activity" class="notif-bell" title="Activity">🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span></a>
+        </div>
     </div>
     <div class="content">
         <div th:if="${successMsg}" class="alert alert-success">✓ <span th:text="${successMsg}"></span></div>
@@ -195,7 +201,11 @@
                                 <span th:if="${entry.editedBy == 'EMPLOYEE'}" class="badge badge-edited-emp">✏ Emp Edited</span>
                                 <span th:if="${entry.editedBy == 'ADMIN'}" class="badge badge-edited-admin">👑 Admin Edited</span>
                             </td>
-                            <td class="text-muted" th:text="${entry.receiptVchNo != null ? entry.receiptVchNo : '—'}"></td>
+                            <td class="text-muted">
+                                <span th:text="${entry.receiptVchNo != null ? entry.receiptVchNo : '—'}"></span>
+                                <a th:if="${entry.hasReceipt}" th:href="@{/admin/entries/{id}/receipt(id=${entry.id})}"
+                                   target="_blank" title="View receipt photo" style="margin-left:6px;text-decoration:none;">📷</a>
+                            </td>
                             <td><span class="emp-pill" th:text="${entry.employeeName}"></span></td>
                             <td class="amount">₹<span th:text="${#numbers.formatDecimal(entry.amount,1,'COMMA',2,'POINT')}"></span></td>
                             <td>
@@ -228,6 +238,20 @@
             row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
         });
     });
+</script>
+<script>
+(function(){
+    var badge = document.getElementById('notifBadge');
+    if (!badge) return;
+    function poll(){
+        fetch('/admin/notifications/unread-count').then(function(r){return r.json();}).then(function(d){
+            if (d.count > 0) { badge.textContent = d.count > 99 ? '99+' : d.count; badge.style.display='flex'; }
+            else { badge.style.display='none'; }
+        }).catch(function(){});
+    }
+    poll();
+    setInterval(poll, 45000);
+})();
 </script>
 </body>
 </html>

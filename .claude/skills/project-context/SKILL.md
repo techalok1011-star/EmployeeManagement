@@ -120,7 +120,7 @@ thing to understand before touching invoices/payments/parties:
   `ExcelPartyService.ensureExists(combined)` / the existing controllers
   rather than hand-crafting the string.
 
-### Tables (7, schema `public`)
+### Tables (9, schema `public`)
 
 | Table | Key columns | Notes |
 |---|---|---|
@@ -131,6 +131,8 @@ thing to understand before touching invoices/payments/parties:
 | `transaction_logs` | id, action, entry_id(no FK, just a Long), employee_name, employee_username, party_name, amount, mode_of_payment, entry_date, remarks, performed_by, notes, performed_at | Audit trail, denormalized snapshot per event, not linked by FK |
 | `notification_logs` | id, party_name, phone, outstanding_amount, status, error_message, triggered_by, sent_at | `status` CHECK: `SENT,FAILED,DRY_RUN`. `triggered_by` = `"SCHEDULER"` or `"ADMIN:<user>"`/`"ACCOUNTANT:<user>"` |
 | `notification_settings` | id(always 1, singleton row), daily_reminder_enabled, updated_by, updated_at | Controls whether the 5pm scheduler actually fires |
+| `payment_receipts` | id, **payment_entry_id**(FK→payment_entries, unique), photo_data(**bytea**), content_type, latitude, longitude, captured_at | Added 2026-07-18. One row per entry that has a photographed receipt - deliberately a separate table, not columns on `payment_entries`, since that table is read on every cached ledger/summary query and a bytea column there would bloat all of them. `photo_data` **must** stay mapped via `@JdbcTypeCode(SqlTypes.VARBINARY)` + `columnDefinition="bytea"` - plain `@Lob` on a `byte[]` with Hibernate+Postgres silently maps to `oid` (large object) instead, which isn't auto-cleaned on row delete and doesn't play well with pooled/serverless Postgres connections (caught and fixed during initial implementation, before any real data existed). |
+| `admin_notifications` | id, type, message, party_name, amount, triggered_by, triggered_by_role, source_type, source_id, is_read, created_at, read_at | Added 2026-07-18. `type` CHECK: `COLLECTION_ADDED,INVOICE_ADDED` - same enum-CHECK-constraint gotcha as below applies to any future new type. Powers the admin activity feed/bell (see its own section). |
 
 ### Entities/enums (`entity/` package)
 
@@ -460,6 +462,88 @@ from your phone" UX but for invoices instead of payments.
   re-query if this matters, it grows via `ExcelPartyService.ensureExists()`
   whenever a new party name is typed into any form.
 
+## Receipt photo + geo-tagging (added 2026-07-18)
+
+Employees can attach a photo of the paper receipt they hand a party after
+collecting money, geo-tagged at capture time. Deliberately scoped to the
+**employee day-entry flow only** (`employee/dashboard.html` → `POST
+/employee/entries/add`) - it's the literal "gave a receipt after an in-person
+collection" moment. The admin/accountant "Add Payment from Ledger" backfill
+path (`createEntryByStaff`) does **not** get photo capture (it's a
+reconciliation entry, not an in-person collection) but still triggers
+notifications (see below).
+
+- **Optional, not mandatory** - a photo/geo problem never blocks saving the
+  entry. `EmployeeController.addEntry()` calls
+  `PaymentEntryService.attachReceipt()` in a try/catch **after** `createEntry()`
+  already succeeded; failures are logged and swallowed.
+- **Client-side compression before upload** (`employee/dashboard.html`,
+  vanilla JS, no library): the file input (`accept="image/*"
+  capture="environment"` - opens the phone's rear camera directly on mobile)
+  triggers a canvas-based downscale to max 1600px + JPEG quality 0.7 before
+  the `<input type="file">`'s `FileList` is replaced via `DataTransfer`. Keeps
+  `payment_receipts.photo_data` rows small and uploads fast on poor field
+  connectivity - a multi-MB raw camera photo becomes ~15-20KB.
+- **Geo-tag**: `navigator.geolocation.getCurrentPosition()` fires on file
+  selection, populates hidden `latitude`/`longitude` fields. Permission
+  denied/unavailable → fields stay blank, entry still saves (see optional
+  above).
+- **Viewing**: `GET /admin/entries/{id}/receipt` (ADMIN + ACCOUNTANT) streams
+  the bytes with stored `content_type`. `admin/entries.html` shows a 📷 icon
+  next to the Receipt Vch No. column for rows that have one, linking straight
+  to that endpoint (opens in a new tab, no lightbox). Whether a row has a
+  receipt is resolved via `PaymentEntryService.withReceiptFlags()` - a single
+  **batched** query (`PaymentReceiptRepository.findPaymentEntryIdsWithReceipt`)
+  called once per list render, not per-row - avoid reintroducing N+1 here if
+  this page's query methods change. Party ledger / full-ledger receipt display
+  is a deliberate fast-follow, not built yet.
+
+## Admin notification system - Observer pattern via Spring events (added 2026-07-18)
+
+Admin gets an in-app notification when EMPLOYEE/ACCOUNTANT logs a collection,
+or MANAGER/ACCOUNTANT adds an invoice. **In-app only** (bell + activity feed),
+no WhatsApp/email push - that was an explicit scope decision.
+
+- **Spring's `ApplicationEventPublisher`/`@TransactionalEventListener` *is*
+  the Observer pattern** here - no hand-rolled `Observable` interface.
+  `PaymentEntryService.createEntry()`/`createEntryByStaff()` and
+  `InvoiceService.createInvoice()` (the single method shared by
+  Admin/Accountant/Manager invoice creation) each publish a
+  `PaymentEntryCreatedEvent`/`InvoiceCreatedEvent` (`event/` package, plain
+  POJOs carrying the entity + actor username) right after `.save()`. The
+  publishers know nothing about who's listening or why - true Observer
+  decoupling.
+- **`AdminNotificationListener`** (`service/` package) is the one subscriber:
+  looks up the actor's role via `UserRepository`, **skips creating a
+  notification if the actor is ADMIN** (no self-notifications - this is where
+  the actual "who should be notified" policy lives, not in the publishers).
+  Otherwise builds a human-readable message and saves an `AdminNotification`
+  row.
+- **`@TransactionalEventListener(phase = AFTER_COMMIT)` alone was not
+  enough** - a real bug hit during initial build: by the time an
+  AFTER_COMMIT callback runs, the *original* transaction's resources are
+  still bound to the thread but already committed, so a plain
+  `repository.save()` inside the listener silently joined that dead
+  transaction and never actually persisted (no exception, the log line even
+  said "created" - only a direct DB query revealed nothing was there). Fix:
+  both listener methods carry `@Transactional(propagation =
+  Propagation.REQUIRES_NEW)` so each gets its own fresh, independently-
+  committing transaction. **Do not remove this annotation** as a "simplification."
+- **Endpoints**: `GET /admin/notifications/unread-count` (tiny JSON
+  `{"count":N}`, ADMIN-only) polled every ~45s by the bell;
+  `GET /admin/activity` renders the full feed (newest-first) and marks
+  everything read as a side effect of visiting - simplest v1 read-state
+  model, no per-row mark-as-read UI.
+- **Bell rollout**: same bell+badge snippet (`.notif-bell`/`.notif-badge` CSS,
+  a small poll script) copy-pasted into the topbar of **all 18**
+  `admin/*.html` templates, mirroring the established convention from the
+  PWA/mobile sidebar rollout ("copy the exact block from one of these rather
+  than reinventing it"). If adding a new admin page, copy this pattern too.
+- Accountants do **not** see the bell/activity feed (`/admin/activity` and
+  the unread-count endpoint are `hasRole('ADMIN')` only, not the usual
+  `hasAnyRole('ADMIN','ACCOUNTANT')` widening) - matches the original request
+  ("admin should be notified"), not extended to accountants.
+
 ## Concurrency: what's actually protected vs. not (as of 2026-07-18)
 
 Came up as a direct question, worth keeping the answer somewhere durable
@@ -640,3 +724,11 @@ Import" section below) - the original demo invoices/payments are gone.
   `invoice_number` doesn't catch the resulting DB constraint-violation
   exception the way `ExcelPartyService.ensureExists()` does - see
   "Concurrency" section above. Explicitly left as-is by user decision.
+- Receipt photo display on `admin/party-ledger.html`/`admin/full-ledger.html`
+  - only `admin/entries.html` shows the 📷 icon today (see receipt section
+    above), deliberately scoped smaller for the first pass.
+- Photo capture only wired into the employee day-entry form, not the
+  admin/accountant "Add Payment from Ledger" backfill flow - see receipt
+  section above for why.
+- Notification bell/activity feed is ADMIN-only, not extended to ACCOUNTANT,
+  per the original request wording.

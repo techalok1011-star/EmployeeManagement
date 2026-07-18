@@ -6,6 +6,7 @@ import com.empmgmt.service.PaymentEntryService;
 import com.empmgmt.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -13,14 +14,17 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Controller
 @RequestMapping("/employee")
 @PreAuthorize("hasRole('EMPLOYEE')")
 @RequiredArgsConstructor
+@Slf4j
 public class EmployeeController {
 
     private final PaymentEntryService paymentEntryService;
@@ -45,6 +49,9 @@ public class EmployeeController {
     @PostMapping("/entries/add")
     public String addEntry(@Valid @ModelAttribute("newEntry") PaymentEntryDTO.Request request,
                            BindingResult result,
+                           @RequestParam(required = false) MultipartFile receiptPhoto,
+                           @RequestParam(required = false) BigDecimal latitude,
+                           @RequestParam(required = false) BigDecimal longitude,
                            Authentication auth,
                            Model model,
                            RedirectAttributes redirectAttributes) {
@@ -59,7 +66,18 @@ public class EmployeeController {
         }
         // Always force today's date — employees cannot add past/future entries
         request.setEntryDate(LocalDate.now());
-        paymentEntryService.createEntry(request, auth.getName());
+        PaymentEntryDTO.Response saved = paymentEntryService.createEntry(request, auth.getName());
+
+        // Receipt photo is optional — a problem attaching it should never block the entry itself.
+        if (receiptPhoto != null && !receiptPhoto.isEmpty()) {
+            try {
+                paymentEntryService.attachReceipt(saved.getId(), receiptPhoto.getBytes(),
+                        receiptPhoto.getContentType(), latitude, longitude);
+            } catch (Exception e) {
+                log.warn("Receipt photo attach failed for entry id={}: {}", saved.getId(), e.getMessage());
+            }
+        }
+
         redirectAttributes.addFlashAttribute("successMsg", "Entry added successfully!");
         return "redirect:/employee/dashboard";
     }

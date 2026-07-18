@@ -4,14 +4,18 @@ import com.empmgmt.dto.EmployeeCollectionSummaryDTO;
 import com.empmgmt.dto.PaymentEntryDTO;
 import com.empmgmt.dto.TransactionLogDTO;
 import com.empmgmt.entity.PaymentEntry;
+import com.empmgmt.entity.PaymentReceipt;
 import com.empmgmt.entity.TransactionLog;
 import com.empmgmt.entity.User;
+import com.empmgmt.event.PaymentEntryCreatedEvent;
 import com.empmgmt.repository.PaymentEntryRepository;
+import com.empmgmt.repository.PaymentReceiptRepository;
 import com.empmgmt.repository.TransactionLogRepository;
 import com.empmgmt.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +40,8 @@ public class PaymentEntryService {
     private final UserRepository userRepository;
     private final TransactionLogRepository transactionLogRepository;
     private final com.empmgmt.service.ExcelPartyService excelPartyService;
+    private final PaymentReceiptRepository paymentReceiptRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final DateTimeFormatter ENTRY_FORMATTER =
             DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a");
@@ -76,7 +82,28 @@ public class PaymentEntryService {
         log.info("✅ Payment entry SAVED to DB | id={} | party={} | amount={} | employee={} | date={}",
                 entry.getId(), entry.getPartyName(), entry.getAmount(), username, entry.getEntryDate());
         logAction("CREATE", entry, username, "Entry created");
+        eventPublisher.publishEvent(new PaymentEntryCreatedEvent(entry, username));
         return mapToResponse(entry);
+    }
+
+    /**
+     * Attaches a photographed receipt (with optional geo-tag) to an already-created
+     * entry. Called right after {@link #createEntry} when the employee submitted a
+     * photo - kept separate so entry creation never fails because of a photo problem.
+     */
+    public void attachReceipt(Long paymentEntryId, byte[] photoData, String contentType,
+                               java.math.BigDecimal latitude, java.math.BigDecimal longitude) {
+        PaymentEntry entry = findEntryById(paymentEntryId);
+        PaymentReceipt receipt = PaymentReceipt.builder()
+                .paymentEntry(entry)
+                .photoData(photoData)
+                .contentType(contentType)
+                .latitude(latitude)
+                .longitude(longitude)
+                .build();
+        paymentReceiptRepository.save(receipt);
+        log.info("📷 Receipt photo attached | entryId={} | hasGeo={}",
+                paymentEntryId, latitude != null && longitude != null);
     }
 
     /**
@@ -110,6 +137,7 @@ public class PaymentEntryService {
         log.info("✅ Payment entry SAVED to DB via ledger | id={} | party={} | amount={} | staff={} | date={}",
                 entry.getId(), entry.getPartyName(), entry.getAmount(), username, entry.getEntryDate());
         logAction("CREATE", entry, username, "Entry added from Party Ledger");
+        eventPublisher.publishEvent(new PaymentEntryCreatedEvent(entry, username));
         return mapToResponse(entry);
     }
 
@@ -233,6 +261,26 @@ public class PaymentEntryService {
     @Transactional(readOnly = true)
     public PaymentEntryDTO.Response getEntryById(Long id) {
         return mapToResponse(findEntryById(id));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<PaymentReceipt> getReceiptByEntryId(Long entryId) {
+        return paymentReceiptRepository.findByPaymentEntryId(entryId);
+    }
+
+    /**
+     * Flags which entries in the list have an attached receipt photo, via a single
+     * batched query - not part of {@link #mapToResponse} itself, since most callers
+     * (employee's own list, ledgers, exports) never need this and shouldn't pay for
+     * an extra join/query on every entry.
+     */
+    @Transactional(readOnly = true)
+    public List<PaymentEntryDTO.Response> withReceiptFlags(List<PaymentEntryDTO.Response> entries) {
+        if (entries.isEmpty()) return entries;
+        Set<Long> ids = entries.stream().map(PaymentEntryDTO.Response::getId).collect(Collectors.toSet());
+        Set<Long> withReceipt = paymentReceiptRepository.findPaymentEntryIdsWithReceipt(ids);
+        entries.forEach(e -> e.setHasReceipt(withReceipt.contains(e.getId())));
+        return entries;
     }
 
     // ─────────────────────────────────────────────────────────

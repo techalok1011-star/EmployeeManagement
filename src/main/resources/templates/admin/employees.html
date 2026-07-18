@@ -67,6 +67,9 @@
         select.form-control option{background:var(--surface)}
         .emp-initials{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white}
         .actions{display:flex;gap:6px}
+        .notif-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text);text-decoration:none;font-size:16px;cursor:pointer;transition:background 0.15s;flex-shrink:0}
+        .notif-bell:hover{background:rgba(255,255,255,0.09)}
+        .notif-badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:white;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1}
     </style>
 </head>
 <body>
@@ -106,6 +109,7 @@
 <div class="main">
     <div class="topbar">
         <span class="topbar-title">Manage Employees</span>
+        <a href="/admin/activity" class="notif-bell" title="Activity">🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span></a>
     </div>
     <div class="content">
         <div th:if="${successMsg}" class="alert alert-success">✓ <span th:text="${successMsg}"></span></div>
@@ -320,6 +324,20 @@
             form.submit();
         });
     });
+</script>
+<script>
+(function(){
+    var badge = document.getElementById('notifBadge');
+    if (!badge) return;
+    function poll(){
+        fetch('/admin/notifications/unread-count').then(function(r){return r.json();}).then(function(d){
+            if (d.count > 0) { badge.textContent = d.count > 99 ? '99+' : d.count; badge.style.display='flex'; }
+            else { badge.style.display='none'; }
+        }).catch(function(){});
+    }
+    poll();
+    setInterval(poll, 45000);
+})();
 </script>
 </body>
 </html>

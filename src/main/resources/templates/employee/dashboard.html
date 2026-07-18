@@ -89,6 +89,13 @@
         .empty-state { text-align:center; padding:40px 20px; color:var(--muted); }
         .empty-icon { font-size:36px; margin-bottom:10px; }
         select.form-control option { background:var(--surface); }
+        .btn-photo { background:rgba(108,142,255,0.1); color:var(--accent); border:1.5px dashed var(--border); width:100%; justify-content:center; padding:12px; margin-bottom:10px; }
+        .btn-photo:hover { background:rgba(108,142,255,0.16); border-color:var(--accent); }
+        .receipt-preview { position:relative; margin-bottom:14px; border-radius:10px; overflow:hidden; border:1px solid var(--border); display:none; }
+        .receipt-preview img { width:100%; max-height:200px; object-fit:cover; display:block; }
+        .receipt-remove { position:absolute; top:8px; right:8px; background:rgba(13,15,20,0.75); color:var(--text); border:none; width:28px; height:28px; border-radius:8px; cursor:pointer; font-size:14px; }
+        .receipt-geo { font-size:11.5px; color:var(--muted); padding:6px 2px 0; }
+        .receipt-geo.ok { color:var(--green); }
         .menu-toggle{display:none;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text);width:38px;height:38px;border-radius:8px;font-size:18px;cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
         .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:150}
         @media(max-width:768px){
@@ -171,7 +178,7 @@
                         <div class="section-title">➕ Add New Entry</div>
                     </div>
                 </div>
-                <form th:action="@{/employee/entries/add}" method="post" th:object="${newEntry}" id="addEntryForm">
+                <form th:action="@{/employee/entries/add}" method="post" th:object="${newEntry}" id="addEntryForm" enctype="multipart/form-data">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
                     <label class="form-label">Employee</label>
@@ -217,6 +224,17 @@
 
                     <label class="form-label">Remarks (Optional)</label>
                     <input type="text" class="form-control" th:field="*{remarks}" placeholder="Any additional notes..."/>
+
+                    <label class="form-label">Receipt Photo <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
+                    <input type="file" id="receiptPhotoInput" name="receiptPhoto" accept="image/*" capture="environment" style="display:none;"/>
+                    <button type="button" class="btn btn-photo" id="receiptPhotoBtn">📷 Attach Receipt Photo</button>
+                    <div class="receipt-preview" id="receiptPreview">
+                        <img id="receiptPreviewImg" alt="Receipt preview"/>
+                        <button type="button" class="receipt-remove" id="receiptRemoveBtn" aria-label="Remove photo">✕</button>
+                    </div>
+                    <div class="receipt-geo" id="receiptGeoStatus"></div>
+                    <input type="hidden" name="latitude" id="latitudeInput"/>
+                    <input type="hidden" name="longitude" id="longitudeInput"/>
 
                     <button type="submit" class="btn btn-primary" id="saveEntryBtn">💾 Save Entry</button>
                 </form>
@@ -327,6 +345,99 @@
 
     function escHtml(s) {
         return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+})();
+
+(function() {
+    const photoInput = document.getElementById('receiptPhotoInput');
+    const photoBtn = document.getElementById('receiptPhotoBtn');
+    const preview = document.getElementById('receiptPreview');
+    const previewImg = document.getElementById('receiptPreviewImg');
+    const removeBtn = document.getElementById('receiptRemoveBtn');
+    const geoStatus = document.getElementById('receiptGeoStatus');
+    const latInput = document.getElementById('latitudeInput');
+    const lngInput = document.getElementById('longitudeInput');
+    if (!photoInput) return;
+
+    photoBtn.addEventListener('click', () => photoInput.click());
+
+    removeBtn.addEventListener('click', () => {
+        photoInput.value = '';
+        preview.style.display = 'none';
+        geoStatus.textContent = '';
+        geoStatus.classList.remove('ok');
+        latInput.value = '';
+        lngInput.value = '';
+    });
+
+    photoInput.addEventListener('change', function() {
+        const file = this.files && this.files[0];
+        if (!file) return;
+
+        // Downscale/compress before upload — receipts are stored as bytes in Postgres,
+        // and mobile camera photos can be several MB; keeps rows small and uploads fast
+        // on poor field connectivity.
+        compressImage(file, 1600, 0.7).then(function(compressedFile) {
+            const dt = new DataTransfer();
+            dt.items.add(compressedFile);
+            photoInput.files = dt.files;
+            showPreview(compressedFile);
+        }).catch(function() {
+            showPreview(file); // compression failed — fall back to the original file
+        });
+
+        requestGeoTag();
+    });
+
+    function showPreview(file) {
+        previewImg.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+    }
+
+    function requestGeoTag() {
+        if (!('geolocation' in navigator)) {
+            geoStatus.textContent = 'Location not available on this device.';
+            return;
+        }
+        geoStatus.textContent = '📍 Getting location…';
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                latInput.value = pos.coords.latitude;
+                lngInput.value = pos.coords.longitude;
+                geoStatus.textContent = '📍 Location tagged';
+                geoStatus.classList.add('ok');
+            },
+            function() {
+                // Permission denied or unavailable — photo still saves, just without a geo-tag.
+                geoStatus.textContent = 'Location not available — photo will still be saved.';
+            },
+            { enableHighAccuracy: true, timeout: 8000 }
+        );
+    }
+
+    function compressImage(file, maxDim, quality) {
+        return new Promise(function(resolve, reject) {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = function() {
+                URL.revokeObjectURL(url);
+                let width = img.width, height = img.height;
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+                    else { width = Math.round(width * maxDim / height); height = maxDim; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                canvas.toBlob(function(blob) {
+                    if (!blob) { reject(new Error('toBlob failed')); return; }
+                    resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }));
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = reject;
+            img.src = url;
+        });
     }
 })();
 

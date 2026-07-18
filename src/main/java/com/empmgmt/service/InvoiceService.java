@@ -9,6 +9,7 @@ import com.empmgmt.dto.PartyPaymentBehaviorDTO;
 import com.empmgmt.entity.Invoice;
 import com.empmgmt.entity.Party;
 import com.empmgmt.entity.PaymentEntry;
+import com.empmgmt.event.InvoiceCreatedEvent;
 import com.empmgmt.repository.InvoiceRepository;
 import com.empmgmt.repository.PartyRepository;
 import com.empmgmt.repository.PaymentEntryRepository;
@@ -16,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +40,7 @@ public class InvoiceService {
     private final InvoiceRepository invoiceRepository;
     private final PaymentEntryRepository paymentEntryRepository;
     private final PartyRepository partyRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final DateTimeFormatter FMT =
             DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a");
@@ -66,6 +69,7 @@ public class InvoiceService {
                         ? request.getTransportNumber().trim() : null)
                 .createdBy(createdBy)
                 .build());
+        eventPublisher.publishEvent(new InvoiceCreatedEvent(saved, createdBy));
         return toResponse(saved);
     }
 
