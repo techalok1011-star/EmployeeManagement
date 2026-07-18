@@ -79,7 +79,12 @@
         .btn{padding:9px 16px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
         .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}
         .btn-primary:hover{opacity:0.88}
+        .btn-ghost{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--border)}
+        .btn-ghost:hover{background:rgba(255,255,255,0.09)}
         .form-hint{font-size:12px;color:var(--muted);margin:-8px 0 16px}
+        .export-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+        .export-date{padding:7px 10px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;outline:none}
+        .export-date:focus{border-color:var(--accent)}
         .notif-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text);text-decoration:none;font-size:16px;cursor:pointer;transition:background 0.15s;flex-shrink:0}
         .notif-bell:hover{background:rgba(255,255,255,0.09)}
         .notif-badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:white;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1}
@@ -160,6 +165,7 @@
         <div class="ledger-tabs">
             <button type="button" class="ledger-tab active" data-tab="statement" onclick="switchLedgerTab('statement')">📒 Statement of Account</button>
             <button type="button" class="ledger-tab" data-tab="add-payment" onclick="switchLedgerTab('add-payment')">➕ Add Payment</button>
+            <button type="button" class="ledger-tab" data-tab="add-invoice" onclick="switchLedgerTab('add-invoice')">🧾 Add Invoice</button>
         </div>
 
         <div class="ledger-panel active" id="tab-statement">
@@ -167,6 +173,14 @@
             <div class="section-header">
                 <span class="section-title">Statement of Account</span>
                 <span class="text-muted" th:text="${#lists.size(ledger.entries)} + ' transactions'"></span>
+            </div>
+
+            <div class="export-bar" style="margin-bottom:18px">
+                <input type="date" id="exportFrom" class="export-date" title="From date"/>
+                <input type="date" id="exportTo" class="export-date" title="To date"/>
+                <button type="button" class="btn btn-ghost" onclick="exportLedger('pdf')">📄 Export PDF</button>
+                <button type="button" class="btn btn-ghost" onclick="exportLedger('csv')">📊 Export CSV</button>
+                <span class="text-muted" style="font-size:11.5px">Leave dates blank to export the full history</span>
             </div>
 
             <div th:if="${#lists.isEmpty(ledger.entries)}" class="empty-state">
@@ -269,9 +283,70 @@
             </form>
         </div>
         </div>
+
+        <div class="ledger-panel" id="tab-add-invoice">
+        <div class="card" style="max-width:520px">
+            <div class="section-header">
+                <span class="section-title">🧾 Add Invoice</span>
+            </div>
+            <div class="form-hint">
+                Add an invoice for this party without leaving the ledger.
+            </div>
+            <form th:action="@{/admin/ledger/add-invoice}" method="post" th:object="${newInvoice}">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input type="hidden" th:field="*{partyName}" th:value="${ledger.partyName}"/>
+
+                <label class="form-label">Party</label>
+                <input type="text" class="form-control" th:value="${ledger.displayName}" disabled/>
+
+                <label class="form-label">Invoice Number <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(auto-suggested, editable)</span></label>
+                <input type="text" class="form-control" th:field="*{invoiceNumber}" placeholder="e.g. INV-2026-001"/>
+                <div class="form-error" th:if="${#fields.hasErrors('invoiceNumber')}" th:errors="*{invoiceNumber}"></div>
+
+                <label class="form-label">Invoice Date</label>
+                <input type="date" class="form-control" id="invoiceDate" name="invoiceDate"
+                       th:value="${newInvoice.invoiceDate != null ? #temporals.format(newInvoice.invoiceDate, 'yyyy-MM-dd') : ''}"/>
+                <div class="form-error" th:if="${#fields.hasErrors('invoiceDate')}" th:errors="*{invoiceDate}"></div>
+
+                <div class="form-row">
+                    <div>
+                        <label class="form-label">Number of Bags</label>
+                        <input type="number" step="1" min="1" class="form-control" id="ledgerBagsInput"
+                               th:field="*{bags}" placeholder="e.g. 100" oninput="recalcLedgerInvoiceAmount()"/>
+                        <div class="form-error" th:if="${#fields.hasErrors('bags')}" th:errors="*{bags}"></div>
+                    </div>
+                    <div>
+                        <label class="form-label">Rate per Bag (₹)</label>
+                        <input type="number" step="0.01" min="0.01" class="form-control" id="ledgerRateInput"
+                               th:field="*{ratePerBag}" placeholder="e.g. 225.50" oninput="recalcLedgerInvoiceAmount()"/>
+                        <div class="form-error" th:if="${#fields.hasErrors('ratePerBag')}" th:errors="*{ratePerBag}"></div>
+                    </div>
+                </div>
+
+                <label class="form-label">Amount (Auto-calculated)</label>
+                <input type="text" class="form-control" id="ledgerAmountDisplay" disabled placeholder="0.00"/>
+
+                <label class="form-label">Description <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
+                <textarea class="form-control" th:field="*{description}" rows="3" placeholder="Goods/services description…" style="resize:vertical"></textarea>
+                <div class="form-error" th:if="${#fields.hasErrors('description')}" th:errors="*{description}"></div>
+
+                <label class="form-label">Delivery Mode</label>
+                <select class="form-control" th:field="*{deliveryMode}">
+                    <option th:each="mode : ${deliveryModes}" th:value="${mode}" th:text="${mode.displayName}"></option>
+                </select>
+                <div class="form-error" th:if="${#fields.hasErrors('deliveryMode')}" th:errors="*{deliveryMode}"></div>
+
+                <label class="form-label">Truck / Trolley / Vehicle No. <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
+                <input type="text" class="form-control" th:field="*{transportNumber}" placeholder="e.g. MH12AB1234"/>
+                <div class="form-error" th:if="${#fields.hasErrors('transportNumber')}" th:errors="*{transportNumber}"></div>
+
+                <button type="submit" class="btn btn-primary">🧾 Save Invoice</button>
+            </form>
+        </div>
+        </div>
     </div>
 </div>
-<script>
+<script th:inline="javascript">
     function switchLedgerTab(name) {
         document.querySelectorAll('.ledger-tab').forEach(function(btn) {
             btn.classList.toggle('active', btn.dataset.tab === name);
@@ -279,6 +354,24 @@
         document.querySelectorAll('.ledger-panel').forEach(function(panel) {
             panel.classList.toggle('active', panel.id === 'tab-' + name);
         });
+    }
+
+    function recalcLedgerInvoiceAmount() {
+        var bags = parseFloat(document.getElementById('ledgerBagsInput').value);
+        var rate = parseFloat(document.getElementById('ledgerRateInput').value);
+        var display = document.getElementById('ledgerAmountDisplay');
+        display.value = (!isNaN(bags) && !isNaN(rate)) ? (bags * rate).toFixed(2) : '';
+    }
+    recalcLedgerInvoiceAmount(); // handle validation-error re-render where bags/rate already have values
+
+    function exportLedger(format) {
+        var partyName = encodeURIComponent([[${ledger.partyName}]]);
+        var from = document.getElementById('exportFrom').value;
+        var to = document.getElementById('exportTo').value;
+        var url = '/admin/ledger/export?partyName=' + partyName + '&format=' + format;
+        if (from) url += '&from=' + from;
+        if (to) url += '&to=' + to;
+        window.location.href = url;
     }
 </script>
 <script>

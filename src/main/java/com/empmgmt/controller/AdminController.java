@@ -335,7 +335,72 @@ public class AdminController {
         newPayment.setEntryDate(LocalDate.now());
         model.addAttribute("newPayment", newPayment);
         model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
+
+        InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
+        newInvoice.setPartyName(partyName);
+        newInvoice.setInvoiceDate(LocalDate.now());
+        newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
+        model.addAttribute("newInvoice", newInvoice);
+        model.addAttribute("deliveryModes", com.empmgmt.entity.Invoice.DeliveryMode.values());
         return "admin/party-ledger";
+    }
+
+    /** Lets Admin/Accountant add an invoice directly from a party's ledger, without leaving the page. */
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @PostMapping("/ledger/add-invoice")
+    public String addLedgerInvoice(@Valid @ModelAttribute("newInvoice") InvoiceDTO.Request request,
+                                   BindingResult result,
+                                   Authentication auth,
+                                   RedirectAttributes redirectAttributes) {
+        String encodedParty = URLEncoder.encode(
+                request.getPartyName() == null ? "" : request.getPartyName(), StandardCharsets.UTF_8);
+        if (result.hasErrors()) {
+            String firstError = result.getFieldErrors().stream()
+                    .map(FieldError::getDefaultMessage)
+                    .findFirst().orElse("Invalid invoice details.");
+            redirectAttributes.addFlashAttribute("errorMsg", firstError);
+            return "redirect:/admin/ledger?partyName=" + encodedParty;
+        }
+        try {
+            invoiceService.createInvoice(request, auth.getName());
+            redirectAttributes.addFlashAttribute("successMsg", "Invoice added to ledger.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/admin/ledger?partyName=" + encodedParty;
+    }
+
+    /** Party ledger export (PDF/CSV), filtered to an optional date range. */
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @GetMapping("/ledger/export")
+    public ResponseEntity<byte[]> exportPartyLedger(
+            @RequestParam String partyName,
+            @RequestParam(defaultValue = "pdf") String format,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        var ledger = invoiceService.getPartyLedger(partyName);
+        var entries = ledger.getEntries().stream()
+                .filter(e -> from == null || !e.getDate().isBefore(from))
+                .filter(e -> to == null || !e.getDate().isAfter(to))
+                .collect(java.util.stream.Collectors.toList());
+        String filename = buildExportFilename("ledger_" + ledger.getDisplayName().replaceAll("[^a-zA-Z0-9]+", "-"), from, to);
+        try {
+            if ("csv".equalsIgnoreCase(format)) {
+                byte[] data = exportService.exportPartyLedgerToCsv(entries);
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + ".csv\"")
+                        .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                        .body(data);
+            }
+            byte[] data = exportService.exportPartyLedgerToPdf(ledger, entries, from, to);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + ".pdf\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(data);
+        } catch (com.lowagie.text.DocumentException e) {
+            log.error("Party ledger PDF export failed", e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**

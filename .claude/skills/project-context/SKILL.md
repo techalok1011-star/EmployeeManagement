@@ -462,6 +462,63 @@ from your phone" UX but for invoices instead of payments.
   re-query if this matters, it grows via `ExcelPartyService.ensureExists()`
   whenever a new party name is typed into any form.
 
+## Party ledger: Add Invoice tab + PDF/CSV export (added 2026-07-18)
+
+`admin/party-ledger.html` (`GET /admin/ledger?partyName=`) now has a third tab
+alongside "Statement of Account" / "Add Payment":
+
+- **🧾 Add Invoice tab** - mirrors `admin/invoices.html`'s Add Invoice form
+  (bags × rate auto-calc via `recalcLedgerInvoiceAmount()`, same field set)
+  but party is fixed/disabled (hidden `partyName` pre-filled from
+  `ledger.partyName`, matching the existing Add Payment tab's pattern).
+  Posts to `POST /admin/ledger/add-invoice` (mirrors `addLedgerPayment` -
+  redirects back to this same ledger page with a flash message either way,
+  not a full page re-render on validation error). Publishes the same
+  `InvoiceCreatedEvent` as every other invoice-creation path (single
+  `InvoiceService.createInvoice()` call), so Observer-pattern notifications
+  and self-notify suppression apply here too - confirmed via direct
+  DB check (curl-based, not browser UI - see gotcha below), no notification
+  row created when ADMIN itself adds the invoice this way.
+- **Export (PDF/CSV), date-range filterable** - two date inputs + Export
+  PDF/Export CSV buttons on the Statement of Account tab
+  (`exportLedger(format)` JS builds `GET /admin/ledger/export?partyName=&
+  format=&from=&to=`). Filtering happens by taking the *already-fully-computed*
+  `ledger.entries` (running balance correct over the party's whole history)
+  and filtering that list to `[from, to]` inclusive - **never** recompute the
+  running balance from zero within just the filtered window, or the Balance
+  column would be wrong. `ExportService.exportPartyLedgerToPdf()`/
+  `exportPartyLedgerToCsv()` follow the exact column set shown on-screen
+  (Date/Type/Reference/Sales Vch/Receipt Vch/Description/Debit/Credit/Balance).
+
+**Two real bugs caught while building this (both fixed before commit):**
+- A `<script>` block using Thymeleaf inline JS (`[[${ledger.partyName}]]`)
+  **must** have `th:inline="javascript"` on the `<script>` tag itself, or
+  Thymeleaf skips proper JS-string quoting and emits the bare unescaped value
+  (`encodeURIComponent(HCL Ltd)` - a `SyntaxError`, not just wrong data). Any
+  future inline-JS-with-Thymeleaf-expression script tag needs this attribute.
+- Binding `<input type="date" th:field="*{invoiceDate}">` directly to a
+  `LocalDate` renders via Spring's default locale-based formatter
+  (`18/07/26`), which is **not** valid HTML5 date-input format (needs strict
+  ISO `yyyy-MM-dd`) - the browser silently ignores it and shows the field
+  empty. This is exactly why `employee/dashboard.html`'s date field already
+  uses a disabled display + separate hidden ISO-formatted input instead of
+  binding `th:field` straight to a date input - same fix applied here
+  (`th:value="${#temporals.format(newInvoice.invoiceDate,'yyyy-MM-dd')}"`
+  instead of `th:field`). **Any new `<input type="date">` bound to a
+  pre-filled `LocalDate` needs this pattern, not bare `th:field`** - only
+  matters when the field is pre-filled server-side; a blank date field posted
+  by the user (like `admin/invoices.html`'s main Add Invoice form, which
+  never pre-fills) doesn't hit this.
+
+**Testing gotcha discovered this session**: browser-automation form
+submission for this app has been unreliable (clicks silently not
+registering, stale cached page loads producing phantom console errors from
+before a fix). A curl-based flow - fetch page → extract `_csrf` (**use the
+first match only**, the login page and others emit the same hidden CSRF
+input more than once on the page) → POST with cookie jar → verify via direct
+DB query - was faster and more reliable for this kind of write-flow
+verification than driving the real browser end-to-end.
+
 ## Receipt photo + geo-tagging (added 2026-07-18)
 
 Employees can attach a photo of the paper receipt they hand a party after

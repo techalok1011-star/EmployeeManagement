@@ -1,5 +1,6 @@
 package com.empmgmt.service;
 
+import com.empmgmt.dto.PartyLedgerDTO;
 import com.empmgmt.dto.PaymentEntryDTO;
 import com.empmgmt.dto.TransactionLogDTO;
 import com.lowagie.text.Document;
@@ -29,9 +30,11 @@ import org.springframework.stereotype.Service;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @Slf4j
@@ -268,5 +271,131 @@ public class ExportService {
     private static String csvField(String value) {
         if (value == null || value.isEmpty()) return "";
         return '"' + value.replace("\"", "\"\"") + '"';
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // PDF — Party Ledger (Statement of Account)
+    // ─────────────────────────────────────────────────────────
+
+    /**
+     * @param entries already filtered to the requested date range by the caller - the
+     *                running balance on each row still reflects the party's full history
+     *                up to that date (computed once by {@code InvoiceService.getPartyLedger},
+     *                not recomputed from zero within the filtered window).
+     */
+    public byte[] exportPartyLedgerToPdf(PartyLedgerDTO.Response ledger, List<PartyLedgerDTO.Entry> entries,
+                                          LocalDate from, LocalDate to) throws DocumentException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document doc = new Document(PageSize.A4.rotate(), 28, 28, 40, 32);
+        PdfWriter.getInstance(doc, out);
+        doc.open();
+
+        com.lowagie.text.Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 15, Color.BLACK);
+        Paragraph title = new Paragraph("PayTrack — Statement of Account: " + ledger.getDisplayName(), titleFont);
+        title.setAlignment(Element.ALIGN_CENTER);
+        title.setSpacingAfter(5);
+        doc.add(title);
+
+        String fromStr = from != null ? from.toString() : "beginning";
+        String toStr   = to   != null ? to.toString()   : LocalDate.now().toString();
+        com.lowagie.text.Font subFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(100, 100, 100));
+        Paragraph subtitle = new Paragraph(
+                "Period: " + fromStr + "  to  " + toStr + "   •   Transactions: " + entries.size(), subFont);
+        subtitle.setAlignment(Element.ALIGN_CENTER);
+        subtitle.setSpacingAfter(4);
+        doc.add(subtitle);
+
+        BigDecimal periodDebit = entries.stream().map(PartyLedgerDTO.Entry::getDebit)
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal periodCredit = entries.stream().map(PartyLedgerDTO.Entry::getCredit)
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        Paragraph totals = new Paragraph(
+                "Period Invoiced: ₹" + periodDebit.toPlainString()
+                        + "   •   Period Paid: ₹" + periodCredit.toPlainString(), subFont);
+        totals.setAlignment(Element.ALIGN_CENTER);
+        totals.setSpacingAfter(18);
+        doc.add(totals);
+
+        PdfPTable table = new PdfPTable(9);
+        table.setWidthPercentage(100);
+        table.setWidths(new float[]{9f, 8f, 14f, 10f, 10f, 22f, 10f, 10f, 11f});
+        table.setSpacingBefore(6);
+        table.setHeaderRows(1);
+
+        Color headerBg = new Color(30, 35, 48);
+        com.lowagie.text.Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.WHITE);
+        for (String h : new String[]{"Date", "Type", "Reference", "Sales Vch", "Receipt Vch",
+                                      "Description", "Debit", "Credit", "Balance"}) {
+            PdfPCell cell = new PdfPCell(new Phrase(h, headerFont));
+            cell.setBackgroundColor(headerBg);
+            cell.setPadding(6f);
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell.setBorderColor(new Color(42, 48, 69));
+            cell.setBorderWidth(0.5f);
+            table.addCell(cell);
+        }
+
+        com.lowagie.text.Font dataFont = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.DARK_GRAY);
+        com.lowagie.text.Font debitFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, new Color(185, 28, 28));
+        com.lowagie.text.Font creditFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, new Color(21, 128, 61));
+        com.lowagie.text.Font balanceFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, new Color(30, 64, 175));
+        Color evenBg = Color.WHITE;
+        Color oddBg  = new Color(248, 249, 252);
+
+        for (int i = 0; i < entries.size(); i++) {
+            PartyLedgerDTO.Entry e = entries.get(i);
+            Color rowBg = (i % 2 == 0) ? evenBg : oddBg;
+
+            addPdfCell(table, e.getDate() != null ? e.getDate().toString() : "", dataFont, rowBg, Element.ALIGN_CENTER);
+            addPdfCell(table, e.getType(), dataFont, rowBg, Element.ALIGN_CENTER);
+            addPdfCell(table, e.getReference() != null ? e.getReference() : "", dataFont, rowBg, Element.ALIGN_LEFT);
+            addPdfCell(table, e.getSalesVchNo() != null ? e.getSalesVchNo() : "", dataFont, rowBg, Element.ALIGN_CENTER);
+            addPdfCell(table, e.getReceiptVchNo() != null ? e.getReceiptVchNo() : "", dataFont, rowBg, Element.ALIGN_CENTER);
+            addPdfCell(table, e.getDescription() != null ? e.getDescription() : "", dataFont, rowBg, Element.ALIGN_LEFT);
+            addPdfCell(table, e.getDebit() != null ? "₹" + e.getDebit().toPlainString() : "",
+                    debitFont, rowBg, Element.ALIGN_RIGHT);
+            addPdfCell(table, e.getCredit() != null ? "₹" + e.getCredit().toPlainString() : "",
+                    creditFont, rowBg, Element.ALIGN_RIGHT);
+            addPdfCell(table, "₹" + e.getBalance().toPlainString(), balanceFont, rowBg, Element.ALIGN_RIGHT);
+        }
+
+        doc.add(table);
+
+        com.lowagie.text.Font footerFont = FontFactory.getFont(FontFactory.HELVETICA, 7, new Color(150, 150, 150));
+        Paragraph footer = new Paragraph(
+                "Generated by PayTrack on " + LocalDate.now() + "   |   Party: " + ledger.getDisplayName(),
+                footerFont);
+        footer.setAlignment(Element.ALIGN_RIGHT);
+        footer.setSpacingBefore(14);
+        doc.add(footer);
+
+        doc.close();
+        return out.toByteArray();
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // CSV — Party Ledger (Statement of Account)
+    // ─────────────────────────────────────────────────────────
+
+    public byte[] exportPartyLedgerToCsv(List<PartyLedgerDTO.Entry> entries) {
+        StringBuilder sb = new StringBuilder();
+        sb.append((char) 0xFEFF); // UTF-8 BOM - keeps Excel from mangling the currency symbol / non-ASCII chars
+
+        sb.append("Date,Type,Reference,Sales Vch No,Receipt Vch No,Description,Debit,Credit,Balance\n");
+
+        for (PartyLedgerDTO.Entry e : entries) {
+            sb.append(e.getDate() != null ? e.getDate().toString() : "").append(',');
+            sb.append(csvField(e.getType())).append(',');
+            sb.append(csvField(e.getReference())).append(',');
+            sb.append(csvField(e.getSalesVchNo())).append(',');
+            sb.append(csvField(e.getReceiptVchNo())).append(',');
+            sb.append(csvField(e.getDescription())).append(',');
+            sb.append(e.getDebit() != null ? e.getDebit().toPlainString() : "").append(',');
+            sb.append(e.getCredit() != null ? e.getCredit().toPlainString() : "").append(',');
+            sb.append(e.getBalance() != null ? e.getBalance().toPlainString() : "");
+            sb.append('\n');
+        }
+
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 }
