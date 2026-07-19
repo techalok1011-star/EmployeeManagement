@@ -361,6 +361,10 @@
 
     photoBtn.addEventListener('click', () => photoInput.click());
 
+    // Fetch location as soon as the page loads, not only once a photo is attached —
+    // by the time the employee is ready to submit, the geo-tag is already there.
+    requestGeoTag();
+
     removeBtn.addEventListener('click', () => {
         photoInput.value = '';
         preview.style.display = 'none';

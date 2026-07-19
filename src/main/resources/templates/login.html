@@ -240,6 +240,34 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        .login-overlay {
+            display: none;
+            position: absolute;
+            inset: 0;
+            background: rgba(13,15,20,0.82);
+            backdrop-filter: blur(3px);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            z-index: 20;
+            animation: riseIn 0.25s cubic-bezier(0.16,1,0.3,1) both;
+        }
+        .login-overlay.show { display: flex; }
+        .login-overlay .spinner-lg {
+            width: 34px; height: 34px;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        .login-overlay .overlay-text {
+            font-family: 'Syne', sans-serif;
+            font-size: 14.5px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
         .footer-note {
             text-align: center;
             margin-top: 22px;
@@ -299,6 +327,11 @@
                     <span id="loginBtnText">Sign In →</span>
                 </button>
             </form>
+
+            <div class="login-overlay" id="loginOverlay">
+                <div class="spinner-lg"></div>
+                <div class="overlay-text">Signing you in…</div>
+            </div>
         </div>
 
         <div class="footer-note">PayTrack &middot; Role-based access for admins &amp; employees</div>
@@ -314,11 +347,36 @@
             toggleBtn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
         });
 
-        document.getElementById('loginForm').addEventListener('submit', () => {
-            const btn = document.getElementById('loginBtn');
+        const loginForm = document.getElementById('loginForm');
+        const loginBtn = document.getElementById('loginBtn');
+        const usernameInput = document.getElementById('username');
+
+        let submitting = false;
+        loginForm.addEventListener('submit', (e) => {
+            if (submitting) { e.preventDefault(); return; }
+            submitting = true;
             document.getElementById('loginSpinner').style.display = 'inline-block';
             document.getElementById('loginBtnText').textContent = 'Signing in…';
-            btn.disabled = true;
+            loginBtn.disabled = true;
+            // readOnly, not disabled — disabled fields are dropped from the submitted
+            // form data, which would send the request with no username/password.
+            usernameInput.readOnly = true;
+            pwInput.readOnly = true;
+            document.getElementById('loginOverlay').classList.add('show');
+        });
+
+        // If the page is restored from the back/forward cache (e.g. the user hits
+        // "back" after logging out), reset the button instead of leaving it stuck
+        // in a permanent "Signing in…" state with no request in flight.
+        window.addEventListener('pageshow', (e) => {
+            if (!e.persisted) return;
+            submitting = false;
+            loginBtn.disabled = false;
+            usernameInput.readOnly = false;
+            pwInput.readOnly = false;
+            document.getElementById('loginSpinner').style.display = 'none';
+            document.getElementById('loginBtnText').textContent = 'Sign In →';
+            document.getElementById('loginOverlay').classList.remove('show');
         });
 
         if ('serviceWorker' in navigator) {
