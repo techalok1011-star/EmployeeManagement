@@ -80,6 +80,9 @@
         .btn-ghost:hover{background:rgba(255,255,255,0.09)}
         .btn-danger{background:rgba(248,113,113,0.1);color:var(--red);border:1px solid rgba(248,113,113,0.2)}
         .btn-danger:hover{background:rgba(248,113,113,0.2)}
+        .btn-danger:disabled{opacity:0.6;cursor:default}
+        .row-spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(248,113,113,0.35);border-top-color:var(--red);border-radius:50%;animation:rowspin 0.7s linear infinite}
+        @keyframes rowspin{to{transform:rotate(360deg)}}
         .alert{padding:12px 16px;border-radius:10px;font-size:13.5px;margin-bottom:20px}
         .alert-success{background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#6ee7b7}
         .alert-danger{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);color:#fca5a5}
@@ -273,8 +276,7 @@
                                        th:href="@{/employee/entries/{id}/edit(id=${entry.id})}" class="btn btn-ghost">✏️ Edit</a>
                                     <span th:if="${entry.entryDate != T(java.time.LocalDate).now()}"
                                           class="btn btn-ghost" style="opacity:0.4;cursor:not-allowed" title="Only today's entries can be edited">🔒</span>
-                                    <form th:action="@{/employee/entries/{id}/delete(id=${entry.id})}" method="post"
-                                          onsubmit="return confirm('Delete this entry? This action will be logged.')">
+                                    <form class="delete-entry-form" th:action="@{/employee/entries/{id}/delete(id=${entry.id})}" method="post">
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                         <button type="submit" class="btn btn-danger">🗑</button>
                                     </form>
@@ -314,6 +316,18 @@
         document.querySelector('.sidebar').classList.toggle('open');
         document.getElementById('sidebarOverlay').classList.toggle('open');
     }
+
+    document.querySelectorAll('.delete-entry-form').forEach(function(form) {
+        let submitting = false;
+        form.addEventListener('submit', function(e) {
+            if (submitting) { e.preventDefault(); return; }
+            if (!confirm('Delete this entry? This action will be logged.')) { e.preventDefault(); return; }
+            submitting = true;
+            const btn = form.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="row-spinner"></span>';
+        });
+    });
 
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
