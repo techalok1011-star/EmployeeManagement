@@ -155,6 +155,7 @@ public class AdminController {
         return "admin/entries";
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @GetMapping("/entries/{id}/edit")
     public String editEntryForm(@PathVariable Long id, Model model) {
         PaymentEntryDTO.Response entry = paymentEntryService.getEntryById(id);
@@ -171,6 +172,7 @@ public class AdminController {
         return "admin/edit-entry";
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/entries/{id}/edit")
     public String editEntry(@PathVariable Long id,
                             @Valid @ModelAttribute("editRequest") PaymentEntryDTO.Request request,
@@ -188,6 +190,7 @@ public class AdminController {
         return "redirect:/admin/entries";
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     @PostMapping("/entries/{id}/delete")
     public String deleteEntry(@PathVariable Long id,
                               Authentication auth,

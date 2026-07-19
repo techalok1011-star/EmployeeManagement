@@ -31,7 +31,12 @@
         .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
         .topbar-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700}
         .content{padding:28px 32px;max-width:600px}
-        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;position:relative}
+        .form-loading-overlay{display:none;position:absolute;inset:0;background:rgba(13,15,20,0.82);backdrop-filter:blur(3px);flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:20;border-radius:16px}
+        .form-loading-overlay.show{display:flex}
+        .form-loading-overlay .spinner-lg{width:34px;height:34px;border:3px solid rgba(255,255,255,0.2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite}
+        .form-loading-overlay .overlay-text{font-family:'Syne',sans-serif;font-size:14.5px;font-weight:600;color:var(--text)}
+        @keyframes spin{to{transform:rotate(360deg)}}
         .section-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px}
         .section-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
         .meta-row{display:flex;gap:16px;margin-bottom:24px;padding:14px 16px;background:var(--surface);border-radius:10px;border:1px solid var(--border)}
@@ -142,7 +147,7 @@
                 </div>
             </div>
 
-            <form th:action="@{/admin/entries/{id}/edit(id=${entry.id})}" method="post" th:object="${editRequest}">
+            <form id="editEntryForm" th:action="@{/admin/entries/{id}/edit(id=${entry.id})}" method="post" th:object="${editRequest}">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
                 <label class="form-label">Party Name</label>
@@ -221,10 +226,15 @@
                 <div class="form-error" th:if="${#fields.hasErrors('remarks')}" th:errors="*{remarks}"></div>
 
                 <div class="btn-group">
-                    <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+                    <button type="submit" class="btn btn-primary" id="saveChangesBtn">💾 Save Changes</button>
                     <a href="/admin/entries" class="btn btn-ghost">Cancel</a>
                 </div>
             </form>
+
+            <div class="form-loading-overlay" id="editEntryOverlay">
+                <div class="spinner-lg"></div>
+                <div class="overlay-text">Saving changes…</div>
+            </div>
         </div>
     </div>
 </div>
@@ -247,6 +257,18 @@ function toggleSidebar() {
     document.querySelector('.sidebar').classList.toggle('open');
     document.getElementById('sidebarOverlay').classList.toggle('open');
 }
+
+(function() {
+    const form = document.getElementById('editEntryForm');
+    if (!form) return;
+    let submitting = false;
+    form.addEventListener('submit', (e) => {
+        if (submitting) { e.preventDefault(); return; }
+        submitting = true;
+        document.getElementById('saveChangesBtn').disabled = true;
+        document.getElementById('editEntryOverlay').classList.add('show');
+    });
+})();
 </script>
 </body>
 </html>

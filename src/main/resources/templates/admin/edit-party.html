@@ -33,7 +33,12 @@
         .topbar-back:hover{color:var(--text)}
         .topbar-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700}
         .content{padding:28px 32px;max-width:560px}
-        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;position:relative}
+        .form-loading-overlay{display:none;position:absolute;inset:0;background:rgba(13,15,20,0.82);backdrop-filter:blur(3px);flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:20;border-radius:16px}
+        .form-loading-overlay.show{display:flex}
+        .form-loading-overlay .spinner-lg{width:34px;height:34px;border:3px solid rgba(255,255,255,0.2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite}
+        .form-loading-overlay .overlay-text{font-family:'Syne',sans-serif;font-size:14.5px;font-weight:600;color:var(--text)}
+        @keyframes spin{to{transform:rotate(360deg)}}
         .section-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:22px}
         .meta-row{display:flex;gap:8px;align-items:center;margin-bottom:20px;padding:12px 14px;background:var(--surface);border-radius:10px;border:1px solid var(--border)}
         .meta-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px}
@@ -133,7 +138,7 @@
                 </div>
             </div>
 
-            <form th:action="@{/admin/parties/{id}/edit(id=${party.id})}" method="post"
+            <form id="editPartyForm" th:action="@{/admin/parties/{id}/edit(id=${party.id})}" method="post"
                   th:object="${editRequest}" autocomplete="off">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
@@ -161,10 +166,15 @@
                 </div>
 
                 <div class="btn-row">
-                    <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+                    <button type="submit" class="btn btn-primary" id="savePartyBtn">💾 Save Changes</button>
                     <a href="/admin/parties" class="btn btn-ghost">Cancel</a>
                 </div>
             </form>
+
+            <div class="form-loading-overlay" id="editPartyOverlay">
+                <div class="spinner-lg"></div>
+                <div class="overlay-text">Saving changes…</div>
+            </div>
         </div>
     </div>
 </div>
@@ -187,6 +197,18 @@ function toggleSidebar() {
     document.querySelector('.sidebar').classList.toggle('open');
     document.getElementById('sidebarOverlay').classList.toggle('open');
 }
+
+(function() {
+    const form = document.getElementById('editPartyForm');
+    if (!form) return;
+    let submitting = false;
+    form.addEventListener('submit', (e) => {
+        if (submitting) { e.preventDefault(); return; }
+        submitting = true;
+        document.getElementById('savePartyBtn').disabled = true;
+        document.getElementById('editPartyOverlay').classList.add('show');
+    });
+})();
 </script>
 </body>
 </html>
