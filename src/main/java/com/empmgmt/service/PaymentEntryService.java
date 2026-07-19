@@ -483,6 +483,7 @@ public class PaymentEntryService {
     public void deleteEntry(Long id, String performedBy) {
         PaymentEntry entry = findEntryById(id);
         logAction("DELETE", entry, performedBy, "Entry deleted");
+        paymentReceiptRepository.findByPaymentEntryId(id).ifPresent(paymentReceiptRepository::delete);
         paymentEntryRepository.deleteById(id);
     }
 
