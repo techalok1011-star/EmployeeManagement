@@ -9,9 +9,10 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&amp;family=DM+Sans:wght@300;400;500&amp;display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" th:href="@{/css/theme.css}"/>
+    <script th:src="@{/js/theme.js}"></script>
     <style>
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-        :root{color-scheme:dark;--ink:#0d0f14;--surface:#161a24;--card:#1e2330;--border:#2a3045;--accent:#6c8eff;--accent2:#a78bfa;--gold:#f5c842;--green:#34d399;--red:#f87171;--orange:#fb923c;--text:#e2e8f0;--muted:#8892a4;--muted2:#4a556a}
         body{font-family:'DM Sans',sans-serif;background:var(--ink);color:var(--text);min-height:100vh;display:flex}
         .sidebar{width:240px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100}
         .sidebar-brand{padding:24px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
@@ -25,7 +26,7 @@
         .sidebar-nav{padding:16px 12px;flex:1}
         .nav-section-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);padding:0 8px;margin-bottom:6px;display:block;margin-top:12px}
         .nav-link{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;text-decoration:none;color:var(--muted);font-size:14px;font-weight:500;transition:all 0.15s;margin-bottom:2px}
-        .nav-link:hover{background:rgba(255,255,255,0.05);color:var(--text)}
+        .nav-link:hover{background:var(--overlay-3);color:var(--text)}
         .nav-link.active{background:rgba(108,142,255,0.12);color:var(--accent)}
         .sidebar-footer{padding:16px 12px;border-top:1px solid var(--border)}
         .logout-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;text-decoration:none;color:var(--muted);font-size:14px;font-weight:500;transition:all 0.15s;width:100%;cursor:pointer;background:transparent;border:none;font-family:'DM Sans',sans-serif}
@@ -44,7 +45,7 @@
         /* Day Group */
         .day-group{margin-bottom:28px}
         .day-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px 12px 0 0;cursor:pointer;user-select:none}
-        .day-header:hover{background:rgba(255,255,255,0.03)}
+        .day-header:hover{background:var(--overlay-1)}
         .day-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:10px}
         .day-badge{font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(108,142,255,0.12);color:var(--accent)}
         .day-stats{display:flex;align-items:center;gap:16px;font-size:13px}
@@ -54,11 +55,11 @@
         .day-body{border:1px solid var(--border);border-top:none;border-radius:0 0 12px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch}
         /* Table */
         table{width:100%;border-collapse:collapse}
-        thead{background:rgba(255,255,255,0.02)}
+        thead{background:var(--overlay-1)}
         th{padding:10px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
-        td{padding:12px 14px;font-size:13.5px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle}
+        td{padding:12px 14px;font-size:13.5px;border-bottom:1px solid var(--overlay-2);vertical-align:middle}
         tr:last-child td{border-bottom:none}
-        tr:hover td{background:rgba(255,255,255,0.02)}
+        tr:hover td{background:var(--overlay-1)}
         .badge{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:500;display:inline-block}
         .badge-cash{background:rgba(52,211,153,0.15);color:var(--green)}
         .badge-cheque{background:rgba(108,142,255,0.15);color:var(--accent)}
@@ -76,8 +77,8 @@
         .btn{padding:6px 12px;border-radius:7px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
         .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}
         .btn-primary:hover{opacity:0.88}
-        .btn-ghost{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--border)}
-        .btn-ghost:hover{background:rgba(255,255,255,0.09)}
+        .btn-ghost{background:var(--overlay-3);color:var(--text);border:1px solid var(--border)}
+        .btn-ghost:hover{background:var(--overlay-5)}
         .btn-danger{background:rgba(248,113,113,0.1);color:var(--red);border:1px solid rgba(248,113,113,0.2)}
         .btn-danger:hover{background:rgba(248,113,113,0.2)}
         .btn-danger:disabled{opacity:0.6;cursor:default}
@@ -102,10 +103,10 @@
         .btn-filter{padding:8px 16px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;display:inline-flex;align-items:center;gap:5px;text-decoration:none}
         .btn-filter-apply{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}
         .btn-filter-apply:hover{opacity:0.88}
-        .btn-filter-clear{background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid var(--border)}
-        .btn-filter-clear:hover{background:rgba(255,255,255,0.09);color:var(--text)}
+        .btn-filter-clear{background:var(--overlay-3);color:var(--muted);border:1px solid var(--border)}
+        .btn-filter-clear:hover{background:var(--overlay-5);color:var(--text)}
         .filter-active-badge{padding:3px 9px;border-radius:20px;font-size:11px;background:rgba(108,142,255,0.15);color:var(--accent);font-weight:500}
-        .menu-toggle{display:none;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text);width:38px;height:38px;border-radius:8px;font-size:18px;cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
+        .menu-toggle{display:none;background:var(--overlay-3);border:1px solid var(--border);color:var(--text);width:38px;height:38px;border-radius:8px;font-size:18px;cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
         .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:150}
         @media(max-width:768px){
             .sidebar{transform:translateX(-100%);transition:transform 0.25s ease;z-index:200}
@@ -158,6 +159,7 @@
         <div class="topbar-actions">
             <a href="/employee/history" class="btn btn-ghost">📜 History</a>
             <a href="/employee/dashboard" class="btn btn-primary">+ New Entry</a>
+            <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle light/dark theme">☀️</button>
         </div>
     </div>
     <div class="content">

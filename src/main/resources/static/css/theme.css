@@ -1,0 +1,78 @@
+/*
+ * PayTrack design tokens — single source of truth for color.
+ * Light is the default (:root) so the app renders light even before
+ * static/js/theme.js runs. Dark is an opt-in override under
+ * [data-theme="dark"], applied by that script when a user toggles it
+ * (and remembered per-browser via localStorage). To restyle the app,
+ * change values here only — every template consumes these via
+ * var(--token), never hardcoded hex.
+ */
+:root {
+    color-scheme: light;
+    --ink: #f4f6fb;
+    --surface: #ffffff;
+    --card: #ffffff;
+    --border: #dde3ee;
+    --accent: #3b5bdb;
+    --accent2: #7c4fe0;
+    --gold: #b8860b;
+    --green: #0f9d68;
+    --red: #dc2626;
+    --orange: #d9540a;
+    --text: #1a2233;
+    --muted: #5b6577;
+    --muted2: #94a3b8;
+
+    /* neutral overlay tints used for hover states, dashed borders, subtle fills */
+    --overlay-1: rgba(15,23,42,0.035);
+    --overlay-2: rgba(15,23,42,0.05);
+    --overlay-3: rgba(15,23,42,0.06);
+    --overlay-4: rgba(15,23,42,0.07);
+    --overlay-5: rgba(15,23,42,0.09);
+    --overlay-6: rgba(15,23,42,0.16);
+    /* dark glass scrim behind loading spinners/modals — stays dark in both themes
+       so the always-white spinner text/icons on top remain legible */
+    --backdrop: rgba(15,23,42,0.6);
+}
+
+[data-theme="dark"] {
+    color-scheme: dark;
+    --ink: #0d0f14;
+    --surface: #161a24;
+    --card: #1e2330;
+    --border: #2a3045;
+    --accent: #6c8eff;
+    --accent2: #a78bfa;
+    --gold: #f5c842;
+    --green: #34d399;
+    --red: #f87171;
+    --orange: #fb923c;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --muted2: #4a556a;
+
+    --overlay-1: rgba(255,255,255,0.02);
+    --overlay-2: rgba(255,255,255,0.04);
+    --overlay-3: rgba(255,255,255,0.05);
+    --overlay-4: rgba(255,255,255,0.06);
+    --overlay-5: rgba(255,255,255,0.09);
+    --overlay-6: rgba(255,255,255,0.2);
+    --backdrop: rgba(13,15,20,0.82);
+}
+
+.theme-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    background: var(--overlay-1);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+.theme-toggle-btn:hover { background: var(--overlay-3); }

@@ -6,14 +6,10 @@
     <title th:replace="${title}">PayTrack</title>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&amp;family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&amp;display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" th:href="@{/css/theme.css}"/>
+    <script th:src="@{/js/theme.js}"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        :root {
-            --ink: #0d0f14; --surface: #161a24; --card: #1e2330; --border: #2a3045;
-            --accent: #6c8eff; --accent2: #a78bfa; --gold: #f5c842; --green: #34d399;
-            --red: #f87171; --orange: #fb923c;
-            --text: #e2e8f0; --muted: #8892a4; --muted2: #4a556a;
-        }
         body { font-family:'DM Sans',sans-serif; background:var(--ink); color:var(--text); min-height:100vh; display:flex; }
 
         /* Sidebar */
@@ -56,7 +52,7 @@
             font-size:14px; font-weight:500; transition:all 0.15s;
             margin-bottom:2px;
         }
-        .nav-link:hover { background:rgba(255,255,255,0.05); color:var(--text); }
+        .nav-link:hover { background:var(--overlay-3); color:var(--text); }
         .nav-link.active { background:rgba(108,142,255,0.12); color:var(--accent); }
         .nav-link .nav-icon { font-size:16px; width:20px; text-align:center; }
 
@@ -118,9 +114,9 @@
             text-transform:uppercase; letter-spacing:0.8px; color:var(--muted);
             font-weight:600; border-bottom:1px solid var(--border);
         }
-        td { padding:13px 16px; font-size:14px; border-bottom:1px solid rgba(255,255,255,0.04); }
+        td { padding:13px 16px; font-size:14px; border-bottom:1px solid var(--overlay-2); }
         tr:last-child td { border-bottom:none; }
-        tr:hover td { background:rgba(255,255,255,0.02); }
+        tr:hover td { background:var(--overlay-1); }
 
         /* Badges */
         .badge {
@@ -148,7 +144,7 @@
         .btn-sm { padding:6px 12px; font-size:12.5px; border-radius:7px; }
         .btn-danger { background:rgba(248,113,113,0.15); color:var(--red); border:1px solid rgba(248,113,113,0.3); }
         .btn-danger:hover { background:rgba(248,113,113,0.25); }
-        .btn-ghost { background:rgba(255,255,255,0.05); color:var(--text); border:1px solid var(--border); }
+        .btn-ghost { background:var(--overlay-3); color:var(--text); border:1px solid var(--border); }
         .btn-ghost:hover { background:rgba(255,255,255,0.08); }
         .btn-success { background:rgba(52,211,153,0.15); color:var(--green); border:1px solid rgba(52,211,153,0.3); }
         .btn-success:hover { background:rgba(52,211,153,0.25); }
