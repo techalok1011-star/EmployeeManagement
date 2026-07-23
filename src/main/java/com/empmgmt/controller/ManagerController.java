@@ -16,6 +16,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -37,10 +39,12 @@ public class ManagerController {
     // ─── Dashboard ────────────────────────────────────────────
 
     @GetMapping("/dashboard")
-    public String dashboard(Model model, Authentication auth) {
+    public String dashboard(@RequestParam(required = false) String date,
+                             @RequestParam(required = false) String month,
+                             Model model, Authentication auth) {
         String username = auth.getName();
         model.addAttribute("user", userService.getUserByUsername(username));
-        addDashboardAttributes(model, username);
+        addDashboardAttributes(model, username, parseDateOrToday(date), parseMonthOrCurrent(month));
         InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
         newInvoice.setInvoiceDate(LocalDate.now());
         newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
@@ -50,13 +54,43 @@ public class ManagerController {
         return "manager/dashboard";
     }
 
-    private void addDashboardAttributes(Model model, String username) {
-        List<InvoiceDTO.Response> todayInvoices = invoiceService.getInvoicesCreatedByOnDate(username, LocalDate.now());
-        BigDecimal todayTotal = todayInvoices.stream()
+    private LocalDate parseDateOrToday(String date) {
+        if (date == null || date.isBlank()) return LocalDate.now();
+        try {
+            return LocalDate.parse(date);
+        } catch (Exception e) {
+            return LocalDate.now();
+        }
+    }
+
+    private YearMonth parseMonthOrCurrent(String month) {
+        if (month == null || month.isBlank()) return YearMonth.now();
+        try {
+            return YearMonth.parse(month);
+        } catch (Exception e) {
+            return YearMonth.now();
+        }
+    }
+
+    private void addDashboardAttributes(Model model, String username, LocalDate selectedDate, YearMonth selectedMonth) {
+        List<InvoiceDTO.Response> dayInvoices = invoiceService.getInvoicesCreatedByOnDate(username, selectedDate);
+        BigDecimal dayTotal = dayInvoices.stream()
                 .map(InvoiceDTO.Response::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        model.addAttribute("todayInvoices", todayInvoices);
-        model.addAttribute("todayTotal", todayTotal);
+        model.addAttribute("dayInvoices", dayInvoices);
+        model.addAttribute("dayTotal", dayTotal);
+        model.addAttribute("selectedDate", selectedDate);
+
+        LocalDate monthStart = selectedMonth.atDay(1);
+        LocalDate monthEnd = selectedMonth.atEndOfMonth();
+        List<InvoiceDTO.Response> monthInvoices = invoiceService.getInvoicesCreatedByDateRange(username, monthStart, monthEnd);
+        BigDecimal monthTotal = monthInvoices.stream()
+                .map(InvoiceDTO.Response::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        model.addAttribute("monthInvoices", monthInvoices);
+        model.addAttribute("monthTotal", monthTotal);
+        model.addAttribute("selectedMonth", selectedMonth);
+        model.addAttribute("selectedMonthLabel", selectedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
     }
 
     // ─── Add Invoice ──────────────────────────────────────────
@@ -70,7 +104,7 @@ public class ManagerController {
         String username = auth.getName();
         if (result.hasErrors()) {
             model.addAttribute("user", userService.getUserByUsername(username));
-            addDashboardAttributes(model, username);
+            addDashboardAttributes(model, username, LocalDate.now(), YearMonth.now());
             model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
             model.addAttribute("today", LocalDate.now());
             return "manager/dashboard";

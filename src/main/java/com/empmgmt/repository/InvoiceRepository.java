@@ -22,6 +22,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     List<Invoice> findByCreatedByAndInvoiceDateOrderByCreatedAtDesc(String createdBy, LocalDate invoiceDate);
 
+    List<Invoice> findByCreatedByAndInvoiceDateBetweenOrderByInvoiceDateDescCreatedAtDesc(
+            String createdBy, LocalDate start, LocalDate end);
+
     List<Invoice> findByInvoiceNumberStartingWith(String prefix);
 
     boolean existsByInvoiceNumber(String invoiceNumber);

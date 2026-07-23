@@ -151,6 +151,13 @@ public class InvoiceService {
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    /** One user's invoices within [from, to] inclusive, newest first — powers a Manager's monthly view. */
+    @Transactional(readOnly = true)
+    public List<InvoiceDTO.Response> getInvoicesCreatedByDateRange(String username, LocalDate from, LocalDate to) {
+        return invoiceRepository.findByCreatedByAndInvoiceDateBetweenOrderByInvoiceDateDescCreatedAtDesc(username, from, to)
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
     // ─────────────────────────────────────────────────────────
     // DELETE
     // ─────────────────────────────────────────────────────────

@@ -145,18 +145,22 @@
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon">🧾</div>
-                <div class="stat-label">Today's Invoices</div>
-                <div class="stat-value blue" th:text="${#lists.size(todayInvoices)}">0</div>
+                <div class="stat-label">Invoices on Selected Day</div>
+                <div class="stat-value blue" th:text="${#lists.size(dayInvoices)}">0</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">💰</div>
-                <div class="stat-label">Today's Total Amount</div>
-                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(todayTotal, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
+                <div class="stat-label">Selected Day Total</div>
+                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(dayTotal, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">📅</div>
-                <div class="stat-label">Date</div>
-                <div class="stat-value" style="font-size:18px;color:var(--text)" th:text="${#temporals.format(today, 'dd MMM yyyy')}"></div>
+                <div class="stat-label">Viewing Day</div>
+                <form method="get" th:action="@{/manager/dashboard}">
+                    <input type="hidden" name="month" th:value="${selectedMonth}"/>
+                    <input type="date" name="date" class="form-control" style="margin-bottom:0"
+                           th:value="${selectedDate}" onchange="this.form.submit()"/>
+                </form>
             </div>
         </div>
 
@@ -225,20 +229,20 @@
                 </form>
             </div>
 
-            <!-- Today's Invoices Table -->
+            <!-- Selected Day's Invoices Table -->
             <div class="card">
                 <div class="section-header">
                     <div>
-                        <div class="section-title">🧾 Today's Invoices</div>
+                        <div class="section-title">🧾 Invoices — <span th:text="${#temporals.format(selectedDate, 'dd MMM yyyy')}"></span></div>
                     </div>
                     <a href="/manager/invoices" style="font-size:13px;color:var(--accent);text-decoration:none;">View All →</a>
                 </div>
-                <div th:if="${#lists.isEmpty(todayInvoices)}" class="empty-state">
+                <div th:if="${#lists.isEmpty(dayInvoices)}" class="empty-state">
                     <div class="empty-icon">📭</div>
-                    <div>No invoices added today yet.</div>
+                    <div>No invoices added on this day yet.</div>
                     <div style="font-size:12px;margin-top:6px;">Add your first invoice using the form.</div>
                 </div>
-                <div th:if="${!#lists.isEmpty(todayInvoices)}" class="table-wrapper">
+                <div th:if="${!#lists.isEmpty(dayInvoices)}" class="table-wrapper">
                     <table>
                         <thead>
                             <tr>
@@ -249,7 +253,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr th:each="inv : ${todayInvoices}">
+                            <tr th:each="inv : ${dayInvoices}">
                                 <td th:text="${inv.invoiceNumber}"></td>
                                 <td th:text="${inv.partyName}"></td>
                                 <td class="amount">₹<span th:text="${#numbers.formatDecimal(inv.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
@@ -258,6 +262,56 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <!-- Monthly Invoices -->
+        <div class="card" style="margin-top:24px">
+            <div class="section-header">
+                <div>
+                    <div class="section-title">📅 Monthly Invoices — <span th:text="${selectedMonthLabel}"></span></div>
+                </div>
+                <form method="get" th:action="@{/manager/dashboard}" style="display:flex;align-items:center;gap:10px">
+                    <input type="hidden" name="date" th:value="${selectedDate}"/>
+                    <input type="month" name="month" class="form-control" style="margin-bottom:0"
+                           th:value="${selectedMonth}" onchange="this.form.submit()"/>
+                </form>
+            </div>
+            <div style="display:flex;gap:24px;margin-bottom:18px;flex-wrap:wrap">
+                <div>
+                    <div class="stat-label" style="margin-bottom:4px">Invoices this Month</div>
+                    <div class="stat-value blue" style="font-size:20px" th:text="${#lists.size(monthInvoices)}">0</div>
+                </div>
+                <div>
+                    <div class="stat-label" style="margin-bottom:4px">Total Amount</div>
+                    <div class="stat-value green" style="font-size:20px">₹<span th:text="${#numbers.formatDecimal(monthTotal, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
+                </div>
+            </div>
+            <div th:if="${#lists.isEmpty(monthInvoices)}" class="empty-state">
+                <div class="empty-icon">📭</div>
+                <div>No invoices added in this month yet.</div>
+            </div>
+            <div th:if="${!#lists.isEmpty(monthInvoices)}" class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Invoice No.</th>
+                            <th>Party</th>
+                            <th>Amount</th>
+                            <th>Delivery</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="inv : ${monthInvoices}">
+                            <td th:text="${#temporals.format(inv.invoiceDate, 'dd MMM yyyy')}"></td>
+                            <td th:text="${inv.invoiceNumber}"></td>
+                            <td th:text="${inv.partyName}"></td>
+                            <td class="amount">₹<span th:text="${#numbers.formatDecimal(inv.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
+                            <td><span class="badge" th:text="${inv.deliveryMode}"></span></td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
