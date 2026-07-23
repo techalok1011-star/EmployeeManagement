@@ -343,6 +343,7 @@
         let submitting = false;
         loginForm.addEventListener('submit', (e) => {
             if (submitting) { e.preventDefault(); return; }
+            e.preventDefault();
             submitting = true;
             document.getElementById('loginSpinner').style.display = 'inline-block';
             document.getElementById('loginBtnText').textContent = 'Signing in…';
@@ -352,6 +353,15 @@
             usernameInput.readOnly = true;
             pwInput.readOnly = true;
             document.getElementById('loginOverlay').classList.add('show');
+            // On some mobile browsers, submitting in the same tick can navigate away
+            // before this loading state ever paints — a same-tick form submit doesn't
+            // guarantee a frame renders first (desktop browsers are more forgiving here).
+            // A short setTimeout yields to the browser so it can paint before we hand
+            // off to the real navigation. Deliberately NOT requestAnimationFrame here —
+            // rAF only fires while the page is actively rendering, so on a backgrounded/
+            // inactive tab it can simply never fire, leaving the form stuck on "Signing
+            // in…" forever with no submission ever happening (verified while testing this).
+            setTimeout(() => loginForm.submit(), 50);
         });
 
         // If the page is restored from the back/forward cache (e.g. the user hits
