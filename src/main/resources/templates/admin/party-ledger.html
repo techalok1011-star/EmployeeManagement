@@ -197,15 +197,16 @@
         <div class="card">
             <div class="section-header">
                 <span class="section-title">Statement of Account</span>
-                <span class="text-muted" th:text="${ledger.transactionCount} + ' transactions'"></span>
+                <span class="text-muted" id="ledgerTxnCount" th:text="${ledger.transactionCount} + ' transactions'"></span>
             </div>
 
             <div class="export-bar" style="margin-bottom:18px">
-                <input type="date" id="exportFrom" class="export-date" title="From date"/>
-                <input type="date" id="exportTo" class="export-date" title="To date"/>
+                <input type="date" id="exportFrom" class="export-date" title="Filter from date" onchange="filterLedgerTable()"/>
+                <input type="date" id="exportTo" class="export-date" title="Filter to date" onchange="filterLedgerTable()"/>
+                <button type="button" class="btn btn-ghost" id="clearLedgerFilterBtn" onclick="clearLedgerFilter()" style="display:none">✕ Clear filter</button>
                 <button type="button" class="btn btn-ghost" onclick="exportLedger('pdf')">📄 Export PDF</button>
                 <button type="button" class="btn btn-ghost" onclick="exportLedger('csv')">📊 Export CSV</button>
-                <span class="text-muted" style="font-size:11.5px">Leave dates blank to export the full history</span>
+                <span class="text-muted" style="font-size:11.5px">Dates filter the table below and the export — leave blank for full history</span>
             </div>
 
             <div th:if="${#lists.isEmpty(ledger.entries)}" class="empty-state">
@@ -214,7 +215,13 @@
                 <div style="font-size:13px">This party has no invoices or payments recorded.</div>
             </div>
 
-            <div th:if="${!#lists.isEmpty(ledger.entries)}" class="table-wrapper">
+            <div th:if="${!#lists.isEmpty(ledger.entries)}" id="ledgerNoMatch" class="empty-state" style="display:none">
+                <div class="empty-icon">🔍</div>
+                <div style="font-size:15px;font-weight:600;margin-bottom:6px">No transactions in this date range</div>
+                <div style="font-size:13px">Try widening the range, or clear the filter to see everything.</div>
+            </div>
+
+            <div th:if="${!#lists.isEmpty(ledger.entries)}" id="ledgerTableWrapper" class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
@@ -229,15 +236,17 @@
                             <th>Balance</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="ledgerTableBody">
                         <th:block th:each="e : ${ledger.entries}">
-                            <tr th:if="${e.type == 'FY_SUMMARY'}" class="fy-summary-row">
+                            <tr th:if="${e.type == 'FY_SUMMARY'}" class="fy-summary-row"
+                                th:attr="data-date=${#temporals.format(e.date,'yyyy-MM-dd')},data-summary=true">
                                 <td colspan="6">📅 <span th:text="${e.fyLabel}"></span> — Total</td>
                                 <td class="amount-debit">₹<span th:text="${#numbers.formatDecimal(e.fyTotalDebit,1,'COMMA',2,'POINT')}"></span></td>
                                 <td class="amount-credit">₹<span th:text="${#numbers.formatDecimal(e.fyTotalCredit,1,'COMMA',2,'POINT')}"></span></td>
                                 <td class="amount-balance">₹<span th:text="${#numbers.formatDecimal(e.balance,1,'COMMA',2,'POINT')}"></span></td>
                             </tr>
-                            <tr th:unless="${e.type == 'FY_SUMMARY'}">
+                            <tr th:unless="${e.type == 'FY_SUMMARY'}"
+                                th:attr="data-date=${#temporals.format(e.date,'yyyy-MM-dd')},data-summary=false">
                                 <td class="text-muted" th:text="${#temporals.format(e.date,'dd MMM yyyy')}"></td>
                                 <td>
                                     <span class="badge-invoice" th:if="${e.type == 'INVOICE'}">🧾 Invoice</span>
@@ -396,6 +405,35 @@
         display.value = (!isNaN(bags) && !isNaN(rate)) ? (bags * rate).toFixed(2) : '';
     }
     recalcLedgerInvoiceAmount(); // handle validation-error re-render where bags/rate already have values
+
+    function filterLedgerTable() {
+        var from = document.getElementById('exportFrom').value;
+        var to = document.getElementById('exportTo').value;
+        var tbody = document.getElementById('ledgerTableBody');
+        if (!tbody) return;
+        var rows = tbody.querySelectorAll('tr');
+        var visibleCount = 0;
+        rows.forEach(function(row) {
+            var date = row.getAttribute('data-date');
+            var inRange = (!from || date >= from) && (!to || date <= to);
+            row.style.display = inRange ? '' : 'none';
+            if (inRange && row.getAttribute('data-summary') !== 'true') visibleCount++;
+        });
+        var countLabel = document.getElementById('ledgerTxnCount');
+        if (countLabel) countLabel.textContent = visibleCount + ' transactions' + (from || to ? ' (filtered)' : '');
+        var noMatch = document.getElementById('ledgerNoMatch');
+        if (noMatch) noMatch.style.display = (visibleCount === 0) ? 'block' : 'none';
+        var wrapper = document.getElementById('ledgerTableWrapper');
+        if (wrapper) wrapper.style.display = (visibleCount === 0) ? 'none' : '';
+        var clearBtn = document.getElementById('clearLedgerFilterBtn');
+        if (clearBtn) clearBtn.style.display = (from || to) ? 'inline-flex' : 'none';
+    }
+
+    function clearLedgerFilter() {
+        document.getElementById('exportFrom').value = '';
+        document.getElementById('exportTo').value = '';
+        filterLedgerTable();
+    }
 
     function exportLedger(format) {
         var partyName = encodeURIComponent([[${ledger.partyName}]]);
