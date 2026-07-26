@@ -41,7 +41,7 @@
         .topbar-title { font-family:'Syne',sans-serif; font-size:20px; font-weight:700; }
         .topbar-date { font-size:13px; color:var(--muted); }
         .content { padding:28px 32px; }
-        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:28px; }
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom:28px; }
         .stat-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; }
         .stat-label { font-size:12px; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); margin-bottom:8px; }
         .stat-value { font-family:'Syne',sans-serif; font-size:26px; font-weight:700; }
@@ -50,16 +50,17 @@
         .stat-icon { font-size:22px; margin-bottom:8px; }
         .two-col { display:grid; grid-template-columns:1fr 1.2fr; gap:24px; }
         @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }
-        .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:24px; }
-        .section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+        .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:24px; position:relative; }
+        .section-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; row-gap:10px; margin-bottom:20px; }
         .section-title { font-family:'Syne',sans-serif; font-size:16px; font-weight:700; color:var(--text); }
         .form-label { display:block; font-size:12px; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); margin-bottom:7px; font-weight:600; }
         .form-control { width:100%; padding:11px 14px; background:var(--surface); border:1.5px solid var(--border); border-radius:9px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px; transition:border-color 0.2s,box-shadow 0.2s; outline:none; margin-bottom:14px; }
         .form-control:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,142,255,0.12); }
         .form-control::placeholder { color:var(--muted2); }
         .form-control:disabled { opacity:0.65; cursor:not-allowed; }
-        input[type="date"].form-control { min-width:0; max-width:100%; }
-        input[type="date"].form-control::-webkit-calendar-picker-indicator { margin-left:4px; }
+        input[type="date"].form-control, input[type="month"].form-control { min-width:0; max-width:100%; }
+        input[type="date"].form-control::-webkit-calendar-picker-indicator,
+        input[type="month"].form-control::-webkit-calendar-picker-indicator { margin-left:4px; }
         .form-error { font-size:12px; color:var(--red); margin-bottom:10px; margin-top:-10px; }
         .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
         .btn { padding:10px 20px; border-radius:9px; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; border:none; transition:all 0.15s; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
@@ -76,6 +77,13 @@
         tr:last-child td { border-bottom:none; }
         tr:hover td { background:var(--overlay-1); }
         .badge { padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:500; display:inline-block; background:rgba(108,142,255,0.15); color:var(--accent); }
+        .badge-cash{background:rgba(52,211,153,0.15);color:var(--green)}
+        .badge-cheque{background:rgba(108,142,255,0.15);color:var(--accent)}
+        .badge-upi{background:rgba(167,139,250,0.15);color:var(--accent2)}
+        .badge-neft{background:rgba(245,200,66,0.15);color:var(--gold)}
+        .badge-rtgs{background:rgba(251,146,60,0.15);color:var(--orange)}
+        .badge-bank{background:rgba(56,189,248,0.15);color:#38bdf8}
+        .badge-dd{background:rgba(248,113,113,0.15);color:var(--red)}
         .amount { font-weight:600; color:var(--green); }
         .text-muted { color:var(--muted); font-size:12px; }
         .empty-state { text-align:center; padding:40px 20px; color:var(--muted); }
@@ -86,6 +94,24 @@
         .autocomplete-item { padding:10px 14px; cursor:pointer; font-size:13px; display:flex; justify-content:space-between; gap:8px; }
         .autocomplete-item:hover { background:var(--overlay-3); }
         .item-gstin { color:var(--muted); font-size:11px; font-family:monospace; }
+        .ledger-tabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid var(--border)}
+        .ledger-tab{padding:10px 18px;background:transparent;border:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+        .ledger-tab:hover{color:var(--text)}
+        .ledger-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+        .ledger-panel{display:none}
+        .ledger-panel.active{display:block}
+        .btn-photo { background:rgba(108,142,255,0.1); color:var(--accent); border:1.5px dashed var(--border); width:100%; justify-content:center; padding:12px; margin-bottom:10px; }
+        .btn-photo:hover { background:rgba(108,142,255,0.16); border-color:var(--accent); }
+        .receipt-preview { position:relative; margin-bottom:14px; border-radius:10px; overflow:hidden; border:1px solid var(--border); display:none; }
+        .receipt-preview img { width:100%; max-height:200px; object-fit:cover; display:block; }
+        .receipt-remove { position:absolute; top:8px; right:8px; background:var(--backdrop); color:#e2e8f0; border:none; width:28px; height:28px; border-radius:8px; cursor:pointer; font-size:14px; }
+        .receipt-geo { font-size:11.5px; color:var(--muted); padding:6px 2px 0; }
+        .receipt-geo.ok { color:var(--green); }
+        .form-loading-overlay{display:none;position:absolute;inset:0;background:var(--backdrop);backdrop-filter:blur(3px);flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:20;border-radius:16px}
+        .form-loading-overlay.show{display:flex}
+        .form-loading-overlay .spinner-lg{width:34px;height:34px;border:3px solid var(--overlay-6);border-top-color:var(--accent);border-radius:50%;animation:mgrspin 0.7s linear infinite}
+        .form-loading-overlay .overlay-text{font-family:'Syne',sans-serif;font-size:14.5px;font-weight:600;color:#e2e8f0}
+        @keyframes mgrspin{to{transform:rotate(360deg)}}
         .menu-toggle{display:none;background:var(--overlay-3);border:1px solid var(--border);color:var(--text);width:38px;height:38px;border-radius:8px;font-size:18px;cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
         .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:150}
         @media(max-width:768px){
@@ -102,6 +128,11 @@
             .form-row{grid-template-columns:1fr}
             .form-control{font-size:16px}
             th,td{padding:9px 10px;font-size:12px}
+            .stats-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+            .stat-card{padding:14px}
+            .stat-value{font-size:20px}
+            .stat-icon{font-size:18px;margin-bottom:5px}
+            .ledger-tab{padding:9px 14px;font-size:12.5px}
         }
     </style>
 </head>
@@ -145,13 +176,23 @@
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon">🧾</div>
-                <div class="stat-label">Invoices on Selected Day</div>
+                <div class="stat-label">Invoices (Day)</div>
                 <div class="stat-value blue" th:text="${#lists.size(dayInvoices)}">0</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">💰</div>
-                <div class="stat-label">Selected Day Total</div>
+                <div class="stat-label">Invoice Total (Day)</div>
                 <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(dayTotal, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🧾</div>
+                <div class="stat-label">Collections (Day)</div>
+                <div class="stat-value blue" th:text="${#lists.size(dayPayments)}">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💰</div>
+                <div class="stat-label">Collection Total (Day)</div>
+                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(dayPaymentTotal, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">📅</div>
@@ -164,6 +205,13 @@
             </div>
         </div>
 
+        <!-- Tabs: Invoices / Collections -->
+        <div class="ledger-tabs">
+            <button type="button" class="ledger-tab" th:classappend="${activeTab == 'invoices'} ? ' active'" data-tab="invoices" onclick="switchTab('invoices')">🧾 Invoices</button>
+            <button type="button" class="ledger-tab" th:classappend="${activeTab == 'collections'} ? ' active'" data-tab="collections" onclick="switchTab('collections')">💰 Collections</button>
+        </div>
+
+        <div class="ledger-panel" th:classappend="${activeTab == 'invoices'} ? ' active'" id="tab-invoices">
         <div class="two-col">
             <!-- Add Invoice Form -->
             <div class="card">
@@ -314,51 +362,220 @@
                 </table>
             </div>
         </div>
+        </div>
+
+        <div class="ledger-panel" th:classappend="${activeTab == 'collections'} ? ' active'" id="tab-collections">
+        <div class="two-col">
+            <!-- Add Collection Form -->
+            <div class="card">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">➕ Add New Collection</div>
+                    </div>
+                </div>
+                <form th:action="@{/manager/entries/add}" method="post" th:object="${newEntry}"
+                      id="addEntryForm" autocomplete="off" enctype="multipart/form-data">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                    <label class="form-label">Party Name / Trailing No.</label>
+                    <div class="autocomplete-wrapper">
+                        <input type="text" id="entryPartyInput" class="form-control" th:field="*{partyName}"
+                               placeholder="Search party…" autocomplete="off" style="margin-bottom:0"/>
+                        <div class="autocomplete-list" id="entryPartyDropdown"></div>
+                    </div>
+                    <div class="form-error" style="margin-top:6px" th:if="${#fields.hasErrors('partyName')}" th:errors="*{partyName}"></div>
+                    <div style="margin-bottom:14px"></div>
+
+                    <label class="form-label">Amount (₹)</label>
+                    <input type="number" step="0.01" min="0.01" class="form-control" th:field="*{amount}" placeholder="0.00"/>
+                    <div class="form-error" th:if="${#fields.hasErrors('amount')}" th:errors="*{amount}"></div>
+
+                    <div class="form-row">
+                        <div>
+                            <label class="form-label">Mode of Payment</label>
+                            <select class="form-control" th:field="*{modeOfPayment}">
+                                <option value="">Select mode...</option>
+                                <option th:each="mode : ${paymentModes}" th:value="${mode}" th:text="${mode.displayName}"></option>
+                            </select>
+                            <div class="form-error" th:if="${#fields.hasErrors('modeOfPayment')}" th:errors="*{modeOfPayment}"></div>
+                        </div>
+                        <div>
+                            <label class="form-label">Date <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(auto-filled)</span></label>
+                            <input type="text" class="form-control"
+                                   th:value="${#temporals.format(today, 'dd MMM yyyy')}"
+                                   disabled style="opacity:0.65;cursor:not-allowed;"/>
+                            <input type="hidden" name="entryDate"
+                                   th:value="${#temporals.format(today, 'yyyy-MM-dd')}"/>
+                            <div class="form-error" th:if="${#fields.hasErrors('entryDate')}" th:errors="*{entryDate}"></div>
+                        </div>
+                    </div>
+
+                    <label class="form-label">Receipt Vch No. <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
+                    <input type="text" class="form-control" th:field="*{receiptVchNo}" placeholder="e.g. from the paper receipt"/>
+                    <div class="form-error" th:if="${#fields.hasErrors('receiptVchNo')}" th:errors="*{receiptVchNo}"></div>
+
+                    <label class="form-label">Remarks (Optional)</label>
+                    <input type="text" class="form-control" th:field="*{remarks}" placeholder="Any additional notes..."/>
+
+                    <label class="form-label">Receipt Photo <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
+                    <input type="file" id="receiptPhotoInput" name="receiptPhoto" accept="image/*" capture="environment" style="display:none;"/>
+                    <button type="button" class="btn btn-photo" id="receiptPhotoBtn">📷 Attach Receipt Photo</button>
+                    <div class="receipt-preview" id="receiptPreview">
+                        <img id="receiptPreviewImg" alt="Receipt preview"/>
+                        <button type="button" class="receipt-remove" id="receiptRemoveBtn" aria-label="Remove photo">✕</button>
+                    </div>
+                    <div class="receipt-geo" id="receiptGeoStatus"></div>
+                    <input type="hidden" name="latitude" id="latitudeInput"/>
+                    <input type="hidden" name="longitude" id="longitudeInput"/>
+
+                    <button type="submit" class="btn btn-primary" id="saveEntryBtn">💾 Save Collection</button>
+                </form>
+
+                <div class="form-loading-overlay" id="saveEntryOverlay">
+                    <div class="spinner-lg"></div>
+                    <div class="overlay-text">Saving collection…</div>
+                </div>
+            </div>
+
+            <!-- Selected Day's Collections Table -->
+            <div class="card">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">💰 Collections — <span th:text="${#temporals.format(selectedDate, 'dd MMM yyyy')}"></span></div>
+                    </div>
+                </div>
+                <div th:if="${#lists.isEmpty(dayPayments)}" class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <div>No collections added on this day yet.</div>
+                    <div style="font-size:12px;margin-top:6px;">Add your first collection using the form.</div>
+                </div>
+                <div th:if="${!#lists.isEmpty(dayPayments)}" class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Party</th>
+                                <th>Receipt Vch No.</th>
+                                <th>Amount</th>
+                                <th>Mode</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="entry : ${dayPayments}">
+                                <td th:text="${entry.partyName}"></td>
+                                <td class="text-muted" th:text="${entry.receiptVchNo != null ? entry.receiptVchNo : '—'}"></td>
+                                <td class="amount">₹<span th:text="${#numbers.formatDecimal(entry.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
+                                <td>
+                                    <span class="badge"
+                                          th:classappend="${entry.modeOfPayment=='Cash'}?'badge-cash':(${entry.modeOfPayment=='Cheque'}?'badge-cheque':(${entry.modeOfPayment=='UPI'}?'badge-upi':(${entry.modeOfPayment=='NEFT'}?'badge-neft':(${entry.modeOfPayment=='RTGS'}?'badge-rtgs':(${entry.modeOfPayment=='Bank Transfer'}?'badge-bank':'badge-dd')))))"
+                                          th:text="${entry.modeOfPayment}"></span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Collections -->
+        <div class="card" style="margin-top:24px">
+            <div class="section-header">
+                <div>
+                    <div class="section-title">📅 Monthly Collections — <span th:text="${selectedMonthLabel}"></span></div>
+                </div>
+                <form method="get" th:action="@{/manager/dashboard}" style="display:flex;align-items:center;gap:10px">
+                    <input type="hidden" name="date" th:value="${selectedDate}"/>
+                    <input type="month" name="month" class="form-control" style="margin-bottom:0"
+                           th:value="${selectedMonth}" onchange="this.form.submit()"/>
+                </form>
+            </div>
+            <div style="display:flex;gap:24px;margin-bottom:18px;flex-wrap:wrap">
+                <div>
+                    <div class="stat-label" style="margin-bottom:4px">Collections this Month</div>
+                    <div class="stat-value blue" style="font-size:20px" th:text="${#lists.size(monthPayments)}">0</div>
+                </div>
+                <div>
+                    <div class="stat-label" style="margin-bottom:4px">Total Amount</div>
+                    <div class="stat-value green" style="font-size:20px">₹<span th:text="${#numbers.formatDecimal(monthPaymentTotal, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
+                </div>
+            </div>
+            <div th:if="${#lists.isEmpty(monthPayments)}" class="empty-state">
+                <div class="empty-icon">📭</div>
+                <div>No collections added in this month yet.</div>
+            </div>
+            <div th:if="${!#lists.isEmpty(monthPayments)}" class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Party</th>
+                            <th>Receipt Vch No.</th>
+                            <th>Amount</th>
+                            <th>Mode</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="entry : ${monthPayments}">
+                            <td th:text="${#temporals.format(entry.entryDate, 'dd MMM yyyy')}"></td>
+                            <td th:text="${entry.partyName}"></td>
+                            <td class="text-muted" th:text="${entry.receiptVchNo != null ? entry.receiptVchNo : '—'}"></td>
+                            <td class="amount">₹<span th:text="${#numbers.formatDecimal(entry.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${entry.modeOfPayment=='Cash'}?'badge-cash':(${entry.modeOfPayment=='Cheque'}?'badge-cheque':(${entry.modeOfPayment=='UPI'}?'badge-upi':(${entry.modeOfPayment=='NEFT'}?'badge-neft':(${entry.modeOfPayment=='RTGS'}?'badge-rtgs':(${entry.modeOfPayment=='Bank Transfer'}?'badge-bank':'badge-dd')))))"
+                                      th:text="${entry.modeOfPayment}"></span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </div>
     </div>
 </div>
 <script>
-(function() {
-    const partyInput = document.getElementById('partyInput');
-    const partyDropdown = document.getElementById('partyDropdown');
-    let allParties = [];
-
-    if (partyInput) {
-        fetch('/api/parties/suggest?q=&limit=5000')
-            .then(r => r.json())
-            .then(data => { allParties = data; })
-            .catch(() => {});
-
-        partyInput.addEventListener('input', function() {
-            const q = this.value.toLowerCase().trim();
-            partyDropdown.innerHTML = '';
-            if (!q) { partyDropdown.style.display = 'none'; return; }
-            const matches = allParties.filter(p =>
-                (p.name && p.name.toLowerCase().includes(q)) ||
-                (p.trailingNumber && p.trailingNumber.toLowerCase().includes(q))
-            ).slice(0, 12);
-            if (!matches.length) { partyDropdown.style.display = 'none'; return; }
-            matches.forEach(p => {
-                const li = document.createElement('div');
-                li.className = 'autocomplete-item';
-                li.innerHTML = '<span>' + p.name + '</span>' +
-                    (p.trailingNumber ? '<span class="item-gstin">No. ' + p.trailingNumber + '</span>' : '');
-                li.addEventListener('mousedown', e => {
-                    e.preventDefault();
-                    partyInput.value = p.combined;
-                    partyDropdown.style.display = 'none';
-                });
-                partyDropdown.appendChild(li);
+function wirePartyAutocomplete(inputEl, dropdownEl, allPartiesRef) {
+    if (!inputEl) return;
+    inputEl.addEventListener('input', function() {
+        const q = this.value.toLowerCase().trim();
+        dropdownEl.innerHTML = '';
+        if (!q) { dropdownEl.style.display = 'none'; return; }
+        const matches = allPartiesRef.list.filter(p =>
+            (p.name && p.name.toLowerCase().includes(q)) ||
+            (p.trailingNumber && p.trailingNumber.toLowerCase().includes(q))
+        ).slice(0, 12);
+        if (!matches.length) { dropdownEl.style.display = 'none'; return; }
+        matches.forEach(p => {
+            const li = document.createElement('div');
+            li.className = 'autocomplete-item';
+            li.innerHTML = '<span>' + p.name + '</span>' +
+                (p.trailingNumber ? '<span class="item-gstin">No. ' + p.trailingNumber + '</span>' : '');
+            li.addEventListener('mousedown', e => {
+                e.preventDefault();
+                inputEl.value = p.combined;
+                dropdownEl.style.display = 'none';
             });
-            partyDropdown.style.display = 'block';
+            dropdownEl.appendChild(li);
         });
+        dropdownEl.style.display = 'block';
+    });
 
-        partyInput.addEventListener('blur', () => {
-            setTimeout(() => partyDropdown.style.display = 'none', 150);
-        });
-        partyInput.addEventListener('focus', function() {
-            if (this.value) this.dispatchEvent(new Event('input'));
-        });
-    }
+    inputEl.addEventListener('blur', () => {
+        setTimeout(() => dropdownEl.style.display = 'none', 150);
+    });
+    inputEl.addEventListener('focus', function() {
+        if (this.value) this.dispatchEvent(new Event('input'));
+    });
+}
+
+(function() {
+    const allPartiesRef = { list: [] };
+    fetch('/api/parties/suggest?q=&limit=5000')
+        .then(r => r.json())
+        .then(data => { allPartiesRef.list = data; })
+        .catch(() => {});
+
+    wirePartyAutocomplete(document.getElementById('partyInput'), document.getElementById('partyDropdown'), allPartiesRef);
+    wirePartyAutocomplete(document.getElementById('entryPartyInput'), document.getElementById('entryPartyDropdown'), allPartiesRef);
 })();
 
 function recalcAmount() {
@@ -374,12 +591,126 @@ function toggleSidebar() {
     document.getElementById('sidebarOverlay').classList.toggle('open');
 }
 
+function switchTab(name) {
+    document.querySelectorAll('.ledger-tab').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.tab === name);
+    });
+    document.querySelectorAll('.ledger-panel').forEach(function(panel) {
+        panel.classList.toggle('active', panel.id === 'tab-' + name);
+    });
+}
+
 document.getElementById('addInvoiceForm')?.addEventListener('submit', function() {
     const btn = document.getElementById('saveInvoiceBtn');
     if (btn.disabled) return false;
     btn.disabled = true;
     btn.textContent = 'Saving...';
 });
+
+(function() {
+    const photoInput = document.getElementById('receiptPhotoInput');
+    const photoBtn = document.getElementById('receiptPhotoBtn');
+    const preview = document.getElementById('receiptPreview');
+    const previewImg = document.getElementById('receiptPreviewImg');
+    const removeBtn = document.getElementById('receiptRemoveBtn');
+    const geoStatus = document.getElementById('receiptGeoStatus');
+    const latInput = document.getElementById('latitudeInput');
+    const lngInput = document.getElementById('longitudeInput');
+    if (!photoInput) return;
+
+    photoBtn.addEventListener('click', () => photoInput.click());
+
+    // Fetch location as soon as the collections tab's form exists, not only once a
+    // photo is attached — by the time the manager is ready to submit, it's already there.
+    requestGeoTag();
+
+    removeBtn.addEventListener('click', () => {
+        photoInput.value = '';
+        preview.style.display = 'none';
+        geoStatus.textContent = '';
+        geoStatus.classList.remove('ok');
+        latInput.value = '';
+        lngInput.value = '';
+    });
+
+    photoInput.addEventListener('change', function() {
+        const file = this.files && this.files[0];
+        if (!file) return;
+
+        compressImage(file, 1600, 0.7).then(function(compressedFile) {
+            const dt = new DataTransfer();
+            dt.items.add(compressedFile);
+            photoInput.files = dt.files;
+            showPreview(compressedFile);
+        }).catch(function() {
+            showPreview(file);
+        });
+
+        requestGeoTag();
+    });
+
+    function showPreview(file) {
+        previewImg.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+    }
+
+    function requestGeoTag() {
+        if (!('geolocation' in navigator)) {
+            geoStatus.textContent = 'Location not available on this device.';
+            return;
+        }
+        geoStatus.textContent = '📍 Getting location…';
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                latInput.value = pos.coords.latitude;
+                lngInput.value = pos.coords.longitude;
+                geoStatus.textContent = '📍 Location tagged';
+                geoStatus.classList.add('ok');
+            },
+            function() {
+                geoStatus.textContent = 'Location not available — collection will still be saved.';
+            },
+            { enableHighAccuracy: true, timeout: 8000 }
+        );
+    }
+
+    function compressImage(file, maxDim, quality) {
+        return new Promise(function(resolve, reject) {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = function() {
+                URL.revokeObjectURL(url);
+                let width = img.width, height = img.height;
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+                    else { width = Math.round(width * maxDim / height); height = maxDim; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                canvas.toBlob(function(blob) {
+                    if (!blob) { reject(new Error('toBlob failed')); return; }
+                    resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }));
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = reject;
+            img.src = url;
+        });
+    }
+})();
+
+(function() {
+    const form = document.getElementById('addEntryForm');
+    if (!form) return;
+    let submitting = false;
+    form.addEventListener('submit', function(e) {
+        if (submitting) { e.preventDefault(); return; }
+        submitting = true;
+        document.getElementById('saveEntryBtn').disabled = true;
+        document.getElementById('saveEntryOverlay').classList.add('show');
+    });
+})();
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));

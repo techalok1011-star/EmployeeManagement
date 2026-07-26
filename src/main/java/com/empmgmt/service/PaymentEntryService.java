@@ -160,6 +160,22 @@ public class PaymentEntryService {
                 .stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    /** One user's payment entries for a single date — powers a Manager's day-wise collections view. */
+    @Transactional(readOnly = true)
+    public List<PaymentEntryDTO.Response> getEntriesForEmployeeOnDate(String username, LocalDate date) {
+        User employee = findUserByUsername(username);
+        return paymentEntryRepository.findByEmployeeAndEntryDateOrderByCreatedAtDesc(employee, date)
+                .stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    /** One user's payment entries within [from, to] inclusive — powers a Manager's monthly collections view. */
+    @Transactional(readOnly = true)
+    public List<PaymentEntryDTO.Response> getEntriesForEmployeeDateRange(String username, LocalDate from, LocalDate to) {
+        User employee = findUserByUsername(username);
+        return paymentEntryRepository.findByEmployeeIdAndDateRange(employee.getId(), from, to)
+                .stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
     @Transactional(readOnly = true)
     public PaymentEntryDTO.DailySummary getDailySummaryForEmployee(String username) {
         User employee = findUserByUsername(username);

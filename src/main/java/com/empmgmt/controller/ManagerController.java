@@ -1,17 +1,22 @@
 package com.empmgmt.controller;
 
 import com.empmgmt.dto.InvoiceDTO;
+import com.empmgmt.dto.PaymentEntryDTO;
 import com.empmgmt.entity.Invoice;
+import com.empmgmt.entity.PaymentEntry;
 import com.empmgmt.service.InvoiceService;
+import com.empmgmt.service.PaymentEntryService;
 import com.empmgmt.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
@@ -21,19 +26,21 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * Mobile-first area for the MANAGER role: add + view invoices, mirroring the
- * EMPLOYEE dashboard's "add today's collections from your phone" pattern but
- * for invoices instead of payments. Managers cannot see payment entries,
- * parties, or anything under /admin/** — this is deliberately scoped to just
- * invoice entry/viewing.
+ * Mobile-first area for the MANAGER role: add + view invoices AND payment
+ * entries (collections), mirroring the EMPLOYEE dashboard's "add today's
+ * stuff from your phone" pattern for both. Managers still cannot see
+ * parties or anything under /admin/** - this controller is the entirety of
+ * their access.
  */
 @Controller
 @RequestMapping("/manager")
 @PreAuthorize("hasRole('MANAGER')")
 @RequiredArgsConstructor
+@Slf4j
 public class ManagerController {
 
     private final InvoiceService invoiceService;
+    private final PaymentEntryService paymentEntryService;
     private final UserService userService;
 
     // ─── Dashboard ────────────────────────────────────────────
@@ -49,8 +56,11 @@ public class ManagerController {
         newInvoice.setInvoiceDate(LocalDate.now());
         newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
         model.addAttribute("newInvoice", newInvoice);
+        model.addAttribute("newEntry", new PaymentEntryDTO.Request());
         model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
+        model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
         model.addAttribute("today", LocalDate.now());
+        model.addAttribute("activeTab", "invoices");
         return "manager/dashboard";
     }
 
@@ -91,6 +101,20 @@ public class ManagerController {
         model.addAttribute("monthTotal", monthTotal);
         model.addAttribute("selectedMonth", selectedMonth);
         model.addAttribute("selectedMonthLabel", selectedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
+
+        List<PaymentEntryDTO.Response> dayPayments = paymentEntryService.getEntriesForEmployeeOnDate(username, selectedDate);
+        BigDecimal dayPaymentTotal = dayPayments.stream()
+                .map(PaymentEntryDTO.Response::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        model.addAttribute("dayPayments", dayPayments);
+        model.addAttribute("dayPaymentTotal", dayPaymentTotal);
+
+        List<PaymentEntryDTO.Response> monthPayments = paymentEntryService.getEntriesForEmployeeDateRange(username, monthStart, monthEnd);
+        BigDecimal monthPaymentTotal = monthPayments.stream()
+                .map(PaymentEntryDTO.Response::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        model.addAttribute("monthPayments", monthPayments);
+        model.addAttribute("monthPaymentTotal", monthPaymentTotal);
     }
 
     // ─── Add Invoice ──────────────────────────────────────────
@@ -105,8 +129,11 @@ public class ManagerController {
         if (result.hasErrors()) {
             model.addAttribute("user", userService.getUserByUsername(username));
             addDashboardAttributes(model, username, LocalDate.now(), YearMonth.now());
+            model.addAttribute("newEntry", new PaymentEntryDTO.Request());
             model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
+            model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
             model.addAttribute("today", LocalDate.now());
+            model.addAttribute("activeTab", "invoices");
             return "manager/dashboard";
         }
         try {
@@ -126,5 +153,48 @@ public class ManagerController {
         model.addAttribute("user", userService.getUserByUsername(username));
         model.addAttribute("invoices", invoiceService.getInvoicesCreatedBy(username));
         return "manager/invoices";
+    }
+
+    // ─── Add Collection (payment entry) ────────────────────────
+
+    @PostMapping("/entries/add")
+    public String addEntry(@Valid @ModelAttribute("newEntry") PaymentEntryDTO.Request request,
+                           BindingResult result,
+                           @RequestParam(required = false) MultipartFile receiptPhoto,
+                           @RequestParam(required = false) BigDecimal latitude,
+                           @RequestParam(required = false) BigDecimal longitude,
+                           Authentication auth,
+                           Model model,
+                           RedirectAttributes redirectAttributes) {
+        String username = auth.getName();
+        if (result.hasErrors()) {
+            model.addAttribute("user", userService.getUserByUsername(username));
+            addDashboardAttributes(model, username, LocalDate.now(), YearMonth.now());
+            InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
+            newInvoice.setInvoiceDate(LocalDate.now());
+            newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
+            model.addAttribute("newInvoice", newInvoice);
+            model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
+            model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
+            model.addAttribute("today", LocalDate.now());
+            model.addAttribute("activeTab", "collections");
+            return "manager/dashboard";
+        }
+        // Always force today's date - same rule as the employee collection flow.
+        request.setEntryDate(LocalDate.now());
+        PaymentEntryDTO.Response saved = paymentEntryService.createEntry(request, username);
+
+        // Receipt photo is optional - a problem attaching it should never block the entry itself.
+        if (receiptPhoto != null && !receiptPhoto.isEmpty()) {
+            try {
+                paymentEntryService.attachReceipt(saved.getId(), receiptPhoto.getBytes(),
+                        receiptPhoto.getContentType(), latitude, longitude);
+            } catch (Exception e) {
+                log.warn("Receipt photo attach failed for entry id={}: {}", saved.getId(), e.getMessage());
+            }
+        }
+
+        redirectAttributes.addFlashAttribute("successMsg", "Collection added successfully!");
+        return "redirect:/manager/dashboard";
     }
 }
