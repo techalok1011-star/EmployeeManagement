@@ -307,11 +307,13 @@ public class InvoiceService {
         entries.sort(Comparator.comparing(PartyLedgerDTO.Entry::getDate)
                 .thenComparing(PartyLedgerDTO.Entry::getSortTiebreak, Comparator.nullsFirst(Comparator.naturalOrder())));
 
+        int transactionCount = entries.size();
         BigDecimal running = BigDecimal.ZERO;
         for (PartyLedgerDTO.Entry e : entries) {
             running = e.getDebit() != null ? running.add(e.getDebit()) : running.subtract(e.getCredit());
             e.setBalance(running);
         }
+        entries = insertFiscalYearTotals(entries);
         Collections.reverse(entries);
 
         int sep = combinedPartyName.indexOf('_');
@@ -330,6 +332,7 @@ public class InvoiceService {
                 .totalPaid(totalPaid)
                 .outstanding(totalInvoiced.subtract(totalPaid))
                 .entries(entries)
+                .transactionCount(transactionCount)
                 .build();
     }
 
@@ -403,10 +406,59 @@ public class InvoiceService {
                     .totalInvoiced(summary.getTotalInvoiced())
                     .totalPaid(summary.getTotalPaid())
                     .outstanding(summary.getOutstanding())
-                    .entries(entries)
+                    .transactionCount(entries.size())
+                    .entries(insertFiscalYearTotals(entries))
                     .build());
         }
         return result;
+    }
+
+    /** Indian fiscal year (Apr 1 - Mar 31) start year for a given date, e.g. 2026 for any date from 1-Apr-2026 to 31-Mar-2027. */
+    private static int fiscalYearStart(LocalDate d) {
+        return d.getMonthValue() >= 4 ? d.getYear() : d.getYear() - 1;
+    }
+
+    private static String fiscalYearLabel(int startYear) {
+        return "FY " + startYear + "-" + String.format("%02d", (startYear + 1) % 100);
+    }
+
+    /**
+     * Given a party's transactions in chronological (oldest-first) order with
+     * running balance already computed, splices in a synthetic FY_SUMMARY row
+     * at each fiscal-year boundary - the closing totals/balance for the year
+     * that just ended, right before the first entry of the next fiscal year.
+     * Deliberately does not add a trailing summary after the very last entry:
+     * the most recent fiscal year is presumably still ongoing, and its running
+     * total is already shown via the ledger's own overall totals elsewhere.
+     */
+    private List<PartyLedgerDTO.Entry> insertFiscalYearTotals(List<PartyLedgerDTO.Entry> chronological) {
+        if (chronological.isEmpty()) return chronological;
+        List<PartyLedgerDTO.Entry> withTotals = new ArrayList<>();
+        int currentFyStart = fiscalYearStart(chronological.get(0).getDate());
+        BigDecimal fyDebit = BigDecimal.ZERO, fyCredit = BigDecimal.ZERO;
+        BigDecimal lastBalance = BigDecimal.ZERO;
+
+        for (PartyLedgerDTO.Entry e : chronological) {
+            int fyStart = fiscalYearStart(e.getDate());
+            if (fyStart != currentFyStart) {
+                withTotals.add(PartyLedgerDTO.Entry.builder()
+                        .date(LocalDate.of(currentFyStart + 1, 3, 31))
+                        .type("FY_SUMMARY")
+                        .fyLabel(fiscalYearLabel(currentFyStart))
+                        .fyTotalDebit(fyDebit)
+                        .fyTotalCredit(fyCredit)
+                        .balance(lastBalance)
+                        .build());
+                currentFyStart = fyStart;
+                fyDebit = BigDecimal.ZERO;
+                fyCredit = BigDecimal.ZERO;
+            }
+            if (e.getDebit() != null) fyDebit = fyDebit.add(e.getDebit());
+            if (e.getCredit() != null) fyCredit = fyCredit.add(e.getCredit());
+            lastBalance = e.getBalance();
+            withTotals.add(e);
+        }
+        return withTotals;
     }
 
     // ─────────────────────────────────────────────────────────

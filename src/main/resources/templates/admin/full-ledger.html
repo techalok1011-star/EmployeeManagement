@@ -65,6 +65,7 @@
         .text-muted{color:var(--muted);font-size:12px}
         .badge-invoice{background:rgba(108,142,255,0.15);color:var(--accent);padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600}
         .badge-payment{background:rgba(52,211,153,0.15);color:var(--green);padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600}
+        .fy-summary-row td{background:rgba(245,200,66,0.12);color:var(--gold);font-weight:700;border-top:1.5px solid var(--gold);border-bottom:1.5px solid var(--gold)}
         .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
         .empty-icon{font-size:44px;margin-bottom:12px}
         .count-badge{background:rgba(108,142,255,0.12);color:var(--accent);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
@@ -216,29 +217,37 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="e : ${ledger.entries}">
-                        <td class="text-muted" th:text="${#temporals.format(e.date,'dd MMM yyyy')}"></td>
-                        <td>
-                            <span class="badge-invoice" th:if="${e.type == 'INVOICE'}">🧾 Invoice</span>
-                            <span class="badge-payment" th:if="${e.type == 'PAYMENT'}">💰 Payment</span>
-                        </td>
-                        <td th:text="${e.reference != null ? e.reference : '—'}"></td>
-                        <td class="text-muted" th:text="${e.salesVchNo != null ? e.salesVchNo : '—'}"></td>
-                        <td class="text-muted" th:text="${e.receiptVchNo != null ? e.receiptVchNo : '—'}"></td>
-                        <td class="text-muted">
-                            <div th:text="${e.description != null and !e.description.isEmpty() ? e.description : '—'}"></div>
-                            <div th:if="${e.deliveryInfo != null}" style="font-size:10.5px;color:var(--accent2);margin-top:2px" th:text="'🚚 ' + ${e.deliveryInfo}"></div>
-                        </td>
-                        <td>
-                            <span class="amount-debit" th:if="${e.debit != null}">₹<span th:text="${#numbers.formatDecimal(e.debit,1,'COMMA',2,'POINT')}"></span></span>
-                            <span class="text-muted" th:if="${e.debit == null}">—</span>
-                        </td>
-                        <td>
-                            <span class="amount-credit" th:if="${e.credit != null}">₹<span th:text="${#numbers.formatDecimal(e.credit,1,'COMMA',2,'POINT')}"></span></span>
-                            <span class="text-muted" th:if="${e.credit == null}">—</span>
-                        </td>
-                        <td class="amount-balance">₹<span th:text="${#numbers.formatDecimal(e.balance,1,'COMMA',2,'POINT')}"></span></td>
-                    </tr>
+                    <th:block th:each="e : ${ledger.entries}">
+                        <tr th:if="${e.type == 'FY_SUMMARY'}" class="fy-summary-row">
+                            <td colspan="6">📅 <span th:text="${e.fyLabel}"></span> — Total</td>
+                            <td class="amount-debit">₹<span th:text="${#numbers.formatDecimal(e.fyTotalDebit,1,'COMMA',2,'POINT')}"></span></td>
+                            <td class="amount-credit">₹<span th:text="${#numbers.formatDecimal(e.fyTotalCredit,1,'COMMA',2,'POINT')}"></span></td>
+                            <td class="amount-balance">₹<span th:text="${#numbers.formatDecimal(e.balance,1,'COMMA',2,'POINT')}"></span></td>
+                        </tr>
+                        <tr th:unless="${e.type == 'FY_SUMMARY'}">
+                            <td class="text-muted" th:text="${#temporals.format(e.date,'dd MMM yyyy')}"></td>
+                            <td>
+                                <span class="badge-invoice" th:if="${e.type == 'INVOICE'}">🧾 Invoice</span>
+                                <span class="badge-payment" th:if="${e.type == 'PAYMENT'}">💰 Payment</span>
+                            </td>
+                            <td th:text="${e.reference != null ? e.reference : '—'}"></td>
+                            <td class="text-muted" th:text="${e.salesVchNo != null ? e.salesVchNo : '—'}"></td>
+                            <td class="text-muted" th:text="${e.receiptVchNo != null ? e.receiptVchNo : '—'}"></td>
+                            <td class="text-muted">
+                                <div th:text="${e.description != null and !e.description.isEmpty() ? e.description : '—'}"></div>
+                                <div th:if="${e.deliveryInfo != null}" style="font-size:10.5px;color:var(--accent2);margin-top:2px" th:text="'🚚 ' + ${e.deliveryInfo}"></div>
+                            </td>
+                            <td>
+                                <span class="amount-debit" th:if="${e.debit != null}">₹<span th:text="${#numbers.formatDecimal(e.debit,1,'COMMA',2,'POINT')}"></span></span>
+                                <span class="text-muted" th:if="${e.debit == null}">—</span>
+                            </td>
+                            <td>
+                                <span class="amount-credit" th:if="${e.credit != null}">₹<span th:text="${#numbers.formatDecimal(e.credit,1,'COMMA',2,'POINT')}"></span></span>
+                                <span class="text-muted" th:if="${e.credit == null}">—</span>
+                            </td>
+                            <td class="amount-balance">₹<span th:text="${#numbers.formatDecimal(e.balance,1,'COMMA',2,'POINT')}"></span></td>
+                        </tr>
+                    </th:block>
                 </tbody>
             </table>
         </div>

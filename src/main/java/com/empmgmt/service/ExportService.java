@@ -298,9 +298,10 @@ public class ExportService {
 
         String fromStr = from != null ? from.toString() : "beginning";
         String toStr   = to   != null ? to.toString()   : LocalDate.now().toString();
+        long realTxnCount = entries.stream().filter(e -> !"FY_SUMMARY".equals(e.getType())).count();
         com.lowagie.text.Font subFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(100, 100, 100));
         Paragraph subtitle = new Paragraph(
-                "Period: " + fromStr + "  to  " + toStr + "   •   Transactions: " + entries.size(), subFont);
+                "Period: " + fromStr + "  to  " + toStr + "   •   Transactions: " + realTxnCount, subFont);
         subtitle.setAlignment(Element.ALIGN_CENTER);
         subtitle.setSpacingAfter(4);
         doc.add(subtitle);
@@ -341,9 +342,26 @@ public class ExportService {
         com.lowagie.text.Font balanceFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, new Color(30, 64, 175));
         Color evenBg = Color.WHITE;
         Color oddBg  = new Color(248, 249, 252);
+        Color fySummaryBg = new Color(255, 244, 214);
+        com.lowagie.text.Font fySummaryFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, new Color(146, 100, 5));
 
         for (int i = 0; i < entries.size(); i++) {
             PartyLedgerDTO.Entry e = entries.get(i);
+
+            if ("FY_SUMMARY".equals(e.getType())) {
+                PdfPCell labelCell = new PdfPCell(new Phrase(e.getFyLabel() + " — Total", fySummaryFont));
+                labelCell.setColspan(6);
+                labelCell.setBackgroundColor(fySummaryBg);
+                labelCell.setPadding(5f);
+                labelCell.setBorderColor(new Color(220, 224, 235));
+                labelCell.setBorderWidth(0.4f);
+                table.addCell(labelCell);
+                addPdfCell(table, "₹" + e.getFyTotalDebit().toPlainString(), fySummaryFont, fySummaryBg, Element.ALIGN_RIGHT);
+                addPdfCell(table, "₹" + e.getFyTotalCredit().toPlainString(), fySummaryFont, fySummaryBg, Element.ALIGN_RIGHT);
+                addPdfCell(table, "₹" + e.getBalance().toPlainString(), fySummaryFont, fySummaryBg, Element.ALIGN_RIGHT);
+                continue;
+            }
+
             Color rowBg = (i % 2 == 0) ? evenBg : oddBg;
 
             addPdfCell(table, e.getDate() != null ? e.getDate().toString() : "", dataFont, rowBg, Element.ALIGN_CENTER);
@@ -384,6 +402,16 @@ public class ExportService {
         sb.append("Date,Type,Reference,Sales Vch No,Receipt Vch No,Description,Debit,Credit,Balance\n");
 
         for (PartyLedgerDTO.Entry e : entries) {
+            if ("FY_SUMMARY".equals(e.getType())) {
+                sb.append(e.getDate() != null ? e.getDate().toString() : "").append(',');
+                sb.append(csvField("FY_SUMMARY")).append(',');
+                sb.append(csvField(e.getFyLabel() + " - Total")).append(",,,,");
+                sb.append(e.getFyTotalDebit() != null ? e.getFyTotalDebit().toPlainString() : "").append(',');
+                sb.append(e.getFyTotalCredit() != null ? e.getFyTotalCredit().toPlainString() : "").append(',');
+                sb.append(e.getBalance() != null ? e.getBalance().toPlainString() : "");
+                sb.append('\n');
+                continue;
+            }
             sb.append(e.getDate() != null ? e.getDate().toString() : "").append(',');
             sb.append(csvField(e.getType())).append(',');
             sb.append(csvField(e.getReference())).append(',');
