@@ -10,6 +10,7 @@ import com.empmgmt.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -196,5 +197,97 @@ public class ManagerController {
 
         redirectAttributes.addFlashAttribute("successMsg", "Collection added successfully!");
         return "redirect:/manager/dashboard";
+    }
+
+    // ─── View All My Collections (day-wise, filterable) ────────
+
+    @GetMapping("/entries")
+    public String allEntries(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            Model model, Authentication auth) {
+        String username = auth.getName();
+        boolean filtered = from != null || to != null;
+        model.addAttribute("user", userService.getUserByUsername(username));
+        model.addAttribute("dayGroups", filtered
+                ? paymentEntryService.getFilteredEntriesGroupedByDayForEmployee(username, from, to)
+                : paymentEntryService.getEntriesGroupedByDayForEmployee(username));
+        model.addAttribute("summary", paymentEntryService.getDailySummaryForEmployee(username));
+        model.addAttribute("totalAllTime", paymentEntryService.getEntriesForEmployee(username).size());
+        model.addAttribute("from", from);
+        model.addAttribute("to", to);
+        return "manager/entries";
+    }
+
+    // ─── Edit Collection (today's entries only) ────────────────
+
+    @GetMapping("/entries/{id}/edit")
+    public String editEntryForm(@PathVariable Long id, Authentication auth, Model model,
+                                RedirectAttributes redirectAttributes) {
+        try {
+            PaymentEntryDTO.Response entry = paymentEntryService.getEntryById(id);
+            if (!entry.getEmployeeUsername().equals(auth.getName())) {
+                redirectAttributes.addFlashAttribute("errorMsg", "You can only edit your own collections.");
+                return "redirect:/manager/entries";
+            }
+            if (!entry.getEntryDate().equals(LocalDate.now())) {
+                redirectAttributes.addFlashAttribute("errorMsg",
+                        "You can only edit today's collections. Past entries are locked.");
+                return "redirect:/manager/entries";
+            }
+            PaymentEntryDTO.Request req = new PaymentEntryDTO.Request();
+            req.setPartyName(entry.getPartyName());
+            req.setAmount(entry.getAmount());
+            req.setRemarks(entry.getRemarks());
+            req.setEntryDate(entry.getEntryDate());
+            req.setReceiptVchNo(entry.getReceiptVchNo());
+            model.addAttribute("entry", entry);
+            model.addAttribute("editRequest", req);
+            model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
+            model.addAttribute("user", userService.getUserByUsername(auth.getName()));
+            return "manager/edit-entry";
+        } catch (RuntimeException e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+            return "redirect:/manager/entries";
+        }
+    }
+
+    @PostMapping("/entries/{id}/edit")
+    public String editEntry(@PathVariable Long id,
+                            @Valid @ModelAttribute("editRequest") PaymentEntryDTO.Request request,
+                            BindingResult result,
+                            Authentication auth,
+                            Model model,
+                            RedirectAttributes redirectAttributes) {
+        if (result.hasErrors()) {
+            PaymentEntryDTO.Response entry = paymentEntryService.getEntryById(id);
+            model.addAttribute("entry", entry);
+            model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
+            model.addAttribute("user", userService.getUserByUsername(auth.getName()));
+            return "manager/edit-entry";
+        }
+        try {
+            request.setEntryDate(LocalDate.now());
+            paymentEntryService.updateEntryByEmployee(id, request, auth.getName());
+            redirectAttributes.addFlashAttribute("successMsg", "Collection updated successfully!");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/manager/entries";
+    }
+
+    // ─── Delete Collection ──────────────────────────────────────
+
+    @PostMapping("/entries/{id}/delete")
+    public String deleteEntry(@PathVariable Long id,
+                              Authentication auth,
+                              RedirectAttributes redirectAttributes) {
+        try {
+            paymentEntryService.deleteEntryByEmployee(id, auth.getName());
+            redirectAttributes.addFlashAttribute("successMsg", "Collection deleted successfully.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/manager/entries";
     }
 }
