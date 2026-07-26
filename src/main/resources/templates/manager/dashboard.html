@@ -14,6 +14,7 @@
     <script th:src="@{/js/theme.js}"></script>
     <style th:inline="none">
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { overflow-x: hidden; max-width: 100vw; }
         body { font-family:'DM Sans',sans-serif; background:var(--ink); color:var(--text); min-height:100vh; display:flex; }
         .sidebar {
             width:240px; min-height:100vh; background:var(--surface);
@@ -42,7 +43,8 @@
         .topbar-date { font-size:13px; color:var(--muted); }
         .content { padding:28px 32px; }
         .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom:28px; }
-        .stat-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; min-width:0; }
+        .stat-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; min-width:0; max-width:100%; overflow:hidden; }
+        .stat-card form { width:100%; }
         .stat-label { font-size:12px; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); margin-bottom:8px; }
         .stat-value { font-family:'Syne',sans-serif; font-size:26px; font-weight:700; overflow-wrap:break-word; }
         .stat-value.blue { color:var(--accent); }
@@ -50,7 +52,7 @@
         .stat-icon { font-size:22px; margin-bottom:8px; }
         .two-col { display:grid; grid-template-columns:1fr 1.2fr; gap:24px; }
         @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }
-        .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:24px; position:relative; }
+        .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:24px; position:relative; max-width:100%; }
         .section-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; row-gap:10px; margin-bottom:20px; }
         .section-title { font-family:'Syne',sans-serif; font-size:16px; font-weight:700; color:var(--text); }
         .form-label { display:block; font-size:12px; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); margin-bottom:7px; font-weight:600; }
@@ -58,7 +60,7 @@
         .form-control:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,142,255,0.12); }
         .form-control::placeholder { color:var(--muted2); }
         .form-control:disabled { opacity:0.65; cursor:not-allowed; }
-        input[type="date"].form-control, input[type="month"].form-control { min-width:0; max-width:100%; }
+        input[type="date"].form-control, input[type="month"].form-control { min-width:0; width:100%; max-width:100%; box-sizing:border-box; }
         input[type="date"].form-control::-webkit-calendar-picker-indicator,
         input[type="month"].form-control::-webkit-calendar-picker-indicator { margin-left:4px; }
         .form-error { font-size:12px; color:var(--red); margin-bottom:10px; margin-top:-10px; }
@@ -734,8 +736,14 @@ if ('serviceWorker' in navigator) {
         link.addEventListener('click', function(e) {
             // Don't block modified clicks (new tab / new window) or an already-open menu toggle.
             if (e.metaKey || e.ctrlKey || e.shiftKey || link.target === '_blank') return;
+            // Same-tick navigation can skip painting the overlay entirely on some
+            // mobile browsers (the exact issue already fixed on the login page) -
+            // defer the actual navigation slightly so the overlay reliably shows first.
+            e.preventDefault();
+            const href = link.getAttribute('href');
             overlayText.textContent = 'Loading…';
             overlay.classList.add('show');
+            setTimeout(function() { window.location.href = href; }, 50);
         });
     });
 

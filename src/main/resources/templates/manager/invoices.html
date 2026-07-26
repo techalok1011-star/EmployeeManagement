@@ -14,6 +14,7 @@
     <script th:src="@{/js/theme.js}"></script>
     <style th:inline="none">
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { overflow-x: hidden; max-width: 100vw; }
         body { font-family:'DM Sans',sans-serif; background:var(--ink); color:var(--text); min-height:100vh; display:flex; }
         .sidebar {
             width:240px; min-height:100vh; background:var(--surface);
@@ -178,8 +179,14 @@
         document.querySelectorAll('.nav-link').forEach(function(link) {
             link.addEventListener('click', function(e) {
                 if (e.metaKey || e.ctrlKey || e.shiftKey || link.target === '_blank') return;
+                // Same-tick navigation can skip painting the overlay entirely on some
+                // mobile browsers - defer the actual navigation slightly so the
+                // overlay reliably shows first.
+                e.preventDefault();
+                const href = link.getAttribute('href');
                 overlayText.textContent = 'Loading…';
                 overlay.classList.add('show');
+                setTimeout(function() { window.location.href = href; }, 50);
             });
         });
 
