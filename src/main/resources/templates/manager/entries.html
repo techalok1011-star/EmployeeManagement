@@ -95,7 +95,7 @@
         .search-input::placeholder{color:var(--muted2)}
         .topbar-actions{display:flex;gap:10px;align-items:center}
         .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px}
-        .filter-group{display:flex;flex-direction:column;gap:4px}
+        .filter-group{display:flex;flex-direction:column;gap:4px;flex:1 1 160px;min-width:160px}
         .filter-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);font-weight:600}
         .filter-input{padding:8px 12px;background:var(--card);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s}
         .filter-input:focus{border-color:var(--accent)}
@@ -124,6 +124,7 @@
             .topbar-title{font-size:16px}
             .topbar-actions{width:100%}
             .filter-bar{padding:12px}
+            .filter-group{flex:1 1 100%;min-width:0}
             .search-input,.filter-input{font-size:16px}
             th,td{padding:9px 10px;font-size:12px}
             .day-header{flex-wrap:wrap;gap:8px}
