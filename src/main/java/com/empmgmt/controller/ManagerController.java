@@ -265,9 +265,7 @@ public class ManagerController {
             model.addAttribute("activeTab", "collections");
             return "manager/dashboard";
         }
-        // Always force today's date - same rule as the employee collection flow.
-        request.setEntryDate(LocalDate.now());
-        PaymentEntryDTO.Response saved = paymentEntryService.createEntry(request, username);
+        PaymentEntryDTO.Response saved = paymentEntryService.createEntryForManager(request, username);
 
         // Receipt photo is optional - a problem attaching it should never block the entry itself.
         if (receiptPhoto != null && !receiptPhoto.isEmpty()) {

@@ -463,11 +463,8 @@
                             <div class="form-error" th:if="${#fields.hasErrors('modeOfPayment')}" th:errors="*{modeOfPayment}"></div>
                         </div>
                         <div>
-                            <label class="form-label">Date <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(auto-filled)</span></label>
-                            <input type="text" class="form-control"
-                                   th:value="${#temporals.format(today, 'dd MMM yyyy')}"
-                                   disabled style="opacity:0.65;cursor:not-allowed;"/>
-                            <input type="hidden" name="entryDate"
+                            <label class="form-label">Date</label>
+                            <input type="date" class="form-control" name="entryDate"
                                    th:value="${#temporals.format(today, 'yyyy-MM-dd')}"/>
                             <div class="form-error" th:if="${#fields.hasErrors('entryDate')}" th:errors="*{entryDate}"></div>
                         </div>

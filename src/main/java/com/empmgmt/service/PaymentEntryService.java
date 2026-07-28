@@ -87,6 +87,39 @@ public class PaymentEntryService {
     }
 
     /**
+     * Manager's "Add New Collection" flow - identical to {@link #createEntry} except the
+     * date isn't restricted to today, since managers are allowed to log a collection for
+     * any date (matching the same policy already applied to their invoice edit/delete).
+     * Deliberately a separate method rather than relaxing {@link #createEntry} itself,
+     * since that method is shared with the EMPLOYEE day-entry flow, which still must stay
+     * today-only.
+     */
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    public PaymentEntryDTO.Response createEntryForManager(PaymentEntryDTO.Request request, String username) {
+        User manager = findUserByUsername(username);
+
+        excelPartyService.ensureExists(request.getPartyName());
+
+        PaymentEntry entry = PaymentEntry.builder()
+                .partyName(request.getPartyName())
+                .amount(request.getAmount())
+                .modeOfPayment(request.getModeOfPayment())
+                .entryDate(request.getEntryDate())
+                .remarks(request.getRemarks())
+                .receiptVchNo(request.getReceiptVchNo() != null && !request.getReceiptVchNo().isBlank()
+                        ? request.getReceiptVchNo().trim() : null)
+                .employee(manager)
+                .build();
+
+        entry = paymentEntryRepository.save(entry);
+        log.info("✅ Payment entry SAVED to DB | id={} | party={} | amount={} | manager={} | date={}",
+                entry.getId(), entry.getPartyName(), entry.getAmount(), username, entry.getEntryDate());
+        logAction("CREATE", entry, username, "Entry created");
+        eventPublisher.publishEvent(new PaymentEntryCreatedEvent(entry, username));
+        return mapToResponse(entry);
+    }
+
+    /**
      * Attaches a photographed receipt (with optional geo-tag) to an already-created
      * entry. Called right after {@link #createEntry} when the employee submitted a
      * photo - kept separate so entry creation never fails because of a photo problem.
