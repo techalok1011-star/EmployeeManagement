@@ -13,6 +13,7 @@ public class EmployeeCollectionSummaryDTO {
     private Long employeeId;
     private String fullName;
     private String username;
+    private String role;
 
     private BigDecimal todayAmount;
     private long todayCount;

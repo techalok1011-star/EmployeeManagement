@@ -432,7 +432,9 @@ public class PaymentEntryService {
                 .sumAndCountGroupedByEmployeeInRange(monthStart, today).stream()
                 .collect(Collectors.toMap(row -> (Long) row[0], row -> row));
 
-        return userRepository.findByRole(User.Role.EMPLOYEE).stream()
+        return userRepository.findByRoleIn(
+                        java.util.List.of(User.Role.EMPLOYEE, User.Role.MANAGER, User.Role.ACCOUNTANT))
+                .stream()
                 .map(emp -> {
                     Object[] allTime = allTimeByEmployee.get(emp.getId());
                     Object[] month = monthByEmployee.get(emp.getId());
@@ -443,6 +445,7 @@ public class PaymentEntryService {
                             .employeeId(emp.getId())
                             .fullName(emp.getFullName())
                             .username(emp.getUsername())
+                            .role(emp.getRole().name())
                             .todayAmount(todayAmount != null ? todayAmount : BigDecimal.ZERO)
                             .todayCount(todayCount)
                             .monthAmount(month != null ? (BigDecimal) month[1] : BigDecimal.ZERO)
