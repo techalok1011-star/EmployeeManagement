@@ -17,7 +17,7 @@ are just `User` rows with `role` = `EMPLOYEE`, `ACCOUNTANT`, `MANAGER`, or
 describe an early, much simpler version (Users/PaymentEntry/TransactionLog
 only) and were never updated as Party/Invoice/WhatsApp/export/analytics
 features were added. Verify against `src/main/java/com/empmgmt/` instead.
-Last full re-verification against source: 2026-07-18.
+Last full re-verification against source: 2026-07-28.
 
 **The app is now deployed and live** at
 `https://employeemanagement-q6h3.onrender.com` (Render, free tier, Docker
@@ -37,6 +37,18 @@ data snapshot" below for resulting counts, and the Tally Import section
 further down for the durable facts about this dataset (column conventions,
 what's real vs. placeholder, etc).
 
+**Major data event, 2026-07-28**: a **second, larger** historical backfill
+for the same ShivShakti business - 3 full fiscal years (FY2022-23 through
+FY2024-25, predating the 2026-07-12 import's FY2025-26 start) - was added to
+**local `empdb` only**. 385 new parties, 3,377 invoices, 16,134 payments.
+See the "ShivShakti historical import (2026-07-28)" section below for the
+full details (party-matching approach, invoice-number scheme, what's still
+out of sync with Neon). **Also note**: between the two imports, a smaller,
+undocumented partial **FY2026-27** import (Apr-Jul 2026, 534 invoices/1,911
+payments, `TALLY-S-FY2026-27-<vchNo>`) had already been applied to *both*
+local and Neon before this session started - discovered while building the
+2026-07-28 import's invoice-numbering scheme, not previously captured here.
+
 ## Running it / connecting
 
 - Maven, Java 17, Spring Boot 3.2.0. `mvn spring-boot:run` or run
@@ -50,12 +62,16 @@ what's real vs. placeholder, etc).
 - `spring.jpa.hibernate.ddl-auto=update` - schema auto-migrates new
   tables/columns on boot, but **never** rewrites existing CHECK constraints,
   indexes, or drops columns. See the enum gotcha below.
-- **Two Postgres installs on this machine**: `C:\Program Files\PostgreSQL\13`
-  (matches the running server - use this `psql.exe` for all queries/DDL) and
-  `C:\Program Files\PostgreSQL\18` (only needed for `pg_dump.exe`/`pg_restore.exe`,
-  since v13's dump tools refuse to run against a v18 server - "server version
-  mismatch" - but v13's `psql.exe` talks to the v18 server fine for normal
-  SQL). Don't assume `psql`/`pg_dump` under the same version folder both work.
+- **Two Postgres installs on this machine, roles now REVERSED from earlier
+  notes**: the local server itself is now **v18** (confirmed 2026-07-28 -
+  `pg_dump.exe` under `C:\Program Files\PostgreSQL\13` fails with `server
+  version: 18.4 ... aborting because of server version mismatch`). Use
+  `C:\Program Files\PostgreSQL\18\bin\pg_dump.exe`/`pg_restore.exe` for any
+  local backup/restore. `psql.exe` under either the `13` or `18` folder still
+  connects fine for plain queries/DDL (psql is lenient about talking to a
+  newer server; pg_dump/pg_restore are not). Re-verify which version the
+  server is on before assuming either of these - it may have been upgraded
+  again since.
 - To restart the app after a code change: find the PID on port 8080
   (`Get-NetTCPConnection -LocalPort 8080 -State Listen`), `Stop-Process -Force`
   it, then `nohup mvn -q spring-boot:run &` and poll
@@ -120,7 +136,7 @@ thing to understand before touching invoices/payments/parties:
   `ExcelPartyService.ensureExists(combined)` / the existing controllers
   rather than hand-crafting the string.
 
-### Tables (10, schema `public`)
+### Tables (11, schema `public`)
 
 | Table | Key columns | Notes |
 |---|---|---|
@@ -134,6 +150,7 @@ thing to understand before touching invoices/payments/parties:
 | `notification_settings` | id(always 1, singleton row), daily_reminder_enabled, updated_by, updated_at | Controls whether the 5pm scheduler actually fires |
 | `payment_receipts` | id, **payment_entry_id**(FK→payment_entries, unique), photo_data(**bytea**), content_type, latitude, longitude, captured_at | Added 2026-07-18. One row per entry that has a photographed receipt - deliberately a separate table, not columns on `payment_entries`, since that table is read on every cached ledger/summary query and a bytea column there would bloat all of them. `photo_data` **must** stay mapped via `@JdbcTypeCode(SqlTypes.VARBINARY)` + `columnDefinition="bytea"` - plain `@Lob` on a `byte[]` with Hibernate+Postgres silently maps to `oid` (large object) instead, which isn't auto-cleaned on row delete and doesn't play well with pooled/serverless Postgres connections (caught and fixed during initial implementation, before any real data existed). |
 | `admin_notifications` | id, type, message, party_name, amount, triggered_by, triggered_by_role, source_type, source_id, is_read, created_at, read_at | Added 2026-07-18. `type` CHECK: `COLLECTION_ADDED,INVOICE_ADDED` - same enum-CHECK-constraint gotcha as below applies to any future new type. Powers the admin activity feed/bell (see its own section). |
+| `login_sessions` | id, username, full_name, role, login_at, logout_at | Added 2026-07-28. One row per login; `logout_at` stays null for still-open sessions (or ones where the app restarted before a real logout - no cleanup job for these). Populated entirely from `SecurityConfig`'s auth success/logout handlers, not any controller. Powers the ADMIN-only `/admin/login-history` report - see its own section below. |
 
 ### Entities/enums (`entity/` package)
 
@@ -311,10 +328,14 @@ row (admin-toggleable at `/admin/notifications`).
 - **`AdminController`** (`/admin/**`, role ADMIN; several sub-paths widened
   to ADMIN+ACCOUNTANT): dashboard, employees CRUD, entries CRUD+export
   (excel/pdf/audit-csv) - `/admin/entries` supports `from`/`to`/`employeeId`
-  date-range filtering, history, **invoices** (`/admin/invoices` - also
-  supports `from`/`to` date-range filtering on the Invoice List since
-  2026-07-12, independent of the lifetime stats bar and the notification log
-  section which stay unfiltered), **ledger** (`/admin/ledger?partyName=`,
+  date-range filtering, history, **login-history** (`/admin/login-history`,
+  added 2026-07-28, ADMIN-only - see its own section below), **invoices**
+  (`/admin/invoices` - also supports `from`/`to` date-range filtering on the
+  Invoice List since 2026-07-12, independent of the lifetime stats bar and
+  the notification log section which stay unfiltered; `GET`/`POST
+  /admin/invoices/{id}/edit` added 2026-07-28, ADMIN+ACCOUNTANT, any
+  invoice - see "Invoice edit capability" section below), **ledger**
+  (`/admin/ledger?partyName=`,
   single party, newest-first - has an "➕ Add Payment" tab, see the
   ACCOUNTANT role section above), **full-ledger** (`/admin/full-ledger`, added
   2026-07-12 - every party's statement on one page, oldest-first per party,
@@ -378,11 +399,15 @@ import's placeholder `employee_id=admin` rows), so `employeeName`/`employeeUsern
 in `PaymentEntryDTO.Response` is how you can tell an entry was staff-added rather
 than logged by the employee it might be filed under a party for.
 
-## MANAGER role (added 2026-07-18)
+## MANAGER role (added 2026-07-18, edit/delete added 2026-07-28)
 
-A fourth role alongside ADMIN/EMPLOYEE/ACCOUNTANT, scoped to **only** adding
-and viewing invoices - mirrors the EMPLOYEE dashboard's "add today's stuff
-from your phone" UX but for invoices instead of payments.
+A fourth role alongside ADMIN/EMPLOYEE/ACCOUNTANT. Originally scoped to only
+adding/viewing invoices (mirrors the EMPLOYEE dashboard's "add today's stuff
+from your phone" UX); as of 2026-07-28 can also add/edit/delete **collections**
+(payment entries, added 2026-07-26 - see git log) and now edit/delete their
+**own** invoices too (any date, not just today - see "Invoice edit
+capability" section below for the shared service method and the
+Admin/Accountant side of the same feature).
 
 - New `ManagerController` (`/manager/**`, `@PreAuthorize("hasRole('MANAGER')")`,
   class-level - unlike `AdminController` there's no need for per-method
@@ -390,7 +415,18 @@ from your phone" UX but for invoices instead of payments.
   `GET /manager/dashboard` (add-invoice form + "Today's Invoices" list,
   scoped via `InvoiceService.getInvoicesCreatedByOnDate(username, today)`),
   `POST /manager/invoices/add`, `GET /manager/invoices` (all-time, this
-  manager's invoices only, via `getInvoicesCreatedBy(username)`).
+  manager's invoices only, via `getInvoicesCreatedBy(username)`),
+  `GET`/`POST /manager/invoices/{id}/edit` and `POST /manager/invoices/{id}/delete`
+  (added 2026-07-28 - ownership enforced by comparing `invoice.createdBy` to
+  `auth.getName()` **in the controller**, not the service layer, since
+  Admin/Accountant's edit of the same shared `InvoiceService.updateInvoice()`
+  method is deliberately unrestricted to any invoice).
+- **Dashboard invoice tables gained a 👁 View / ✏️ Edit / 🗑 Delete actions
+  column** (2026-07-28) - View opens a small client-side modal (no server
+  round-trip, populated from `data-*` attributes already rendered per row)
+  showing Bags/Rate/Amount/Description/Transport No., since the compact
+  Today's/Month invoice tables never had room for those columns (unlike
+  `manager/invoices.html`, which shows them inline).
 - **Own PWA manifest**: `static/manager-manifest.json` (`start_url:
   /manager/dashboard`, separate from `static/manifest.json`'s
   `/employee/dashboard`) - **necessary**, not cosmetic: if a Manager
@@ -644,6 +680,76 @@ the formatted display string - string-sorting dates would be wrong).
   deliberate, to sidestep the enum/CHECK-constraint gotcha below for a table
   that's expected to grow with more logged action types over time.
 
+## Invoice edit capability (added 2026-07-28)
+
+Before this date, invoices could be created and (Admin/Accountant only)
+deleted, but **never edited by anyone** - `InvoiceService` had no update
+method at all. Added `InvoiceService.updateInvoice(id, request, performedBy)`,
+mirroring `createInvoice()`'s validation (re-checks `invoice_number`
+uniqueness, excluding self; recomputes `amount = ratePerBag × bags`; same
+`@CacheEvict` set) and `logInvoiceAudit()` convention.
+
+- **Admin/Accountant**: `GET`/`POST /admin/invoices/{id}/edit`
+  (`@PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")`, matching the existing
+  delete endpoint) - can edit **any** invoice, no ownership check. New
+  `admin/edit-invoice.html` template (mirrors `admin/edit-entry.html`'s
+  shell), Edit button added next to the existing 🗑 on `admin/invoices.html`.
+- **Manager**: same shared service method, but scoped to invoices they
+  personally created (`invoice.createdBy == auth.getName()`), **any date**
+  (a deliberate, more permissive choice than the "today only" rule payment-
+  entry edits use) - see the MANAGER role section above for the endpoints.
+- **Every edit writes an `audit_logs` `UPDATE` row** via the existing
+  `logInvoiceAudit()` helper - shows up automatically on `/admin/history`
+  with **zero template changes needed there**, since that page already
+  handles arbitrary `CREATE`/`UPDATE`/`DELETE` actions generically.
+- **Real bug hit and fixed during this build**: `InvoiceDTO.Response.deliveryMode`
+  holds the enum's **display name** ("Truck"), not the constant name
+  ("TRUCK") - `toResponse()` maps it via `.getDisplayName()`. Pre-filling the
+  edit form with `Invoice.DeliveryMode.valueOf(invoice.getDeliveryMode())`
+  throws `IllegalArgumentException: No enum constant ...Truck` (500 error).
+  Fixed with a small `findDeliveryModeByDisplayName()` helper (duplicated in
+  both `AdminController` and `ManagerController` - matches each other, no
+  shared util class for it). **Any future code that needs the raw enum from
+  an `InvoiceDTO.Response` must go through display-name matching, not
+  `valueOf()`.**
+- Verified end-to-end (create/edit/delete, ownership-check rejection, audit
+  log entries with correct `performed_by_role`) via a temporary test
+  `MANAGER` account and test invoice, both deleted after - reuse this
+  pattern for any future invoice-edit-flow verification.
+
+## Login/logout session tracking (added 2026-07-28)
+
+Net-new feature - nothing tracked login/logout timing before this. New
+`login_sessions` table (see Tables list above), `LoginSessionService`
+(`recordLogin(username)` / `recordLogout(username)` / `getRecentSessions()`
+returning `List<Map<String,Object>>` with a computed `durationText` and
+`active` flag - not a formal DTO class, kept simple since it's read-only and
+single-purpose).
+
+- **Wired into `SecurityConfig`**, not any controller: the existing
+  role-based-redirect `successHandler` lambda now also calls
+  `loginSessionService.recordLogin(auth.getName())` right before
+  `res.sendRedirect(...)`; `.logout(...)` switched from a plain
+  `logoutSuccessUrl` string to a `logoutSuccessHandler` lambda that calls
+  `loginSessionService.recordLogout(authentication.getName())` before
+  redirecting - the `Authentication` parameter passed into a
+  `LogoutSuccessHandler` is still populated (captured before context-clearing)
+  even though `.clearAuthentication(true)` runs as part of the same logout
+  filter chain, so this works correctly.
+- **New `GET /admin/login-history`** (`AdminController`, ADMIN-only - no
+  `@PreAuthorize` override needed since the class default is already
+  `hasRole('ADMIN')`, matching the bell/activity-feed precedent of not
+  extending this kind of thing to ACCOUNTANT) → `admin/login-history.html`,
+  showing user/role/login time/logout time/duration/live "🟢 Active" badge,
+  newest-first, last 200 sessions. Nav link (`🕐 Login History`, right after
+  `📜 Audit Log`) added to **all 19 other** `admin/*.html` templates via a
+  scripted `sed` pass matching both the plain and
+  `sec:authorize="hasRole('ADMIN')"` variants of the existing Audit Log link
+  - if adding a 20th admin template later, copy this link too.
+- Sessions where the app restarted before a real logout stay permanently
+  `logout_at IS NULL` (shown as "🟢 Active" even though the user is long
+  gone) - no cleanup/expiry job exists for this yet.
+
 ## Concurrency: what's actually protected vs. not (as of 2026-07-18)
 
 Came up as a direct question, worth keeping the answer somewhere durable
@@ -690,35 +796,39 @@ rather than re-deriving it:
 - Render's free-tier ~750 instance-hours/month easily covers a ~16h/day
   active window, so this doesn't risk exceeding the free plan.
 
-## Current data snapshot (point-in-time, end of day 2026-07-12 - re-query live, don't trust these numbers as still current)
+## Current data snapshot (point-in-time, end of day 2026-07-28 - re-query live, don't trust these numbers as still current)
 
-Superseded by the Tally import (see "Major data event" above and "Tally
-Import" section below) - the original demo invoices/payments are gone.
+**Local `empdb` only** - see the ShivShakti historical import section below
+for why local and Neon now diverge on more than just organic usage.
 
-- `parties`: 241 rows (85 original + 156 imported). Only 174 of these have
-  any invoice or payment at all (all Tally-imported ones); the other 67
-  original parties now have zero transactions and won't appear in
-  `getPartyOutstandingSummary()` / the outstanding-based pages. Only 2 have
-  `whatsapp_opt_in=true` (A.K Enterrises, Lalchand Yadav).
-- `invoices`: 1,355 rows, **all** from the Tally Sales Register import
-  (`invoice_number` prefix `TALLY-S-<vchNo>`), all `delivery_mode='TRUCK'`.
-  Sum: ₹11,41,75,575.54.
-- `payment_entries`: 5,292 rows, **all** from the Tally Receipt Register
-  import (`receipt_vch_no` set on every row), all `mode_of_payment='CASH'`
-  (Tally didn't record actual payment mode - stated as an assumption in each
-  row's `remarks`), `employee_id` = `admin` for all of them (placeholder,
-  since these aren't real employee-logged entries). Sum: ₹10,91,46,126.00.
-  Net outstanding across all parties: ₹50,29,449.54 (verified live against
-  `/admin/invoices`'s stat bar and `/admin/full-ledger`).
-- `users`: 6 - `admin` (ADMIN), `rahul.sharma`/`priya.patel`/`amit.kumar`/
-  `Amardeep` (EMPLOYEE), `satya` (ACCOUNTANT). Unchanged by the import.
-- `notification_logs`: 44 rows, all pre-date the import, includes repeated
-  `FAILED` sends to "LALCHAND YADAV" worth investigating if WhatsApp
-  reminders matter right now.
-- `transaction_logs`: 0 rows - the 12 rows that existed were audit entries
-  for the now-deleted original `payment_entries` and were cleaned up
-  alongside them (they're not FK-linked, so they'd otherwise have become
-  orphaned pointers to nonexistent `entry_id`s).
+- `parties`: 664 rows (241 as of 2026-07-12 + 385 from the 2026-07-28
+  historical import, minus the ~10 that fuzzy-merged into existing rows
+  instead of creating duplicates - net +423). 403 of these currently share a
+  `trailing_number` with at least one other party (across 157 distinct
+  codes) - expected, not a bug, since this business reused Tally ledger
+  codes for different real parties across fiscal years; flagged to the user
+  as a `PayTrack_Shared_Trailing_Numbers.xlsx` review file, not yet acted on.
+- `invoices`: 5,266 rows, ₹48,00,34,775.44 total, spanning 2022-04-01 to
+  2026-07-19 (was 2025-04-01 onward before the historical import).
+- `payment_entries`: 23,337 rows, ₹45,94,59,706.00 total, spanning
+  2022-04-01 to 2026-07-24.
+- `users`: 6 (unchanged in count from 2026-07-12, though the specific
+  accountant/employee usernames may have changed) - `admin` (ADMIN), 4
+  EMPLOYEE, 1 ACCOUNTANT. **No MANAGER user currently exists** - every
+  manager-role test in this project has used a temporary account created via
+  `/admin/employees/add` and deleted after, since real managers' passwords
+  aren't recoverable (see BCrypt note above).
+- `login_sessions`: 6 rows (feature added 2026-07-28, so this only reflects
+  activity since then, mostly from this session's own admin logins/logouts
+  plus test-account sessions that were cleaned up).
+- **Neon is behind on all of the above** - last directly queried
+  2026-07-28 at 227 parties / 1,896 invoices / 7,211 payments (already
+  diverged from local's pre-historical-import baseline via real production
+  usage, e.g. real invoices/payments Neon has that local didn't). The
+  FY2026-27 partial import (534 invoices/1,911 payments) *is* on Neon. The
+  2026-07-28 FY22-23/23-24/24-25 historical import is **not**. `login_sessions`
+  table does not exist on Neon yet either until the next deploy (schema
+  auto-migrates via `ddl-auto=update` on next boot, no manual step needed).
 
 ## Tally import (2026-07-12) - durable facts
 
@@ -752,6 +862,76 @@ Import" section below) - the original demo invoices/payments are gone.
   "clean up" these names to match the other style without checking with the
   user first - the trailing number is the important, deliberately-preserved
   part.
+
+## ShivShakti historical import (2026-07-28) - durable facts
+
+Second, larger historical backfill, covering FY2022-23/FY2023-24/FY2024-25
+(the 3 fiscal years immediately **before** the 2026-07-12 import's
+FY2025-26 start). Source workbook:
+`Shiv Shakti Cement Supply Agency_FY2022-23_to_FY2024-25_Outstanding_and_Trend.xlsx`
+(`C:\Users\ay036\Downloads\`, built via [[register-reconciliation]] from
+`sale regiter.xlsx` on 2026-07-27) - has 3 years × 4 sheets each (Outstanding/
+Monthly Trend/Party Ledger/No Party Code) plus one cross-year "Code
+Collisions" sheet.
+
+- **Party identity = exact ledger text, never the trailing code** - the
+  workbook's own Party Ledger sheets already resolve the "same code, two
+  different real parties" collision problem (documented on its own "Code
+  Collisions" sheet) by keeping each distinct full-text name as its own
+  ledger block per year. The import parser just followed that: grouped
+  transactions by the literal header-row text found in each year's Party
+  Ledger sheet, never by `trailing_number`. Two parties sharing a code is
+  harmless in the schema (`trailing_number` isn't unique, only `combined`
+  is) - confirmed working correctly post-import for a real 3-way collision
+  (code `162`: `AGENCY SUPLYY  B M (MADURI) 162` / `Jialala Yadav B. M (
+  Muzzfrpur) 162 Myank` / `CHANDRABHUSANN (MADURI) 162`, all landed as 3
+  separate `Party` rows with correct per-party transaction totals).
+- **Party names carry real double-spacing/case drift the Outstanding/Code-
+  Collisions sheets don't preserve** - e.g. the actual Party Ledger header is
+  `AGENCY SUPLYY  B M (MADURI) 162` (double space before "B M"), while other
+  sheets in the same workbook render it single-spaced. Don't assume text
+  copied from one sheet exactly matches what's in the Party Ledger sheet -
+  verify against the Party Ledger itself before writing match/merge logic.
+- Of 398 distinct historical party names, only **12** fuzzy-matched (case/
+  punctuation only) an existing DB party and were merged into the existing
+  `combined` string per explicit user decision; the other 386 (→385 after
+  in-batch dedup) were new - this business's Tally naming drifts heavily
+  year to year, confirmed independently by the Code Collisions sheet.
+- **Invoice-number scheme**: `TALLY-S-FY<year>-<vchNo>` (e.g.
+  `TALLY-S-FY2022-23-714`) - this exact year-qualified pattern was
+  discovered **already in use** for the FY2026-27 partial import
+  (`TALLY-S-FY2026-27-<n>`) before this session touched anything, so the
+  historical import matched it rather than inventing a new one. Description/
+  remarks text also matches that existing convention exactly (`"Imported
+  from ShivShakti Sales/Receipt Register (Tally) - FY<year>..."`).
+- **New parties' `total_amount`** = sum of Sales (debit) only from whatever
+  was being imported at that moment, same convention as the original
+  2026-07-12 import - see the `total_amount` gotcha in the `parties` table
+  row above; this field is never live-recomputed afterward.
+- All sums verified byte-exact against the workbook's own per-year Outstanding
+  + Monthly Trend grand totals, both before and after the DB write - see
+  [[register-reconciliation]] skill's verification discipline.
+- Full `pg_dump` backup (local **and** a separate Neon backup, taken right
+  before writing to each) in the session scratchpad, not the repo - ask
+  where these ended up if a rollback is ever needed for this specific change.
+- **Local was imported first; Neon is NOT yet done.** The plan was to
+  re-run the identical import against Neon (using its live connection
+  string, pulled from the Render dashboard - not stored anywhere in this
+  repo/skill) rather than a dump/restore of local→Neon, since Neon already
+  had real production activity local didn't (confirmed: Neon had *more*
+  recent invoices/payments than local's pre-import baseline at the time).
+  **The one attempt made died partway through** - `Connection terminated
+  unexpectedly` after the 385 parties + 3,377 invoices were sent but before
+  the 16,134 payments - but the whole batch was one transaction, so it
+  **rolled back cleanly with zero partial state**, re-verified via direct
+  query immediately after (227 parties / 1,896 invoices / 7,211 payments,
+  unchanged). A retry was proposed (batching multi-row inserts instead of
+  ~20k individual round-trip statements, since Neon's pooled connection
+  can't survive that long a single connection) but the session moved on to
+  other work before it happened - **Neon still does not have this
+  historical import as of end of session 2026-07-28.** Don't assume it's
+  done; re-check party/invoice/payment counts against Neon before trusting
+  any "is Neon in sync" assumption.
 
 ## PWA + mobile responsiveness (added 2026-07-15)
 
@@ -795,6 +975,58 @@ Import" section below) - the original demo invoices/payments are gone.
   Reuse this same create-test-employee-then-delete approach for any future
   employee-only-page verification.
 
+### Flex/grid `min-width:auto` gotcha - a recurring class of mobile bug (2026-07-26, extended 2026-07-28)
+
+Flex and grid items both default to `min-width:auto`, meaning they refuse to
+shrink below their **content's intrinsic min-width** unless told otherwise
+with an explicit `min-width:0`. This has now bitten the manager pages twice:
+
+1. **2026-07-26**: `.stat-card` inside `.stats-grid` (large ₹ totals could
+   spill past the card edge) - fixed with `min-width:0; max-width:100%;
+   overflow:hidden` on `.stat-card` + `overflow-wrap:break-word` on the
+   value text.
+2. **2026-07-28**: much bigger version of the same bug - `.main` (a flex
+   child of `body{display:flex}`) and `.card` (a grid child of
+   `.two-col{display:grid}`) both lacked `min-width:0`. Adding a wider
+   Actions column to the dashboard's invoice tables (see "Invoice edit
+   capability" above) pushed a descendant `<table>`'s intrinsic width high
+   enough that `.main` refused to shrink at all on mobile - the **entire
+   page**, not just that one table, rendered wider than the viewport and
+   required horizontal scrolling to see anything. Fixed by adding
+   `min-width:0` to `.main` (in `manager/dashboard.html`, `invoices.html`,
+   `entries.html`, `edit-entry.html`, `edit-invoice.html`) and to
+   `.two-col > *` (in `dashboard.html`, the only file with that class).
+
+**How to apply**: any time a new wide/complex element (a table with an
+explicit `min-width`, a long unbreakable string, a fixed-width control) gets
+added inside a flex or grid container on a mobile-treated page, check
+whether every ancestor in that flex/grid chain has `min-width:0` - if the
+*whole page* spills out rather than just the one element scrolling within
+its own wrapper, this is almost certainly why.
+
+**Also separately fixed 2026-07-28**: `display:flex` was put directly on a
+few `<td>` elements (for an Edit/Delete/View actions cell) - mixing flex
+display on table cells is its own known cross-browser landmine (inconsistent
+width-calculation behavior, particularly on iOS Safari). Moved the flex
+layout onto an inner wrapper `<div>` inside the cell instead, in
+`manager/dashboard.html`, `manager/invoices.html`, and `admin/invoices.html`
+- keep table cells as plain `display:table-cell` and wrap any flex/grid
+layout you need inside them in a child element.
+
+**Browser-based mobile-viewport testing gotcha (2026-07-28)**: in this
+environment, `mcp__claude-in-chrome__resize_window` reports success but does
+**not** actually change `window.innerWidth` (confirmed stuck at the full
+desktop resolution regardless of requested size), so `@media` queries never
+activate and screenshots/computed-styles at the "resized" width are
+misleading. **Workaround that works**: create a same-origin `<iframe>` via
+`javascript_tool`, set its `style.width`/`height` to the target mobile size,
+point `src` at the page under test, await `onload`, then inspect
+`iframe.contentDocument`/`contentWindow` - media queries correctly evaluate
+against the iframe's own dimensions regardless of the outer window. Also
+useful: compare `iframe.contentDocument.body.scrollWidth` against the
+iframe's own width to directly detect real horizontal-overflow bugs like the
+one above.
+
 ## Where to look next
 
 - Root-level ad hoc scripts `cleanup_parties.ps1` / `test_cleanup.ps1` hit
@@ -806,24 +1038,37 @@ Import" section below) - the original demo invoices/payments are gone.
   on, see the [[register-reconciliation]] skill's Node-only workaround for
   the same constraint).
 - `git log --oneline` on `main` is a reliable, dense summary of everything
-  built since the Tally import (`be798cf`) through the PWA/responsive work
-  (`a65a4b2` as of 2026-07-15) - caching, compression/lazy-loading, Docker/
-  Render deploy config, bags×rate auto-calc, PWA - read commit messages
-  there for anything this skill doesn't cover yet, rather than assuming the
-  feature set is frozen at what's written above.
+  built since the Tally import (`be798cf`) - caching, compression/lazy-
+  loading, Docker/Render deploy config, bags×rate auto-calc, PWA, fiscal-
+  year ledger partitioning, manager collections, invoice edit/login-history
+  (`dda38ac` as of 2026-07-28, the mobile-overflow fix commit) - read commit
+  messages there for anything this skill doesn't cover yet, rather than
+  assuming the feature set is frozen at what's written above.
 
-## Still open / not yet done (updated 2026-07-18)
+## Still open / not yet done (updated 2026-07-28)
 
-- PWA/responsive treatment not yet applied to the 16 admin-facing
-  templates - only login + the 4 employee pages (and now `manager/*`, see
-  MANAGER role section) have it.
+- **Neon does not have the 2026-07-28 ShivShakti historical import** (FY22-23
+  through FY24-25) - local only. See that section above before assuming the
+  two databases are in sync on party/invoice/payment counts.
+- **403 parties currently share a `trailing_number` with another party**
+  (157 distinct codes) - a review workbook (`PayTrack_Shared_Trailing_Numbers.xlsx`)
+  was generated and handed to the user 2026-07-28 but no merge/cleanup
+  decisions have been made yet. If asked to act on this, don't assume every
+  row is a duplicate - see the historical-import section above for why
+  code reuse across years is expected, not automatically wrong.
+- PWA/responsive treatment not yet applied to the 18 admin-facing
+  templates (now 20 with `edit-invoice.html`/`login-history.html` added
+  2026-07-28, both also un-treated) - only login + the 4 employee pages +
+  `manager/*` have it.
 - `SINGH BUILDNG MATERIAL (LALGANG)` (DB id 59) party-matching ambiguity
-  from the Tally import - still unresolved, see "Tally import" section
-  above.
+  from the 2026-07-12 Tally import - still unresolved, see "Tally import"
+  section above.
 - `InvoiceService.createInvoice()`'s check-then-act race on
   `invoice_number` doesn't catch the resulting DB constraint-violation
   exception the way `ExcelPartyService.ensureExists()` does - see
   "Concurrency" section above. Explicitly left as-is by user decision.
+  `updateInvoice()` (added 2026-07-28) has the identical gap for the same
+  reason - not fixed either.
 - Receipt photo display on `admin/party-ledger.html`/`admin/full-ledger.html`
   - only `admin/entries.html` shows the 📷 icon today (see receipt section
     above), deliberately scoped smaller for the first pass.
@@ -831,4 +1076,8 @@ Import" section below) - the original demo invoices/payments are gone.
   admin/accountant "Add Payment from Ledger" backfill flow - see receipt
   section above for why.
 - Notification bell/activity feed is ADMIN-only, not extended to ACCOUNTANT,
-  per the original request wording.
+  per the original request wording. Login History (added 2026-07-28) follows
+  the same ADMIN-only precedent.
+- `login_sessions` rows never get a `logout_at` if the app/server restarts
+  before a real logout - no expiry/cleanup job exists, so very old "🟢
+  Active" badges on `/admin/login-history` may just be stale, not real.
