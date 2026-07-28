@@ -12,6 +12,7 @@ import com.empmgmt.service.AdminNotificationService;
 import com.empmgmt.service.AuditLogService;
 import com.empmgmt.service.ExportService;
 import com.empmgmt.service.InvoiceService;
+import com.empmgmt.service.LoginSessionService;
 import com.empmgmt.service.OutstandingNotificationService;
 import com.empmgmt.service.PaymentEntryService;
 import com.empmgmt.service.UserService;
@@ -56,6 +57,7 @@ public class AdminController {
     private final PartyRepository partyRepository;
     private final AdminNotificationService adminNotificationService;
     private final AuditLogService auditLogService;
+    private final LoginSessionService loginSessionService;
 
     // ─── Dashboard ────────────────────────────────────────────
 
@@ -267,6 +269,13 @@ public class AdminController {
         return "admin/history";
     }
 
+    @GetMapping("/login-history")
+    public String loginHistory(Model model, Authentication auth) {
+        model.addAttribute("sessions", loginSessionService.getRecentSessions());
+        model.addAttribute("adminName", auth.getName());
+        return "admin/login-history";
+    }
+
     // ─── Invoices & Outstanding ────────────────────────────────
 
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
@@ -311,6 +320,57 @@ public class AdminController {
         try {
             invoiceService.createInvoice(request, auth.getName());
             redirectAttributes.addFlashAttribute("successMsg", "Invoice added successfully!");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/admin/invoices";
+    }
+
+    private com.empmgmt.entity.Invoice.DeliveryMode findDeliveryModeByDisplayName(String displayName) {
+        if (displayName == null) return null;
+        for (com.empmgmt.entity.Invoice.DeliveryMode mode : com.empmgmt.entity.Invoice.DeliveryMode.values()) {
+            if (mode.getDisplayName().equals(displayName)) return mode;
+        }
+        return null;
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @GetMapping("/invoices/{id}/edit")
+    public String editInvoiceForm(@PathVariable Long id, Model model, Authentication auth) {
+        InvoiceDTO.Response invoice = invoiceService.getInvoiceById(id);
+        InvoiceDTO.Request req = new InvoiceDTO.Request();
+        req.setInvoiceNumber(invoice.getInvoiceNumber());
+        req.setInvoiceDate(invoice.getInvoiceDate());
+        req.setPartyName(invoice.getPartyName());
+        req.setBags(invoice.getBags());
+        req.setRatePerBag(invoice.getRatePerBag());
+        req.setDescription(invoice.getDescription());
+        req.setDeliveryMode(findDeliveryModeByDisplayName(invoice.getDeliveryMode()));
+        req.setTransportNumber(invoice.getTransportNumber());
+        model.addAttribute("invoice", invoice);
+        model.addAttribute("editRequest", req);
+        model.addAttribute("deliveryModes", com.empmgmt.entity.Invoice.DeliveryMode.values());
+        model.addAttribute("adminName", auth.getName());
+        return "admin/edit-invoice";
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @PostMapping("/invoices/{id}/edit")
+    public String editInvoice(@PathVariable Long id,
+                              @Valid @ModelAttribute("editRequest") InvoiceDTO.Request request,
+                              BindingResult result,
+                              Authentication auth,
+                              Model model,
+                              RedirectAttributes redirectAttributes) {
+        if (result.hasErrors()) {
+            model.addAttribute("invoice", invoiceService.getInvoiceById(id));
+            model.addAttribute("deliveryModes", com.empmgmt.entity.Invoice.DeliveryMode.values());
+            model.addAttribute("adminName", auth.getName());
+            return "admin/edit-invoice";
+        }
+        try {
+            invoiceService.updateInvoice(id, request, auth.getName());
+            redirectAttributes.addFlashAttribute("successMsg", "Invoice updated successfully!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
         }

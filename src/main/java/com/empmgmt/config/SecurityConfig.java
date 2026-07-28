@@ -1,6 +1,7 @@
 package com.empmgmt.config;
 
 import com.empmgmt.security.CustomUserDetailsService;
+import com.empmgmt.service.LoginSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +23,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 public class SecurityConfig {
 
     private final CustomUserDetailsService userDetailsService;
+    private final LoginSessionService loginSessionService;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -70,6 +72,7 @@ public class SecurityConfig {
                     } else {
                         redirect = "/employee/dashboard";
                     }
+                    loginSessionService.recordLogin(auth.getName());
                     res.sendRedirect(redirect);
                 })
                 .failureUrl("/login?error=true")
@@ -77,7 +80,12 @@ public class SecurityConfig {
             )
             .logout(logout -> logout
                 .logoutRequestMatcher(new AntPathRequestMatcher("/logout"))
-                .logoutSuccessUrl("/login?logout=true")
+                .logoutSuccessHandler((req, res, authentication) -> {
+                    if (authentication != null) {
+                        loginSessionService.recordLogout(authentication.getName());
+                    }
+                    res.sendRedirect("/login?logout=true");
+                })
                 .invalidateHttpSession(true)
                 .clearAuthentication(true)
                 .permitAll()

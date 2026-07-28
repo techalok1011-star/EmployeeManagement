@@ -156,6 +156,90 @@ public class ManagerController {
         return "manager/invoices";
     }
 
+    private Invoice.DeliveryMode findDeliveryModeByDisplayName(String displayName) {
+        if (displayName == null) return null;
+        for (Invoice.DeliveryMode mode : Invoice.DeliveryMode.values()) {
+            if (mode.getDisplayName().equals(displayName)) return mode;
+        }
+        return null;
+    }
+
+    // ─── Edit Invoice (own invoices, any date) ──────────────────
+
+    @GetMapping("/invoices/{id}/edit")
+    public String editInvoiceForm(@PathVariable Long id, Authentication auth, Model model,
+                                  RedirectAttributes redirectAttributes) {
+        try {
+            InvoiceDTO.Response invoice = invoiceService.getInvoiceById(id);
+            if (!auth.getName().equals(invoice.getCreatedBy())) {
+                redirectAttributes.addFlashAttribute("errorMsg", "You can only edit invoices you added yourself.");
+                return "redirect:/manager/invoices";
+            }
+            InvoiceDTO.Request req = new InvoiceDTO.Request();
+            req.setInvoiceNumber(invoice.getInvoiceNumber());
+            req.setInvoiceDate(invoice.getInvoiceDate());
+            req.setPartyName(invoice.getPartyName());
+            req.setBags(invoice.getBags());
+            req.setRatePerBag(invoice.getRatePerBag());
+            req.setDescription(invoice.getDescription());
+            req.setDeliveryMode(findDeliveryModeByDisplayName(invoice.getDeliveryMode()));
+            req.setTransportNumber(invoice.getTransportNumber());
+            model.addAttribute("invoice", invoice);
+            model.addAttribute("editRequest", req);
+            model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
+            model.addAttribute("user", userService.getUserByUsername(auth.getName()));
+            return "manager/edit-invoice";
+        } catch (RuntimeException e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+            return "redirect:/manager/invoices";
+        }
+    }
+
+    @PostMapping("/invoices/{id}/edit")
+    public String editInvoice(@PathVariable Long id,
+                              @Valid @ModelAttribute("editRequest") InvoiceDTO.Request request,
+                              BindingResult result,
+                              Authentication auth,
+                              Model model,
+                              RedirectAttributes redirectAttributes) {
+        InvoiceDTO.Response existing = invoiceService.getInvoiceById(id);
+        if (!auth.getName().equals(existing.getCreatedBy())) {
+            redirectAttributes.addFlashAttribute("errorMsg", "You can only edit invoices you added yourself.");
+            return "redirect:/manager/invoices";
+        }
+        if (result.hasErrors()) {
+            model.addAttribute("invoice", existing);
+            model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
+            model.addAttribute("user", userService.getUserByUsername(auth.getName()));
+            return "manager/edit-invoice";
+        }
+        try {
+            invoiceService.updateInvoice(id, request, auth.getName());
+            redirectAttributes.addFlashAttribute("successMsg", "Invoice updated successfully!");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/manager/invoices";
+    }
+
+    // ─── Delete Invoice (own invoices, any date) ────────────────
+
+    @PostMapping("/invoices/{id}/delete")
+    public String deleteInvoice(@PathVariable Long id, Authentication auth, RedirectAttributes redirectAttributes) {
+        try {
+            InvoiceDTO.Response existing = invoiceService.getInvoiceById(id);
+            if (!auth.getName().equals(existing.getCreatedBy())) {
+                redirectAttributes.addFlashAttribute("errorMsg", "You can only delete invoices you added yourself.");
+                return "redirect:/manager/invoices";
+            }
+            invoiceService.deleteInvoice(id, auth.getName());
+            redirectAttributes.addFlashAttribute("successMsg", "Invoice deleted successfully.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/manager/invoices";
+    }
+
     // ─── Add Collection (payment entry) ────────────────────────
 
     @PostMapping("/entries/add")

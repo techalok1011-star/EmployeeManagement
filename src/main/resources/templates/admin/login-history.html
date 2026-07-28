@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Activity — PayTrack</title>
+    <title>Login History — PayTrack</title>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&amp;family=DM+Sans:wght@300;400;500&amp;display=swap" rel="stylesheet"/>
     <link rel="stylesheet" th:href="@{/css/theme.css}"/>
@@ -33,38 +33,41 @@
         .topbar-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700}
         .content{padding:28px 32px}
         .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px}
-        .feed-item{display:flex;gap:14px;padding:16px 4px;border-bottom:1px solid var(--overlay-2)}
-        .feed-item:last-child{border-bottom:none}
-        .feed-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
-        .feed-icon.collection{background:rgba(52,211,153,0.12);color:var(--green)}
-        .feed-icon.invoice{background:rgba(108,142,255,0.12);color:var(--accent)}
-        .feed-message{font-size:13.5px;color:var(--text);margin-bottom:4px}
-        .feed-meta{font-size:11.5px;color:var(--muted)}
-        .empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
-        .empty-icon{font-size:36px;margin-bottom:10px}
+        .search-input{width:100%;padding:10px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color 0.2s;margin-bottom:14px}
+        .search-input:focus{border-color:var(--accent)}
+        .search-input::placeholder{color:var(--muted2)}
+        .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;border:1px solid var(--border)}
+        table{width:100%;border-collapse:collapse}
+        thead{background:var(--surface)}
+        th{padding:10px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+        td{padding:11px 14px;font-size:13px;border-bottom:1px solid var(--overlay-2);vertical-align:middle}
+        tr:last-child td{border-bottom:none}
+        tr:hover td{background:var(--overlay-1)}
+        .badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block;letter-spacing:0.5px}
+        .badge-active{background:rgba(52,211,153,0.15);color:var(--green)}
+        .badge-ended{background:rgba(108,142,255,0.15);color:var(--accent)}
+        .role-pill{background:rgba(167,139,250,0.12);color:var(--accent2);padding:2px 8px;border-radius:6px;font-size:11.5px;font-weight:500}
+        .text-muted{color:var(--muted);font-size:12px}
+        .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+        .empty-icon{font-size:44px;margin-bottom:12px}
         .notif-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;background:var(--overlay-3);border:1px solid var(--border);color:var(--text);text-decoration:none;font-size:16px;cursor:pointer;transition:background 0.15s;flex-shrink:0}
         .notif-bell:hover{background:var(--overlay-5)}
         .notif-badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:white;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1}
-    
-.menu-toggle{display:none;background:var(--overlay-3);border:1px solid var(--border);color:var(--text);width:38px;height:38px;border-radius:8px;font-size:18px;cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
-.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:150}
-@media(max-width:768px){
-    .sidebar{transform:translateX(-100%);transition:transform 0.25s ease;z-index:200}
-    .sidebar.open{transform:translateX(0)}
-    .main{margin-left:0}
-    .menu-toggle{display:flex}
-    .sidebar-overlay.open{display:block}
-    .content{padding:16px}
-    .card{padding:16px}
-    .topbar{padding:12px 16px;flex-wrap:wrap;row-gap:8px}
-    .topbar-title{font-size:16px}
-    .stats-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
-    .emp-grid{grid-template-columns:1fr}
-    .form-grid,.form-row{grid-template-columns:1fr}
-    .form-control{font-size:16px}
-    th,td{padding:9px 10px;font-size:12px}
-}
-</style>
+        .menu-toggle{display:none;background:var(--overlay-3);border:1px solid var(--border);color:var(--text);width:38px;height:38px;border-radius:8px;font-size:18px;cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
+        .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:150}
+        @media(max-width:768px){
+            .sidebar{transform:translateX(-100%);transition:transform 0.25s ease;z-index:200}
+            .sidebar.open{transform:translateX(0)}
+            .main{margin-left:0}
+            .menu-toggle{display:flex}
+            .sidebar-overlay.open{display:block}
+            .content{padding:16px}
+            .card{padding:16px}
+            .topbar{padding:12px 16px;flex-wrap:wrap;row-gap:8px}
+            .topbar-title{font-size:16px}
+            th,td{padding:9px 10px;font-size:12px}
+        }
+    </style>
 </head>
 <body>
 <div class="sidebar">
@@ -91,9 +94,8 @@
         <a href="/admin/payment-behavior" class="nav-link"><span>🏅</span> Payment Behavior</a>
         <a href="/admin/collections" class="nav-link"><span>🎯</span> Collections</a>
         <a href="/admin/notifications" class="nav-link"><span>📲</span> Notifications</a>
-        <a href="/admin/activity" class="nav-link active"><span>🔔</span> Activity</a>
         <a href="/admin/history" class="nav-link"><span>📜</span> Audit Log</a>
-        <a href="/admin/login-history" class="nav-link"><span>🕐</span> Login History</a>
+        <a href="/admin/login-history" class="nav-link active"><span>🕐</span> Login History</a>
     </nav>
     <div class="sidebar-footer">
         <form th:action="@{/logout}" method="post">
@@ -107,27 +109,67 @@
 <div class="main">
     <div class="topbar">
         <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
-        <span class="topbar-title">🔔 Activity</span>
-        <div style="display:flex;align-items:center;gap:10px"><button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle light/dark theme">☀️</button><a href="/admin/activity" class="notif-bell" title="Activity">🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span></a></div>
+        <span class="topbar-title">🕐 Login History</span>
+        <div style="display:flex;align-items:center;gap:12px">
+            <span class="text-muted" th:text="${#lists.size(sessions)} + ' sessions (last 200)'"></span>
+            <div style="display:flex;align-items:center;gap:10px"><button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle light/dark theme">☀️</button><a href="/admin/activity" class="notif-bell" title="Activity">🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span></a></div>
+        </div>
     </div>
     <div class="content">
         <div class="card">
-            <div th:if="${#lists.isEmpty(notifications)}" class="empty-state">
-                <div class="empty-icon">🔕</div>
-                <div>No activity yet.</div>
-                <div style="font-size:12px;margin-top:6px;">Collections and invoices added by your team will show up here.</div>
+            <div th:if="${#lists.isEmpty(sessions)}" class="empty-state">
+                <div class="empty-icon">🕐</div>
+                <div style="font-size:15px;font-weight:600;margin-bottom:6px">No login activity yet</div>
+                <div style="font-size:13px">Every sign-in and sign-out will be tracked here.</div>
             </div>
-            <div th:each="n : ${notifications}" class="feed-item">
-                <div class="feed-icon collection" th:if="${n.type == 'COLLECTION_ADDED'}">💰</div>
-                <div class="feed-icon invoice" th:if="${n.type == 'INVOICE_ADDED'}">🧾</div>
-                <div>
-                    <div class="feed-message" th:text="${n.message}"></div>
-                    <div class="feed-meta" th:text="${n.createdAt}"></div>
+
+            <div th:if="${!#lists.isEmpty(sessions)}">
+                <input type="text" class="search-input" id="searchInput"
+                       placeholder="🔍 Search by name, username, role..."/>
+
+                <div class="table-wrapper">
+                    <table id="sessionsTable">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Role</th>
+                                <th>Login At</th>
+                                <th>Logout At</th>
+                                <th>Duration</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="s : ${sessions}">
+                                <td>
+                                    <span style="font-weight:500" th:text="${s.fullName}"></span>
+                                    <div class="text-muted" th:text="'@' + ${s.username}"></div>
+                                </td>
+                                <td><span th:if="${s.role != null}" class="role-pill" th:text="${s.role}"></span></td>
+                                <td class="text-muted" th:text="${#temporals.format(s.loginAt,'dd MMM yyyy, hh:mm a')}"></td>
+                                <td class="text-muted" th:text="${s.logoutAt != null ? #temporals.format(s.logoutAt,'dd MMM yyyy, hh:mm a') : '—'}"></td>
+                                <td class="text-muted" th:text="${s.durationText}"></td>
+                                <td>
+                                    <span th:if="${s.active}" class="badge badge-active">🟢 Active</span>
+                                    <span th:if="${!s.active}" class="badge badge-ended">Ended</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.getElementById('searchInput')?.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('#sessionsTable tbody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+</script>
 <script>
 (function(){
     var badge = document.getElementById('notifBadge');

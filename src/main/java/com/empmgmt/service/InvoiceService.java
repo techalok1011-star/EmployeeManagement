@@ -79,6 +79,42 @@ public class InvoiceService {
         return toResponse(saved);
     }
 
+    // ─────────────────────────────────────────────────────────
+    // UPDATE
+    // ─────────────────────────────────────────────────────────
+
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    public InvoiceDTO.Response updateInvoice(Long id, InvoiceDTO.Request request, String performedBy) {
+        Invoice invoice = invoiceRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Invoice not found: " + id));
+
+        String newNumber = request.getInvoiceNumber().trim();
+        if (!newNumber.equals(invoice.getInvoiceNumber()) && invoiceRepository.existsByInvoiceNumber(newNumber)) {
+            throw new IllegalArgumentException("Invoice number '" + newNumber + "' already exists.");
+        }
+
+        BigDecimal amount = request.getRatePerBag().multiply(BigDecimal.valueOf(request.getBags()));
+        String diff = "invoice_number: '" + invoice.getInvoiceNumber() + "' -> '" + newNumber
+                + "', party: '" + invoice.getPartyName() + "' -> '" + request.getPartyName()
+                + "', amount: " + invoice.getAmount() + " -> " + amount;
+
+        invoice.setInvoiceNumber(newNumber);
+        invoice.setInvoiceDate(request.getInvoiceDate());
+        invoice.setPartyName(request.getPartyName());
+        invoice.setAmount(amount);
+        invoice.setBags(request.getBags());
+        invoice.setRatePerBag(request.getRatePerBag());
+        invoice.setDescription(request.getDescription());
+        invoice.setDeliveryMode(request.getDeliveryMode());
+        invoice.setTransportNumber(request.getTransportNumber() != null && !request.getTransportNumber().isBlank()
+                ? request.getTransportNumber().trim() : null);
+
+        Invoice saved = invoiceRepository.save(invoice);
+        logInvoiceAudit("UPDATE", saved, performedBy,
+                "Invoice " + saved.getInvoiceNumber() + " updated for " + saved.getPartyName() + " (" + diff + ")");
+        return toResponse(saved);
+    }
+
     private void logInvoiceAudit(String action, Invoice invoice, String performedBy, String description) {
         String role = userRepository.findByUsername(performedBy)
                 .map(u -> u.getRole().name()).orElse(null);

@@ -41,12 +41,15 @@
         .topbar-title { font-family:'Syne',sans-serif; font-size:20px; font-weight:700; }
         .content { padding:28px 32px; }
         .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:24px; }
+        .alert{padding:12px 16px;border-radius:10px;font-size:13.5px;margin-bottom:20px}
+        .alert-success{background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#6ee7b7}
+        .alert-danger{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);color:#fca5a5}
         .search-bar { display:flex; gap:10px; margin-bottom:18px; }
         .search-input { flex:1; padding:10px 14px; background:var(--surface); border:1.5px solid var(--border); border-radius:9px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px; outline:none; }
         .search-input:focus { border-color:var(--accent); }
         .search-input::placeholder { color:var(--muted2); }
         .table-wrapper { overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:12px; border:1px solid var(--border); }
-        table { width:100%; border-collapse:collapse; }
+        table { width:100%; min-width:780px; border-collapse:collapse; }
         thead { background:var(--surface); }
         th { padding:11px 14px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); font-weight:600; border-bottom:1px solid var(--border); }
         td { padding:12px 14px; font-size:13.5px; border-bottom:1px solid var(--overlay-2); }
@@ -116,6 +119,8 @@
         <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle light/dark theme">☀️</button>
     </div>
     <div class="content">
+        <div th:if="${successMsg}" class="alert alert-success">✓ <span th:text="${successMsg}"></span></div>
+        <div th:if="${errorMsg}" class="alert alert-danger">⚠ <span th:text="${errorMsg}"></span></div>
         <div class="card">
             <div class="search-bar">
                 <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search by party name, invoice no..."/>
@@ -136,6 +141,7 @@
                             <th>Rate/Bag</th>
                             <th>Amount</th>
                             <th>Delivery</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="invoicesTable">
@@ -147,6 +153,15 @@
                             <td class="text-muted" th:text="${inv.ratePerBag != null ? '₹' + inv.ratePerBag : '—'}"></td>
                             <td class="amount">₹<span th:text="${#numbers.formatDecimal(inv.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
                             <td><span class="badge" th:text="${inv.deliveryMode}"></span></td>
+                            <td style="display:flex;gap:6px">
+                                <a th:href="@{/manager/invoices/{id}/edit(id=${inv.id})}" class="badge" style="cursor:pointer;text-decoration:none">✏️ Edit</a>
+                                <form th:action="@{/manager/invoices/{id}/delete(id=${inv.id})}" method="post"
+                                      onsubmit="return confirm('Delete invoice ' + this.dataset.inv + '?')"
+                                      th:data-inv="${inv.invoiceNumber}" style="margin:0">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button type="submit" style="background:rgba(248,113,113,0.15);color:var(--red);border:none;border-radius:20px;padding:3px 10px;font-size:11.5px;cursor:pointer;font-family:'DM Sans',sans-serif">🗑 Delete</button>
+                                </form>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
