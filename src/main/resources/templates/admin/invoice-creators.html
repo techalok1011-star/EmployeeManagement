@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Employee Collections — PayTrack</title>
+    <title>Invoices by Creator — PayTrack</title>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&amp;family=DM+Sans:wght@300;400;500&amp;display=swap" rel="stylesheet"/>
     <link rel="stylesheet" th:href="@{/css/theme.css}"/>
@@ -53,6 +53,7 @@
         .text-muted{color:var(--muted);font-size:12px}
         .emp-name{font-weight:500}
         .role-pill{font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:middle}
+        .role-pill.admin{background:rgba(245,200,66,0.15);color:var(--gold)}
         .role-pill.manager{background:rgba(245,200,66,0.15);color:var(--gold)}
         .role-pill.accountant{background:rgba(167,139,250,0.15);color:var(--accent2)}
         .rank-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(108,142,255,0.15);color:var(--accent);font-size:11px;font-weight:700}
@@ -62,7 +63,7 @@
         .notif-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;background:var(--overlay-3);border:1px solid var(--border);color:var(--text);text-decoration:none;font-size:16px;cursor:pointer;transition:background 0.15s;flex-shrink:0}
         .notif-bell:hover{background:var(--overlay-5)}
         .notif-badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:white;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1}
-    
+
 .menu-toggle{display:none;background:var(--overlay-3);border:1px solid var(--border);color:var(--text);width:38px;height:38px;border-radius:8px;font-size:18px;cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:150}
 @media(max-width:768px){
@@ -103,8 +104,8 @@
         <a href="/admin/employees" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>👥</span> Employees</a>
         <a href="/admin/entries" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>📋</span> All Entries</a>
         <a href="/admin/parties" class="nav-link"><span>🏢</span> Parties</a>
-        <a href="/admin/employee-collections" class="nav-link active"><span>💰</span> Employee Collections</a>
-        <a href="/admin/invoice-creators" class="nav-link"><span>🧾</span> Invoices by Creator</a>
+        <a href="/admin/employee-collections" class="nav-link"><span>💰</span> Employee Collections</a>
+        <a href="/admin/invoice-creators" class="nav-link active"><span>🧾</span> Invoices by Creator</a>
         <a href="/admin/invoices" class="nav-link"><span>🧾</span> Invoices</a>
         <a href="/admin/full-ledger" class="nav-link"><span>📚</span> Full Ledger</a>
         <a href="/admin/aging" class="nav-link"><span>⏳</span> Aging Report</a>
@@ -126,9 +127,9 @@
 <div class="main">
     <div class="topbar">
         <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
-        <span class="topbar-title">💰 Employee Collections</span>
+        <span class="topbar-title">🧾 Invoices by Creator</span>
         <div style="display:flex;align-items:center;gap:12px">
-            <span class="text-muted">How much each employee has brought in</span>
+            <span class="text-muted">How many invoices each Admin/Accountant/Manager has added</span>
             <div style="display:flex;align-items:center;gap:10px"><button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle light/dark theme">☀️</button><a href="/admin/activity" class="notif-bell" title="Activity">🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span></a></div>
         </div>
     </div>
@@ -137,34 +138,34 @@
 
         <div class="stats-bar">
             <div class="stat-card">
-                <div class="stat-label">Today — All Employees</div>
+                <div class="stat-label">Today — All Creators</div>
                 <div class="stat-value gold">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(todayTotal)}">0</span></div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">This Month — All Employees</div>
+                <div class="stat-label">This Month — All Creators</div>
                 <div class="stat-value accent">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(monthTotal)}">0</span></div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">All Time — All Employees</div>
+                <div class="stat-label">All Time — All Creators</div>
                 <div class="stat-value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(allTimeTotal)}">0</span></div>
             </div>
         </div>
 
         <div class="card" th:if="${!#lists.isEmpty(summaries)}">
             <div class="section-header">
-                <span class="section-title">📊 This Month vs All-Time — by Employee</span>
+                <span class="section-title">📊 This Month vs All-Time — by Creator</span>
             </div>
-            <div class="chart-wrap"><canvas id="empChart"></canvas></div>
+            <div class="chart-wrap"><canvas id="invChart"></canvas></div>
         </div>
 
         <div class="card">
             <div class="section-header">
-                <span class="section-title">By Employee — ranked by all-time total</span>
+                <span class="section-title">By Creator — ranked by all-time total</span>
             </div>
 
             <div th:if="${#lists.isEmpty(summaries)}" class="empty-state">
-                <div class="empty-icon">👥</div>
-                <div style="font-size:14px">No employees yet.</div>
+                <div class="empty-icon">🧾</div>
+                <div style="font-size:14px">No invoices created by any Admin/Accountant/Manager yet.</div>
             </div>
 
             <div th:if="${!#lists.isEmpty(summaries)}" class="table-wrapper">
@@ -172,11 +173,10 @@
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>Employee</th>
+                            <th>Creator</th>
                             <th>Today</th>
                             <th>This Month</th>
                             <th>All Time</th>
-                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -185,6 +185,7 @@
                             <td>
                                 <div class="emp-name">
                                     <span th:text="${s.fullName}"></span>
+                                    <span th:if="${s.role == 'ADMIN'}" class="role-pill admin">👑 Admin</span>
                                     <span th:if="${s.role == 'MANAGER'}" class="role-pill manager">📦 Manager</span>
                                     <span th:if="${s.role == 'ACCOUNTANT'}" class="role-pill accountant">🧮 Accountant</span>
                                 </div>
@@ -192,19 +193,15 @@
                             </td>
                             <td>
                                 <div class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(s.todayAmount)}"></span></div>
-                                <div class="text-muted" th:text="${s.todayCount} + ' entries'"></div>
+                                <div class="text-muted" th:text="${s.todayCount} + ' invoices'"></div>
                             </td>
                             <td>
                                 <div class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(s.monthAmount)}"></span></div>
-                                <div class="text-muted" th:text="${s.monthCount} + ' entries'"></div>
+                                <div class="text-muted" th:text="${s.monthCount} + ' invoices'"></div>
                             </td>
                             <td>
                                 <div class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(s.allTimeAmount)}"></span></div>
-                                <div class="text-muted" th:text="${s.allTimeCount} + ' entries'"></div>
-                            </td>
-                            <td>
-                                <a th:href="@{/admin/entries(employeeId=${s.employeeId})}"
-                                   style="color:var(--accent);text-decoration:none;font-size:12.5px;white-space:nowrap">View Entries →</a>
+                                <div class="text-muted" th:text="${s.allTimeCount} + ' invoices'"></div>
                             </td>
                         </tr>
                     </tbody>
@@ -217,19 +214,19 @@
 <script th:inline="javascript">
 /*<![CDATA[*/
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const empLabels = /*[[${summaries.![fullName]}]]*/ [];
-const empMonth  = /*[[${summaries.![monthAmount]}]]*/ [];
-const empAllTime = /*[[${summaries.![allTimeAmount]}]]*/ [];
+const creatorLabels = /*[[${summaries.![fullName]}]]*/ [];
+const creatorMonth  = /*[[${summaries.![monthAmount]}]]*/ [];
+const creatorAllTime = /*[[${summaries.![allTimeAmount]}]]*/ [];
 
-const empCtx = document.getElementById('empChart');
-if (empCtx) {
-    new Chart(empCtx, {
+const invCtx = document.getElementById('invChart');
+if (invCtx) {
+    new Chart(invCtx, {
         type: 'bar',
         data: {
-            labels: empLabels,
+            labels: creatorLabels,
             datasets: [
-                { label: 'This Month', data: empMonth, backgroundColor: 'rgba(245,200,66,0.7)', borderRadius: 4 },
-                { label: 'All Time',   data: empAllTime, backgroundColor: 'rgba(52,211,153,0.7)', borderRadius: 4 }
+                { label: 'This Month', data: creatorMonth, backgroundColor: 'rgba(245,200,66,0.7)', borderRadius: 4 },
+                { label: 'All Time',   data: creatorAllTime, backgroundColor: 'rgba(52,211,153,0.7)', borderRadius: 4 }
             ]
         },
         options: {

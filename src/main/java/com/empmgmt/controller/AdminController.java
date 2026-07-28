@@ -830,6 +830,31 @@ public class AdminController {
         return "admin/employee-collections";
     }
 
+    // ─── Invoices by Creator (read-only, for Accountant + Admin) ───────────
+
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    @GetMapping("/invoice-creators")
+    public String invoiceCreators(Model model, Authentication auth) {
+        var summaries = invoiceService.getInvoiceCreatorSummaries();
+
+        java.math.BigDecimal todayTotal = summaries.stream()
+                .map(com.empmgmt.dto.InvoiceCreatorSummaryDTO::getTodayAmount)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        java.math.BigDecimal monthTotal = summaries.stream()
+                .map(com.empmgmt.dto.InvoiceCreatorSummaryDTO::getMonthAmount)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        java.math.BigDecimal allTimeTotal = summaries.stream()
+                .map(com.empmgmt.dto.InvoiceCreatorSummaryDTO::getAllTimeAmount)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        model.addAttribute("summaries", summaries);
+        model.addAttribute("todayTotal", todayTotal);
+        model.addAttribute("monthTotal", monthTotal);
+        model.addAttribute("allTimeTotal", allTimeTotal);
+        model.addAttribute("adminName", auth.getName());
+        return "admin/invoice-creators";
+    }
+
     // ─── Executive Dashboard ───────────────────────────────────
 
     @GetMapping("/executive")

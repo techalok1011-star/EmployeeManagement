@@ -6,9 +6,11 @@ import com.empmgmt.dto.PartyAgingDTO;
 import com.empmgmt.dto.PartyLedgerDTO;
 import com.empmgmt.dto.PartyOutstandingDTO;
 import com.empmgmt.dto.PartyPaymentBehaviorDTO;
+import com.empmgmt.dto.InvoiceCreatorSummaryDTO;
 import com.empmgmt.entity.Invoice;
 import com.empmgmt.entity.Party;
 import com.empmgmt.entity.PaymentEntry;
+import com.empmgmt.entity.User;
 import com.empmgmt.event.InvoiceCreatedEvent;
 import com.empmgmt.repository.InvoiceRepository;
 import com.empmgmt.repository.PartyRepository;
@@ -287,6 +289,49 @@ public class InvoiceService {
         stats.put("totalOutstanding", totalOutstanding);
         stats.put("invoiceCount", invoiceCount);
         return stats;
+    }
+
+    /**
+     * One row per ADMIN/ACCOUNTANT/MANAGER showing how many invoices they've created and
+     * for how much - today/this month/all-time. Mirrors
+     * {@link PaymentEntryService#getEmployeeCollectionSummaries()}'s shape, but grouped by
+     * the plain {@code created_by} username string rather than a real FK, since Invoice has
+     * no FK relationship to User (see the data-model gotcha in the project skill).
+     */
+    @Transactional(readOnly = true)
+    public List<InvoiceCreatorSummaryDTO> getInvoiceCreatorSummaries() {
+        LocalDate today = LocalDate.now();
+        LocalDate monthStart = today.withDayOfMonth(1);
+
+        Map<String, Object[]> allTimeByCreator = invoiceRepository.sumAndCountGroupedByCreatedBy().stream()
+                .collect(Collectors.toMap(row -> (String) row[0], row -> row));
+        Map<String, Object[]> monthByCreator = invoiceRepository
+                .sumAndCountGroupedByCreatedByInRange(monthStart, today).stream()
+                .collect(Collectors.toMap(row -> (String) row[0], row -> row));
+
+        return userRepository.findByRoleIn(List.of(User.Role.ADMIN, User.Role.ACCOUNTANT, User.Role.MANAGER))
+                .stream()
+                .map(user -> {
+                    Object[] allTime = allTimeByCreator.get(user.getUsername());
+                    Object[] month = monthByCreator.get(user.getUsername());
+                    BigDecimal todayAmount = invoiceRepository.sumAmountByCreatedByAndDate(user.getUsername(), today);
+                    long todayCount = invoiceRepository.countByCreatedByAndInvoiceDate(user.getUsername(), today);
+
+                    return InvoiceCreatorSummaryDTO.builder()
+                            .creatorId(user.getId())
+                            .fullName(user.getFullName())
+                            .username(user.getUsername())
+                            .role(user.getRole().name())
+                            .todayAmount(todayAmount != null ? todayAmount : BigDecimal.ZERO)
+                            .todayCount(todayCount)
+                            .monthAmount(month != null ? (BigDecimal) month[1] : BigDecimal.ZERO)
+                            .monthCount(month != null ? (Long) month[2] : 0L)
+                            .allTimeAmount(allTime != null ? (BigDecimal) allTime[1] : BigDecimal.ZERO)
+                            .allTimeCount(allTime != null ? (Long) allTime[2] : 0L)
+                            .build();
+                })
+                .sorted(Comparator.comparing(InvoiceCreatorSummaryDTO::getAllTimeAmount).reversed())
+                .collect(Collectors.toList());
     }
 
     // ─────────────────────────────────────────────────────────
