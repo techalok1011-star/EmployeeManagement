@@ -145,6 +145,18 @@ public class InvoiceService {
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
+    /** All invoices by one creator (from the "Invoices by Creator" drill-down), optionally date-bounded. */
+    @Transactional(readOnly = true)
+    public List<InvoiceDTO.Response> getInvoicesByCreatedBy(String createdBy, LocalDate from, LocalDate to) {
+        List<Invoice> invoices = (from == null && to == null)
+                ? invoiceRepository.findByCreatedByOrderByInvoiceDateDescCreatedAtDesc(createdBy)
+                : invoiceRepository.findByCreatedByAndInvoiceDateBetweenOrderByInvoiceDateDescCreatedAtDesc(
+                        createdBy,
+                        from != null ? from : LocalDate.of(1900, 1, 1),
+                        to != null ? to : LocalDate.of(2999, 12, 31));
+        return invoices.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
     /**
      * Suggests the next invoice number as INV-&lt;year&gt;-&lt;seq&gt;, sequence reset each
      * year and zero-padded to 3 digits (INV-2026-001, INV-2026-002, ...). Only a

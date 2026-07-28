@@ -177,6 +177,7 @@
                             <th>Today</th>
                             <th>This Month</th>
                             <th>All Time</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -202,6 +203,10 @@
                             <td>
                                 <div class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(s.allTimeAmount)}"></span></div>
                                 <div class="text-muted" th:text="${s.allTimeCount} + ' invoices'"></div>
+                            </td>
+                            <td>
+                                <a th:href="@{/admin/invoices(createdBy=${s.username})}"
+                                   style="color:var(--accent);text-decoration:none;font-size:12.5px;white-space:nowrap">View Invoices →</a>
                             </td>
                         </tr>
                     </tbody>

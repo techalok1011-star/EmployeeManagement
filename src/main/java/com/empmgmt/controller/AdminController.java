@@ -309,13 +309,20 @@ public class AdminController {
     public String invoices(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String createdBy,
             Model model, Authentication auth) {
-        boolean filtered = from != null || to != null;
-        model.addAttribute("invoices", filtered
-                ? invoiceService.getInvoicesByDateRange(from, to)
-                : invoiceService.getAllInvoices());
+        boolean dateFiltered = from != null || to != null;
+        if (createdBy != null && !createdBy.isBlank()) {
+            model.addAttribute("invoices", invoiceService.getInvoicesByCreatedBy(createdBy, from, to));
+            model.addAttribute("createdByName", userService.getUserByUsername(createdBy).getFullName());
+        } else {
+            model.addAttribute("invoices", dateFiltered
+                    ? invoiceService.getInvoicesByDateRange(from, to)
+                    : invoiceService.getAllInvoices());
+        }
         model.addAttribute("from", from);
         model.addAttribute("to", to);
+        model.addAttribute("createdBy", createdBy);
         model.addAttribute("outstandingSummary", invoiceService.getPartyOutstandingSummary());
         InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
         newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
