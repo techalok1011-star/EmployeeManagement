@@ -336,7 +336,7 @@
                                     th:data-invno="${inv.invoiceNumber}" th:data-party="${inv.partyName}"
                                     th:data-bags="${inv.bags != null ? inv.bags : '—'}"
                                     th:data-rate="${inv.ratePerBag != null ? inv.ratePerBag : '—'}"
-                                    th:data-amount="${T(com.empmgmt.util.AmountFormat).format(inv.amount)}"
+                                    th:data-amount="${@amountFormat.formatInstance(inv.amount)}"
                                     th:data-desc="${inv.description != null ? inv.description : '—'}"
                                     th:data-transport="${inv.transportNumber != null ? inv.transportNumber : '—'}">
                                     <div class="inv-actions-row">
@@ -406,7 +406,7 @@
                                 th:data-invno="${inv.invoiceNumber}" th:data-party="${inv.partyName}"
                                 th:data-bags="${inv.bags != null ? inv.bags : '—'}"
                                 th:data-rate="${inv.ratePerBag != null ? inv.ratePerBag : '—'}"
-                                th:data-amount="${T(com.empmgmt.util.AmountFormat).format(inv.amount)}"
+                                th:data-amount="${@amountFormat.formatInstance(inv.amount)}"
                                 th:data-desc="${inv.description != null ? inv.description : '—'}"
                                 th:data-transport="${inv.transportNumber != null ? inv.transportNumber : '—'}">
                                 <div class="inv-actions-row">
