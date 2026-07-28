@@ -172,7 +172,7 @@
             <div class="stat-card">
                 <div class="stat-icon">💰</div>
                 <div class="stat-label">Today's Total Amount</div>
-                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(summary.totalAmount, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
+                <div class="stat-value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(summary.totalAmount)}">0.00</span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">📅</div>
@@ -288,7 +288,7 @@
                                     <span th:if="${entry.editedBy == 'ADMIN'}" style="background:rgba(167,139,250,0.2);color:#a78bfa;padding:1px 6px;border-radius:5px;font-size:10px">👑 Admin Edited</span>
                                 </td>
                                 <td class="text-muted" th:text="${entry.receiptVchNo != null ? entry.receiptVchNo : '—'}"></td>
-                                <td class="amount">₹<span th:text="${#numbers.formatDecimal(entry.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
+                                <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(entry.amount)}"></span></td>
                                 <td>
                                     <span class="badge"
                                           th:classappend="${entry.modeOfPayment == 'Cash'} ? 'badge-cash' :

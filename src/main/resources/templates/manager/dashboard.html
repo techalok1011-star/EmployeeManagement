@@ -207,7 +207,7 @@
             <div class="stat-card">
                 <div class="stat-icon">💰</div>
                 <div class="stat-label">Invoice Total (Day)</div>
-                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(dayTotal, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
+                <div class="stat-value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(dayTotal)}">0.00</span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">🧾</div>
@@ -217,7 +217,7 @@
             <div class="stat-card">
                 <div class="stat-icon">💰</div>
                 <div class="stat-label">Collection Total (Day)</div>
-                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(dayPaymentTotal, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
+                <div class="stat-value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(dayPaymentTotal)}">0.00</span></div>
             </div>
             <div class="stat-card stat-card-wide">
                 <div class="stat-icon">📅</div>
@@ -330,13 +330,13 @@
                             <tr th:each="inv : ${dayInvoices}">
                                 <td th:text="${inv.invoiceNumber}"></td>
                                 <td th:text="${inv.partyName}"></td>
-                                <td class="amount">₹<span th:text="${#numbers.formatDecimal(inv.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
+                                <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(inv.amount)}"></span></td>
                                 <td><span class="badge" th:text="${inv.deliveryMode}"></span></td>
                                 <td
                                     th:data-invno="${inv.invoiceNumber}" th:data-party="${inv.partyName}"
                                     th:data-bags="${inv.bags != null ? inv.bags : '—'}"
                                     th:data-rate="${inv.ratePerBag != null ? inv.ratePerBag : '—'}"
-                                    th:data-amount="${#numbers.formatDecimal(inv.amount, 1, 'COMMA', 2, 'POINT')}"
+                                    th:data-amount="${T(com.empmgmt.util.AmountFormat).format(inv.amount)}"
                                     th:data-desc="${inv.description != null ? inv.description : '—'}"
                                     th:data-transport="${inv.transportNumber != null ? inv.transportNumber : '—'}">
                                     <div class="inv-actions-row">
@@ -376,7 +376,7 @@
                 </div>
                 <div>
                     <div class="stat-label" style="margin-bottom:4px">Total Amount</div>
-                    <div class="stat-value green" style="font-size:20px">₹<span th:text="${#numbers.formatDecimal(monthTotal, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
+                    <div class="stat-value green" style="font-size:20px">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(monthTotal)}">0.00</span></div>
                 </div>
             </div>
             <div th:if="${#lists.isEmpty(monthInvoices)}" class="empty-state">
@@ -400,13 +400,13 @@
                             <td th:text="${#temporals.format(inv.invoiceDate, 'dd MMM yyyy')}"></td>
                             <td th:text="${inv.invoiceNumber}"></td>
                             <td th:text="${inv.partyName}"></td>
-                            <td class="amount">₹<span th:text="${#numbers.formatDecimal(inv.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
+                            <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(inv.amount)}"></span></td>
                             <td><span class="badge" th:text="${inv.deliveryMode}"></span></td>
                             <td
                                 th:data-invno="${inv.invoiceNumber}" th:data-party="${inv.partyName}"
                                 th:data-bags="${inv.bags != null ? inv.bags : '—'}"
                                 th:data-rate="${inv.ratePerBag != null ? inv.ratePerBag : '—'}"
-                                th:data-amount="${#numbers.formatDecimal(inv.amount, 1, 'COMMA', 2, 'POINT')}"
+                                th:data-amount="${T(com.empmgmt.util.AmountFormat).format(inv.amount)}"
                                 th:data-desc="${inv.description != null ? inv.description : '—'}"
                                 th:data-transport="${inv.transportNumber != null ? inv.transportNumber : '—'}">
                                 <div class="inv-actions-row">
@@ -526,7 +526,7 @@
                             <tr th:each="entry : ${dayPayments}">
                                 <td th:text="${entry.partyName}"></td>
                                 <td class="text-muted" th:text="${entry.receiptVchNo != null ? entry.receiptVchNo : '—'}"></td>
-                                <td class="amount">₹<span th:text="${#numbers.formatDecimal(entry.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
+                                <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(entry.amount)}"></span></td>
                                 <td>
                                     <span class="badge"
                                           th:classappend="${entry.modeOfPayment=='Cash'}?'badge-cash':(${entry.modeOfPayment=='Cheque'}?'badge-cheque':(${entry.modeOfPayment=='UPI'}?'badge-upi':(${entry.modeOfPayment=='NEFT'}?'badge-neft':(${entry.modeOfPayment=='RTGS'}?'badge-rtgs':(${entry.modeOfPayment=='Bank Transfer'}?'badge-bank':'badge-dd')))))"
@@ -558,7 +558,7 @@
                 </div>
                 <div>
                     <div class="stat-label" style="margin-bottom:4px">Total Amount</div>
-                    <div class="stat-value green" style="font-size:20px">₹<span th:text="${#numbers.formatDecimal(monthPaymentTotal, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
+                    <div class="stat-value green" style="font-size:20px">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(monthPaymentTotal)}">0.00</span></div>
                 </div>
             </div>
             <div th:if="${#lists.isEmpty(monthPayments)}" class="empty-state">
@@ -581,7 +581,7 @@
                             <td th:text="${#temporals.format(entry.entryDate, 'dd MMM yyyy')}"></td>
                             <td th:text="${entry.partyName}"></td>
                             <td class="text-muted" th:text="${entry.receiptVchNo != null ? entry.receiptVchNo : '—'}"></td>
-                            <td class="amount">₹<span th:text="${#numbers.formatDecimal(entry.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
+                            <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(entry.amount)}"></span></td>
                             <td>
                                 <span class="badge"
                                       th:classappend="${entry.modeOfPayment=='Cash'}?'badge-cash':(${entry.modeOfPayment=='Cheque'}?'badge-cheque':(${entry.modeOfPayment=='UPI'}?'badge-upi':(${entry.modeOfPayment=='NEFT'}?'badge-neft':(${entry.modeOfPayment=='RTGS'}?'badge-rtgs':(${entry.modeOfPayment=='Bank Transfer'}?'badge-bank':'badge-dd')))))"

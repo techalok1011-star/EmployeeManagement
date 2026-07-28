@@ -175,7 +175,7 @@
             <div class="stat-card">
                 <div class="stat-icon">📅</div>
                 <div class="stat-label">Today's Total</div>
-                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(todayTotal,1,'COMMA',2,'POINT')}">0</span></div>
+                <div class="stat-value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(todayTotal)}">0</span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">🔢</div>
@@ -214,7 +214,7 @@
                         </div>
                         <div class="emp-stat-item">
                             <div class="label">Today Amount</div>
-                            <div class="value green">₹<span th:text="${#numbers.formatDecimal(emp.totalAmount,1,'COMMA',2,'POINT')}">0</span></div>
+                            <div class="value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(emp.totalAmount)}">0</span></div>
                         </div>
                     </div>
                     <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
@@ -266,7 +266,7 @@
                         <tr th:each="p,i : ${top5Parties}">
                             <td class="text-muted" th:text="${i.count}">1</td>
                             <td style="font-weight:500" th:text="${p.name}"></td>
-                            <td class="amount">₹<span th:text="${#numbers.formatDecimal(p.amount,1,'COMMA',2,'POINT')}"></span></td>
+                            <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(p.amount)}"></span></td>
                         </tr>
                     </tbody>
                 </table>
@@ -295,7 +295,7 @@
                         <tr th:each="entry : ${recentEntries}">
                             <td style="font-weight:500" th:text="${entry.partyName}"></td>
                             <td class="text-muted" th:text="${entry.employeeName}"></td>
-                            <td class="amount">₹<span th:text="${#numbers.formatDecimal(entry.amount,1,'COMMA',2,'POINT')}"></span></td>
+                            <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(entry.amount)}"></span></td>
                             <td>
                                 <span class="badge"
                                       th:classappend="${entry.modeOfPayment=='Cash'}?'badge-cash':(${entry.modeOfPayment=='Cheque'}?'badge-cheque':(${entry.modeOfPayment=='UPI'}?'badge-upi':(${entry.modeOfPayment=='NEFT'}?'badge-neft':(${entry.modeOfPayment=='RTGS'}?'badge-rtgs':(${entry.modeOfPayment=='Bank Transfer'}?'badge-bank':'badge-dd')))))"

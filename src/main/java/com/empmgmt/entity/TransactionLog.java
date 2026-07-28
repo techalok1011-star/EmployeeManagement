@@ -42,6 +42,10 @@ public class TransactionLog {
 
     private LocalDate entryDate;
 
+    /** Voucher number from the source Tally Receipt Register, if this entry was imported (or later given one on edit). */
+    @Column(name = "receipt_vch_no", length = 20)
+    private String receiptVchNo;
+
     @Column(length = 500)
     private String remarks;
 

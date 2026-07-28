@@ -271,7 +271,7 @@
                                       th:text="${n.partyName.contains('_') ? n.partyName.substring(0,n.partyName.indexOf('_')) : n.partyName}"></span>
                             </td>
                             <td class="text-muted" th:text="${n.phone}"></td>
-                            <td class="amount">₹<span th:text="${#numbers.formatDecimal(n.outstandingAmount,1,'COMMA',2,'POINT')}"></span></td>
+                            <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(n.outstandingAmount)}"></span></td>
                             <td>
                                 <span th:if="${n.status.name() == 'SENT'}"    class="badge-sent">✅ Sent</span>
                                 <span th:if="${n.status.name() == 'DRY_RUN'}" class="badge-dryrun">🧪 Dry Run</span>

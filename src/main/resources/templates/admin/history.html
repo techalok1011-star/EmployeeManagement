@@ -191,6 +191,7 @@
                                 <th>Amount</th>
                                 <th>Mode</th>
                                 <th>Entry Date</th>
+                                <th>Receipt Vch No.</th>
                                 <th>Performed By</th>
                                 <th>Changes / Notes</th>
                                 <th>When</th>
@@ -215,11 +216,12 @@
                                 </td>
                                 <td style="font-weight:500" th:text="${log.partyName != null ? log.partyName : '—'}"></td>
                                 <td>
-                                    <span th:if="${log.amount != null}" class="amount">₹<span th:text="${#numbers.formatDecimal(log.amount,1,'COMMA',2,'POINT')}"></span></span>
+                                    <span th:if="${log.amount != null}" class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(log.amount)}"></span></span>
                                     <span th:if="${log.amount == null}" class="text-muted">—</span>
                                 </td>
                                 <td class="text-muted" th:text="${log.modeOfPayment != null ? log.modeOfPayment : '—'}"></td>
                                 <td class="text-muted" th:text="${log.entryDate != null ? #temporals.format(log.entryDate,'dd MMM yyyy') : '—'}"></td>
+                                <td class="text-muted" th:text="${log.receiptVchNo != null ? log.receiptVchNo : '—'}"></td>
                                 <td>
                                     <span style="font-size:13px;font-weight:500" th:text="${log.performedBy}"></span>
                                     <div th:if="${log.performedByRole != null}" class="text-muted" th:text="${log.performedByRole}"></div>

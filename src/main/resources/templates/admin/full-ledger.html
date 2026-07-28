@@ -172,11 +172,11 @@
                           style="margin-left:10px"></span>
                 </div>
                 <div class="party-block-meta">
-                    <span class="meta-item">Invoiced <b>₹<span th:text="${#numbers.formatDecimal(ledger.totalInvoiced,1,'COMMA',2,'POINT')}"></span></b></span>
-                    <span class="meta-item">Paid <b>₹<span th:text="${#numbers.formatDecimal(ledger.totalPaid,1,'COMMA',2,'POINT')}"></span></b></span>
+                    <span class="meta-item">Invoiced <b>₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(ledger.totalInvoiced)}"></span></b></span>
+                    <span class="meta-item">Paid <b>₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(ledger.totalPaid)}"></span></b></span>
                     <span class="meta-item">Outstanding
                         <b th:class="${ledger.outstanding.compareTo(T(java.math.BigDecimal).ZERO) > 0} ? 'amount-out-pos' : 'amount-out-neg'">
-                            ₹<span th:text="${#numbers.formatDecimal(ledger.outstanding.abs(),1,'COMMA',2,'POINT')}"></span>
+                            ₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(ledger.outstanding.abs())}"></span>
                         </b>
                     </span>
                     <a th:if="${ledger.partyId != null}" class="text-muted" style="text-decoration:underline"
@@ -221,9 +221,9 @@
                     <th:block th:each="e : ${ledger.entries}">
                         <tr th:if="${e.type == 'FY_SUMMARY'}" class="fy-summary-row">
                             <td colspan="6">📅 <span th:text="${e.fyLabel}"></span> — Total</td>
-                            <td class="amount-debit">₹<span th:text="${#numbers.formatDecimal(e.fyTotalDebit,1,'COMMA',2,'POINT')}"></span></td>
-                            <td class="amount-credit">₹<span th:text="${#numbers.formatDecimal(e.fyTotalCredit,1,'COMMA',2,'POINT')}"></span></td>
-                            <td class="amount-balance">₹<span th:text="${#numbers.formatDecimal(e.balance,1,'COMMA',2,'POINT')}"></span></td>
+                            <td class="amount-debit">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(e.fyTotalDebit)}"></span></td>
+                            <td class="amount-credit">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(e.fyTotalCredit)}"></span></td>
+                            <td class="amount-balance">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(e.balance)}"></span></td>
                         </tr>
                         <tr th:unless="${e.type == 'FY_SUMMARY'}">
                             <td class="text-muted" th:text="${#temporals.format(e.date,'dd MMM yyyy')}"></td>
@@ -239,14 +239,14 @@
                                 <div th:if="${e.deliveryInfo != null}" style="font-size:10.5px;color:var(--accent2);margin-top:2px" th:text="'🚚 ' + ${e.deliveryInfo}"></div>
                             </td>
                             <td>
-                                <span class="amount-debit" th:if="${e.debit != null}">₹<span th:text="${#numbers.formatDecimal(e.debit,1,'COMMA',2,'POINT')}"></span></span>
+                                <span class="amount-debit" th:if="${e.debit != null}">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(e.debit)}"></span></span>
                                 <span class="text-muted" th:if="${e.debit == null}">—</span>
                             </td>
                             <td>
-                                <span class="amount-credit" th:if="${e.credit != null}">₹<span th:text="${#numbers.formatDecimal(e.credit,1,'COMMA',2,'POINT')}"></span></span>
+                                <span class="amount-credit" th:if="${e.credit != null}">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(e.credit)}"></span></span>
                                 <span class="text-muted" th:if="${e.credit == null}">—</span>
                             </td>
-                            <td class="amount-balance">₹<span th:text="${#numbers.formatDecimal(e.balance,1,'COMMA',2,'POINT')}"></span></td>
+                            <td class="amount-balance">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(e.balance)}"></span></td>
                         </tr>
                     </th:block>
                 </tbody>

@@ -157,12 +157,12 @@
         <div class="stats-bar">
             <div class="stat-card">
                 <div class="stat-label">Total To Collect</div>
-                <div class="stat-value red">₹<span th:text="${#numbers.formatDecimal(totalToCollect,1,'COMMA',2,'POINT')}"></span></div>
+                <div class="stat-value red">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(totalToCollect)}"></span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">High Priority (60+ Days)</div>
                 <div class="stat-value orange" th:text="${highPriorityCount}">0</div>
-                <div class="stat-sub">₹<span th:text="${#numbers.formatDecimal(highPriorityAmount,1,'COMMA',2,'POINT')}"></span> outstanding</div>
+                <div class="stat-sub">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(highPriorityAmount)}"></span> outstanding</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Never Contacted</div>
@@ -209,7 +209,7 @@
                                        th:text="${row.displayName}" title="View ledger"></a>
                                     <span class="gstin" th:if="${!#strings.isEmpty(row.gstin)}" th:text="${row.gstin}"></span>
                                 </td>
-                                <td class="amount-red">₹<span th:text="${#numbers.formatDecimal(row.outstanding,1,'COMMA',2,'POINT')}"></span></td>
+                                <td class="amount-red">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(row.outstanding)}"></span></td>
                                 <td class="text-muted" th:text="${row.daysOverdue} + ' days'"></td>
                                 <td>
                                     <span class="bucket-badge"

@@ -59,6 +59,7 @@ public class AuditLogService {
                     .amount(t.getAmount())
                     .modeOfPayment(t.getModeOfPayment())
                     .entryDate(t.getEntryDate())
+                    .receiptVchNo(t.getReceiptVchNo())
                     .performedBy(t.getPerformedBy())
                     .performedByRole(null) // not captured historically for payment entries
                     .notes(t.getNotes())

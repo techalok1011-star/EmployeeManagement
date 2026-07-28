@@ -134,15 +134,15 @@
         <div class="stats-bar">
             <div class="stat-card">
                 <div class="stat-label">Today — All Employees</div>
-                <div class="stat-value gold">₹<span th:text="${#numbers.formatDecimal(todayTotal,1,'COMMA',2,'POINT')}">0</span></div>
+                <div class="stat-value gold">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(todayTotal)}">0</span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">This Month — All Employees</div>
-                <div class="stat-value accent">₹<span th:text="${#numbers.formatDecimal(monthTotal,1,'COMMA',2,'POINT')}">0</span></div>
+                <div class="stat-value accent">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(monthTotal)}">0</span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">All Time — All Employees</div>
-                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(allTimeTotal,1,'COMMA',2,'POINT')}">0</span></div>
+                <div class="stat-value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(allTimeTotal)}">0</span></div>
             </div>
         </div>
 
@@ -183,15 +183,15 @@
                                 <div class="text-muted" th:text="'@' + ${s.username}"></div>
                             </td>
                             <td>
-                                <div class="amount">₹<span th:text="${#numbers.formatDecimal(s.todayAmount,1,'COMMA',2,'POINT')}"></span></div>
+                                <div class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(s.todayAmount)}"></span></div>
                                 <div class="text-muted" th:text="${s.todayCount} + ' entries'"></div>
                             </td>
                             <td>
-                                <div class="amount">₹<span th:text="${#numbers.formatDecimal(s.monthAmount,1,'COMMA',2,'POINT')}"></span></div>
+                                <div class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(s.monthAmount)}"></span></div>
                                 <div class="text-muted" th:text="${s.monthCount} + ' entries'"></div>
                             </td>
                             <td>
-                                <div class="amount">₹<span th:text="${#numbers.formatDecimal(s.allTimeAmount,1,'COMMA',2,'POINT')}"></span></div>
+                                <div class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(s.allTimeAmount)}"></span></div>
                                 <div class="text-muted" th:text="${s.allTimeCount} + ' entries'"></div>
                             </td>
                             <td>

@@ -351,7 +351,6 @@ public class ManagerController {
             return "manager/edit-entry";
         }
         try {
-            request.setEntryDate(LocalDate.now());
             paymentEntryService.updateEntryByEmployee(id, request, auth.getName());
             redirectAttributes.addFlashAttribute("successMsg", "Collection updated successfully!");
         } catch (Exception e) {

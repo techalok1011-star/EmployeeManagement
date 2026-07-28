@@ -145,19 +145,19 @@
         <div class="stats-bar">
             <div class="stat-card">
                 <div class="stat-label">0-30 Days</div>
-                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(bucketTotals.get('0-30'),1,'COMMA',2,'POINT')}"></span></div>
+                <div class="stat-value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(bucketTotals.get('0-30'))}"></span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">31-60 Days</div>
-                <div class="stat-value gold">₹<span th:text="${#numbers.formatDecimal(bucketTotals.get('31-60'),1,'COMMA',2,'POINT')}"></span></div>
+                <div class="stat-value gold">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(bucketTotals.get('31-60'))}"></span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">61-90 Days</div>
-                <div class="stat-value orange">₹<span th:text="${#numbers.formatDecimal(bucketTotals.get('61-90'),1,'COMMA',2,'POINT')}"></span></div>
+                <div class="stat-value orange">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(bucketTotals.get('61-90'))}"></span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">90+ Days</div>
-                <div class="stat-value red">₹<span th:text="${#numbers.formatDecimal(bucketTotals.get('90+'),1,'COMMA',2,'POINT')}"></span></div>
+                <div class="stat-value red">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(bucketTotals.get('90+'))}"></span></div>
             </div>
         </div>
 
@@ -196,7 +196,7 @@
                                        th:text="${row.displayName}" title="View ledger"></a>
                                     <span class="gstin" th:if="${!#strings.isEmpty(row.gstin)}" th:text="${row.gstin}"></span>
                                 </td>
-                                <td class="amount-red">₹<span th:text="${#numbers.formatDecimal(row.outstanding,1,'COMMA',2,'POINT')}"></span></td>
+                                <td class="amount-red">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(row.outstanding)}"></span></td>
                                 <td class="text-muted"
                                     th:text="${row.oldestUnpaidInvoiceDate != null ? #temporals.format(row.oldestUnpaidInvoiceDate,'dd MMM yyyy') : '—'}"></td>
                                 <td class="text-muted" th:text="${row.daysOverdue} + ' days'"></td>

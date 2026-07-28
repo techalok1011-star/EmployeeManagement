@@ -544,6 +544,7 @@ public class PaymentEntryService {
                 .amount(entry.getAmount())
                 .modeOfPayment(entry.getModeOfPayment().getDisplayName())
                 .entryDate(entry.getEntryDate())
+                .receiptVchNo(entry.getReceiptVchNo())
                 .remarks(entry.getRemarks())
                 .performedBy(performedBy)
                 .notes(notes)
@@ -564,6 +565,8 @@ public class PaymentEntryService {
             changes.add("Date: " + before.getEntryDate() + " → " + after.getEntryDate());
         if (!Objects.equals(before.getRemarks(), after.getRemarks()))
             changes.add("Remarks: \"" + before.getRemarks() + "\" → \"" + after.getRemarks() + "\"");
+        if (!Objects.equals(before.getReceiptVchNo(), after.getReceiptVchNo()))
+            changes.add("Receipt Vch No.: \"" + before.getReceiptVchNo() + "\" → \"" + after.getReceiptVchNo() + "\"");
         return changes.isEmpty() ? "No changes detected" : String.join("; ", changes);
     }
 

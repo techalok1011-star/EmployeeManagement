@@ -34,6 +34,12 @@
         .content{padding:28px 32px}
         .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px}
         .search-input{width:100%;padding:10px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color 0.2s;margin-bottom:14px}
+        .alert{padding:12px 16px;border-radius:10px;font-size:13.5px;margin-bottom:20px}
+        .alert-success{background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#6ee7b7}
+        .alert-danger{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);color:#fca5a5}
+        .btn{padding:5px 10px;border-radius:20px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s}
+        .btn-force-logout{background:rgba(248,113,113,0.15);color:var(--red)}
+        .btn-force-logout:hover{background:rgba(248,113,113,0.28)}
         .search-input:focus{border-color:var(--accent)}
         .search-input::placeholder{color:var(--muted2)}
         .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;border:1px solid var(--border)}
@@ -116,6 +122,8 @@
         </div>
     </div>
     <div class="content">
+        <div th:if="${successMsg}" class="alert alert-success" th:text="${successMsg}"></div>
+        <div th:if="${errorMsg}" class="alert alert-danger" th:text="${errorMsg}"></div>
         <div class="card">
             <div th:if="${#lists.isEmpty(sessions)}" class="empty-state">
                 <div class="empty-icon">🕐</div>
@@ -137,6 +145,7 @@
                                 <th>Logout At</th>
                                 <th>Duration</th>
                                 <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -152,6 +161,17 @@
                                 <td>
                                     <span th:if="${s.active}" class="badge badge-active">🟢 Active</span>
                                     <span th:if="${!s.active}" class="badge badge-ended">Ended</span>
+                                </td>
+                                <td>
+                                    <form th:if="${s.active and s.username != adminName}"
+                                          th:action="@{/admin/login-history/force-logout}" method="post"
+                                          onsubmit="return confirm('End the active session for ' + this.dataset.user + '?')"
+                                          th:data-user="${s.username}" style="margin:0">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <input type="hidden" name="username" th:value="${s.username}"/>
+                                        <button type="submit" class="btn btn-force-logout">🔒 Force Logout</button>
+                                    </form>
+                                    <span th:unless="${s.active and s.username != adminName}" class="text-muted">—</span>
                                 </td>
                             </tr>
                         </tbody>

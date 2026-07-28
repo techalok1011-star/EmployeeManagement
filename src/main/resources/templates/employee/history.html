@@ -165,7 +165,7 @@
                                           th:text="${log.action}"></span>
                                 </td>
                                 <td style="font-weight:500" th:text="${log.partyName}"></td>
-                                <td class="amount">₹<span th:text="${#numbers.formatDecimal(log.amount,1,'COMMA',2,'POINT')}"></span></td>
+                                <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(log.amount)}"></span></td>
                                 <td class="text-muted" th:text="${log.modeOfPayment}"></td>
                                 <td class="text-muted" th:text="${log.entryDate != null ? #temporals.format(log.entryDate, 'dd MMM yyyy') : '—'}"></td>
                                 <td class="notes-cell" th:text="${log.notes != null ? log.notes : '—'}"></td>

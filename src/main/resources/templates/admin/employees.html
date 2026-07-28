@@ -169,7 +169,7 @@
                                 <td class="text-muted" th:text="'@' + ${emp.username}"></td>
                                 <td>
                                     <div style="font-size:12px;color:var(--muted)">Entries: <strong style="color:var(--accent)" th:text="${emp.totalEntries}">0</strong></div>
-                                    <div class="amount">₹<span th:text="${#numbers.formatDecimal(emp.totalAmount,1,'COMMA',2,'POINT')}">0</span></div>
+                                    <div class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(emp.totalAmount)}">0</span></div>
                                 </td>
                                 <td>
                                     <span class="badge" th:classappend="${emp.active}?'badge-active':'badge-inactive'" th:text="${emp.active}?'Active':'Inactive'"></span>

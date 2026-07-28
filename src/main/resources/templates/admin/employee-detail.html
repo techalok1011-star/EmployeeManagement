@@ -188,7 +188,7 @@
                 </div>
                 <div class="info-item">
                     <div class="label">Today's Total</div>
-                    <div class="value" style="color:var(--green)">₹<span th:text="${#numbers.formatDecimal(employee.totalAmount,1,'COMMA',2,'POINT')}">0</span></div>
+                    <div class="value" style="color:var(--green)">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(employee.totalAmount)}">0</span></div>
                 </div>
             </div>
         </div>
@@ -217,7 +217,7 @@
                         <tr th:each="entry, stat : ${entries}">
                             <td class="text-muted" th:text="${stat.count}"></td>
                             <td style="font-weight:500" th:text="${entry.partyName}"></td>
-                            <td class="amount">₹<span th:text="${#numbers.formatDecimal(entry.amount,1,'COMMA',2,'POINT')}"></span></td>
+                            <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(entry.amount)}"></span></td>
                             <td>
                                 <span class="badge2"
                                       th:classappend="${entry.modeOfPayment=='Cash'}?'badge-cash':(${entry.modeOfPayment=='Cheque'}?'badge-cheque':(${entry.modeOfPayment=='UPI'}?'badge-upi':(${entry.modeOfPayment=='NEFT'}?'badge-neft':(${entry.modeOfPayment=='RTGS'}?'badge-rtgs':(${entry.modeOfPayment=='Bank Transfer'}?'badge-bank':'badge-dd')))))"

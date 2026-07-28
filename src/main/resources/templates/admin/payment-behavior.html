@@ -229,7 +229,7 @@
                                 </td>
                                 <td>
                                     <span th:classappend="${b.outstanding.compareTo(T(java.math.BigDecimal).ZERO) > 0} ? 'amount-red' : 'amount-credit'">
-                                        ₹<span th:text="${#numbers.formatDecimal(b.outstanding.abs(),1,'COMMA',2,'POINT')}"></span>
+                                        ₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(b.outstanding.abs())}"></span>
                                     </span>
                                 </td>
                                 <td class="text-muted" th:text="${b.totalPaymentsCount}"></td>

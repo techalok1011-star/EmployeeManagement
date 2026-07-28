@@ -185,7 +185,7 @@
             <div class="stat-card">
                 <div class="stat-icon">💰</div>
                 <div class="stat-label">Today's Total</div>
-                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(summary.totalAmount,1,'COMMA',2,'POINT')}">0.00</span></div>
+                <div class="stat-value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(summary.totalAmount)}">0.00</span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">📊</div>
@@ -240,7 +240,7 @@
                     <span class="day-badge" th:text="${group.totalEntries} + (${group.totalEntries} == 1 ? ' entry' : ' entries')"></span>
                 </div>
                 <div class="day-stats">
-                    <span class="day-total">₹<span th:text="${#numbers.formatDecimal(group.totalAmount,1,'COMMA',2,'POINT')}"></span></span>
+                    <span class="day-total">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(group.totalAmount)}"></span></span>
                     <span class="day-count" th:text="${group.totalEntries} + ' entries'"></span>
                     <span class="day-collapse-icon" th:id="'chevron-' + ${gStat.index}">▲</span>
                 </div>
@@ -267,7 +267,7 @@
                                 <span th:if="${entry.editedBy == 'ADMIN'}" class="badge badge-edited-admin">👑 Admin Edited</span>
                             </td>
                             <td class="text-muted" th:text="${entry.receiptVchNo != null ? entry.receiptVchNo : '—'}"></td>
-                            <td class="amount">₹<span th:text="${#numbers.formatDecimal(entry.amount,1,'COMMA',2,'POINT')}"></span></td>
+                            <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(entry.amount)}"></span></td>
                             <td>
                                 <span class="badge"
                                       th:classappend="${entry.modeOfPayment == 'Cash'} ? 'badge-cash' :

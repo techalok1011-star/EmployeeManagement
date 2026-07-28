@@ -25,6 +25,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.session.SessionInformation;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -58,6 +61,7 @@ public class AdminController {
     private final AdminNotificationService adminNotificationService;
     private final AuditLogService auditLogService;
     private final LoginSessionService loginSessionService;
+    private final SessionRegistry sessionRegistry;
 
     // ─── Dashboard ────────────────────────────────────────────
 
@@ -274,6 +278,28 @@ public class AdminController {
         model.addAttribute("sessions", loginSessionService.getRecentSessions());
         model.addAttribute("adminName", auth.getName());
         return "admin/login-history";
+    }
+
+    @PostMapping("/login-history/force-logout")
+    public String forceLogout(@RequestParam String username, RedirectAttributes redirectAttributes) {
+        boolean found = false;
+        for (Object principal : sessionRegistry.getAllPrincipals()) {
+            String principalUsername = (principal instanceof UserDetails ud) ? ud.getUsername() : principal.toString();
+            if (!principalUsername.equals(username)) continue;
+            for (SessionInformation info : sessionRegistry.getAllSessions(principal, false)) {
+                info.expireNow();
+                found = true;
+            }
+        }
+        // Reflects immediately on this page - the browser being kicked off still needs its next
+        // request to actually hit the expired-session redirect, but the admin sees it as ended now.
+        loginSessionService.recordLogout(username);
+        if (found) {
+            redirectAttributes.addFlashAttribute("successMsg", "Session for " + username + " has been ended.");
+        } else {
+            redirectAttributes.addFlashAttribute("errorMsg", username + " has no active session right now.");
+        }
+        return "redirect:/admin/login-history";
     }
 
     // ─── Invoices & Outstanding ────────────────────────────────

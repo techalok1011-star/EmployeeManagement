@@ -220,7 +220,7 @@
                                     </td>
                                     <td>
                                         <span class="amount" th:if="${p.totalAmount != null}">
-                                            ₹<span th:text="${#numbers.formatDecimal(p.totalAmount,1,'COMMA',2,'POINT')}"></span>
+                                            ₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(p.totalAmount)}"></span>
                                         </span>
                                         <span class="text-muted" th:if="${p.totalAmount == null}">—</span>
                                     </td>

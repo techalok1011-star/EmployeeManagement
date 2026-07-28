@@ -151,7 +151,7 @@
                             <td th:text="${inv.partyName}"></td>
                             <td class="text-muted" th:text="${inv.bags != null ? inv.bags : '—'}"></td>
                             <td class="text-muted" th:text="${inv.ratePerBag != null ? '₹' + inv.ratePerBag : '—'}"></td>
-                            <td class="amount">₹<span th:text="${#numbers.formatDecimal(inv.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
+                            <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(inv.amount)}"></span></td>
                             <td><span class="badge" th:text="${inv.deliveryMode}"></span></td>
                             <td>
                                 <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">

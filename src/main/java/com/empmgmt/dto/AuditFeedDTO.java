@@ -27,6 +27,7 @@ public class AuditFeedDTO {
         private BigDecimal amount;
         private String modeOfPayment;
         private LocalDate entryDate;
+        private String receiptVchNo; // only meaningful for "Payment Entry" rows
         private String performedBy;
         private String performedByRole; // null for legacy payment-entry rows - role wasn't captured historically
         private String notes;

@@ -200,17 +200,17 @@
         <div class="stats-bar">
             <div class="stat-card">
                 <div class="stat-label">Total Invoiced</div>
-                <div class="stat-value accent">₹<span th:text="${#numbers.formatDecimal(totalInvoiced,1,'COMMA',2,'POINT')}"></span></div>
+                <div class="stat-value accent">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(totalInvoiced)}"></span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Total Collected</div>
-                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(totalPaid,1,'COMMA',2,'POINT')}"></span></div>
+                <div class="stat-value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(totalPaid)}"></span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Net Outstanding</div>
                 <div class="stat-value"
                      th:classappend="${totalOutstanding.compareTo(T(java.math.BigDecimal).ZERO) > 0} ? 'red' : 'accent'">
-                    ₹<span th:text="${#numbers.formatDecimal(totalOutstanding,1,'COMMA',2,'POINT')}"></span>
+                    ₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(totalOutstanding)}"></span>
                 </div>
             </div>
             <div class="stat-card">
@@ -286,8 +286,8 @@
                                                   th:text="${inv.partyName.substring(inv.partyName.indexOf('_')+1)}"></span>
                                         </td>
                                         <td class="text-muted" th:text="${inv.bags != null ? inv.bags : '—'}"></td>
-                                        <td class="text-muted" th:text="${inv.ratePerBag != null ? '₹' + #numbers.formatDecimal(inv.ratePerBag,1,'COMMA',2,'POINT') : '—'}"></td>
-                                        <td class="amount">₹<span th:text="${#numbers.formatDecimal(inv.amount,1,'COMMA',2,'POINT')}"></span></td>
+                                        <td class="text-muted" th:text="${inv.ratePerBag != null ? '₹' + T(com.empmgmt.util.AmountFormat).format(inv.ratePerBag) : '—'}"></td>
+                                        <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(inv.amount)}"></span></td>
                                         <td class="text-muted" th:text="${inv.description != null ? inv.description : '—'}"></td>
                                         <td>
                                             <span class="delivery-badge"
@@ -350,11 +350,11 @@
                                         <span class="gstin" th:if="${!#strings.isEmpty(row.gstin)}" th:text="${row.gstin}"></span>
                                     </td>
                                     <td class="text-muted" th:text="${!#strings.isEmpty(row.trailingNumber) ? row.trailingNumber : '—'}"></td>
-                                    <td class="amount">₹<span th:text="${#numbers.formatDecimal(row.totalInvoiced,1,'COMMA',2,'POINT')}"></span></td>
-                                    <td class="amount">₹<span th:text="${#numbers.formatDecimal(row.totalPaid,1,'COMMA',2,'POINT')}"></span></td>
+                                    <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(row.totalInvoiced)}"></span></td>
+                                    <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(row.totalPaid)}"></span></td>
                                     <td>
                                         <span th:classappend="${row.credit} ? 'amount-credit' : (${row.outstanding.compareTo(T(java.math.BigDecimal).ZERO) == 0} ? 'amount' : 'amount-red')">
-                                            ₹<span th:text="${#numbers.formatDecimal(row.outstanding.abs(),1,'COMMA',2,'POINT')}"></span>
+                                            ₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(row.outstanding.abs())}"></span>
                                         </span>
                                     </td>
                                     <td>
@@ -503,7 +503,7 @@
                                       th:text="${n.partyName.contains('_') ? n.partyName.substring(0,n.partyName.indexOf('_')) : n.partyName}"></span>
                             </td>
                             <td class="text-muted" th:text="${n.phone}"></td>
-                            <td class="amount">₹<span th:text="${#numbers.formatDecimal(n.outstandingAmount,1,'COMMA',2,'POINT')}"></span></td>
+                            <td class="amount">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(n.outstandingAmount)}"></span></td>
                             <td>
                                 <span th:if="${n.status.name() == 'SENT'}"    class="badge-sent">✅ Sent</span>
                                 <span th:if="${n.status.name() == 'DRY_RUN'}" class="badge-dryrun">🧪 Dry Run</span>

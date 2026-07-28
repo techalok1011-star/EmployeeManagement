@@ -139,23 +139,23 @@
         <div class="stats-bar">
             <div class="stat-card blue">
                 <div class="stat-label">Total Invoiced (All Time)</div>
-                <div class="stat-value blue">₹<span th:text="${#numbers.formatDecimal(summary.totalInvoiced,1,'COMMA',2,'POINT')}"></span></div>
+                <div class="stat-value blue">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(summary.totalInvoiced)}"></span></div>
             </div>
             <div class="stat-card green">
                 <div class="stat-label">Total Collected (All Time)</div>
-                <div class="stat-value green">₹<span th:text="${#numbers.formatDecimal(summary.totalCollected,1,'COMMA',2,'POINT')}"></span></div>
+                <div class="stat-value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(summary.totalCollected)}"></span></div>
             </div>
             <div class="stat-card red">
                 <div class="stat-label">Net Outstanding</div>
-                <div class="stat-value red">₹<span th:text="${#numbers.formatDecimal(summary.totalOutstanding,1,'COMMA',2,'POINT')}"></span></div>
+                <div class="stat-value red">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(summary.totalOutstanding)}"></span></div>
             </div>
             <div class="stat-card gold">
                 <div class="stat-label">Today's Collections</div>
-                <div class="stat-value gold">₹<span th:text="${#numbers.formatDecimal(summary.todayCollections,1,'COMMA',2,'POINT')}"></span></div>
+                <div class="stat-value gold">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(summary.todayCollections)}"></span></div>
             </div>
             <div class="stat-card gold">
                 <div class="stat-label">This Month's Collections</div>
-                <div class="stat-value gold">₹<span th:text="${#numbers.formatDecimal(summary.monthCollections,1,'COMMA',2,'POINT')}"></span></div>
+                <div class="stat-value gold">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(summary.monthCollections)}"></span></div>
             </div>
         </div>
 
@@ -197,9 +197,9 @@
                                    th:text="${row.displayName}" title="View ledger"></a>
                                 <span class="gstin" th:if="${!#strings.isEmpty(row.gstin)}" th:text="${row.gstin}"></span>
                             </td>
-                            <td class="text-muted">₹<span th:text="${#numbers.formatDecimal(row.totalInvoiced,1,'COMMA',2,'POINT')}"></span></td>
-                            <td class="text-muted">₹<span th:text="${#numbers.formatDecimal(row.totalPaid,1,'COMMA',2,'POINT')}"></span></td>
-                            <td class="amount-red">₹<span th:text="${#numbers.formatDecimal(row.outstanding,1,'COMMA',2,'POINT')}"></span></td>
+                            <td class="text-muted">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(row.totalInvoiced)}"></span></td>
+                            <td class="text-muted">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(row.totalPaid)}"></span></td>
+                            <td class="amount-red">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(row.outstanding)}"></span></td>
                         </tr>
                     </tbody>
                 </table>
