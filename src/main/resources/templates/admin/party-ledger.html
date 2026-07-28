@@ -403,7 +403,7 @@
         var bags = parseFloat(document.getElementById('ledgerBagsInput').value);
         var rate = parseFloat(document.getElementById('ledgerRateInput').value);
         var display = document.getElementById('ledgerAmountDisplay');
-        display.value = (!isNaN(bags) && !isNaN(rate)) ? (bags * rate).toFixed(2) : '';
+        display.value = (!isNaN(bags) && !isNaN(rate)) ? (bags * rate).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
     }
     recalcLedgerInvoiceAmount(); // handle validation-error re-render where bags/rate already have values
 

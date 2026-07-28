@@ -645,7 +645,7 @@ function recalcAmount() {
     const bags = parseFloat(document.getElementById('bagsInput').value);
     const rate = parseFloat(document.getElementById('rateInput').value);
     const display = document.getElementById('amountDisplay');
-    display.value = (!isNaN(bags) && !isNaN(rate)) ? (bags * rate).toFixed(2) : '';
+    display.value = (!isNaN(bags) && !isNaN(rate)) ? (bags * rate).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
 }
 recalcAmount();
 
