@@ -17,7 +17,7 @@ are just `User` rows with `role` = `EMPLOYEE`, `ACCOUNTANT`, `MANAGER`, or
 describe an early, much simpler version (Users/PaymentEntry/TransactionLog
 only) and were never updated as Party/Invoice/WhatsApp/export/analytics
 features were added. Verify against `src/main/java/com/empmgmt/` instead.
-Last full re-verification against source: 2026-07-28.
+Last full re-verification against source: 2026-07-29.
 
 **The app is now deployed and live** at
 `https://employeemanagement-q6h3.onrender.com` (Render, free tier, Docker
@@ -306,6 +306,15 @@ gains a new constant.
   - `SPRING_DATASOURCE_URL` on Render must be prefixed `jdbc:postgresql://`
     - pasting Neon's raw connection string (`postgresql://...`, no `jdbc:`)
     causes `Driver org.postgresql.Driver claims to not accept jdbcUrl`.
+  - **A manual "Rollback" from the Render dashboard appears to pause
+    auto-deploy** (discovered 2026-07-28/29) - after rolling back to an
+    earlier deploy to unblock production during an incident, a subsequent
+    `git push origin main` did **not** trigger a new auto-deploy; the
+    dashboard kept showing the rolled-back commit as live even though GitHub
+    had newer commits. Fix was a manual **"Deploy latest commit"** click from
+    the Render dashboard. **After any manual rollback, don't assume the next
+    `git push` will auto-deploy** - check the dashboard and manually trigger
+    if needed.
 - Secrets (Neon connection string, WhatsApp token, seed passwords) live
   only as Render env vars (`sync: false` in `render.yaml`) - never hardcode
   them into this skill, the repo, or any committed file.
@@ -717,6 +726,79 @@ uniqueness, excluding self; recomputes `amount = ratePerBag × bags`; same
   `MANAGER` account and test invoice, both deleted after - reuse this
   pattern for any future invoice-edit-flow verification.
 
+## Indian amount formatting + critical Thymeleaf th:data-* gotcha (added 2026-07-29)
+
+All amounts across the app now render with Indian digit grouping
+(`12,50,000.00` lakh/crore style) instead of Western triads
+(`1,250,000.00`). Thymeleaf's `#numbers.formatDecimal(...)` cannot do this
+regardless of locale - it always groups in fixed triads. Even
+`NumberFormat.getInstance(new Locale("en","IN"))` doesn't help: the JDK's
+core `java.text` formatters only support one uniform grouping interval,
+never the mixed 3-then-2s pattern (ICU4J's `DecimalFormat` can, but that's
+a dependency this app doesn't otherwise need). Fix: a small dependency-free
+`com.empmgmt.util.AmountFormat` that groups digits manually, used across 21
+templates (81 call sites) via SpringEL's `T(com.empmgmt.util.AmountFormat).format(x)`.
+
+**Production incident, 2026-07-29**: this broke the manager dashboard
+for any manager with real invoice data, in a way that was very hard to
+diagnose remotely (see `git log` around `d83a5ba`/`fbd9bf0` for the full
+debugging trail - useful reading if something similar happens again).
+**The durable lesson: Thymeleaf treats `th:data-*` custom-attribute
+expressions as "restricted"** - `T(...)` static-class access (and `new`
+object instantiation) throws
+`org.attoparser.ParseException: Instantiation of new objects and access to
+static classes or parameters is forbidden in this context`, but **only**
+inside that restricted context - ordinary `th:text`/`th:value` are fine.
+A blanket regex replacement of every `#numbers.formatDecimal(...)` call
+(including two `th:data-amount="..."` attributes on
+`manager/dashboard.html` feeding the invoice View-modal) converted a safe
+expression into a forbidden one there specifically.
+
+- **Why it was so hard to catch**: the restriction only fires once
+  Thymeleaf actually *evaluates* the expression against a real row - an
+  empty `th:each` never trips it. Every local test that day happened to hit
+  empty or near-empty tables (or tested Collections, which has no such
+  attribute at all), so it passed repeatedly, then broke immediately and
+  deterministically for a real manager account with actual invoices.
+- **Why the symptom looked like a JS bug, not a template error**: Thymeleaf
+  throws *mid-render*, after already streaming part of the response. The
+  connection closes right there - everything before that point in the
+  document (all the visible UI) renders completely normally, while the
+  entire trailing portion of the page, including every inline `<script>`
+  block, silently never arrives. The browser reports `readyState:
+  "complete"` regardless of the truncation, so the console just showed
+  `ReferenceError: switchTab is not defined` with no obvious page-load
+  failure - `document.scripts` was the tell (only the external `theme.js`
+  tag present, the big inline script entirely missing; full response length
+  roughly half of what it should have been).
+- **Diagnostic path that actually worked** (worth reusing verbatim next
+  time something like this happens): a hard refresh and a fresh Render
+  redeploy of the identical commit ruled out caching/stale-deploy theories;
+  `git show <commit>:path/to/file` (bypassing the local Windows checkout,
+  which has CRLF-conversion warnings on every commit) confirmed the exact
+  pushed bytes were syntactically clean; logging into the *actual*
+  production instance via `claude-in-chrome` (the user had to log in
+  themselves in the watched tab - no valid prod credentials were available
+  otherwise) and running `document.scripts` there was the first hard
+  evidence of a missing script block, not a JS error; reproducing locally
+  needed **bulk-inserting real-scale data** (10 invoices via a
+  `generate_series` SQL insert) for a test manager, since 0-1 row tests
+  never triggered it - that's when the server log finally showed the real
+  `attoparser.ParseException` with an exact line/column.
+- **Fix**: made `AmountFormat` a Spring bean (`@Component("amountFormat")`)
+  with an instance method `formatInstance(Number)`, and switched the two
+  affected `th:data-amount` attributes to
+  `${@amountFormat.formatInstance(inv.amount)}` (a bean reference, not
+  subject to the restriction) instead of `T(...)`. The other 79 `T(...)`
+  call sites are all in normal `th:text` contexts and are fine as-is - no
+  need to convert those.
+- **How to apply going forward**: any new `th:data-*` attribute that needs
+  computed/formatted values must use a bean reference (`${@beanName.method(...)}`)
+  or a plain Thymeleaf built-in (`#numbers`, `#temporals`, etc.), never
+  `T(...)` or `new SomeClass()`. If a future global find/replace touches
+  amount-formatting expressions again, grep for `th:data-` first and treat
+  those occurrences separately.
+
 ## Login/logout session tracking (added 2026-07-28)
 
 Net-new feature - nothing tracked login/logout timing before this. New
@@ -1040,13 +1122,21 @@ one above.
 - `git log --oneline` on `main` is a reliable, dense summary of everything
   built since the Tally import (`be798cf`) - caching, compression/lazy-
   loading, Docker/Render deploy config, bags×rate auto-calc, PWA, fiscal-
-  year ledger partitioning, manager collections, invoice edit/login-history
-  (`dda38ac` as of 2026-07-28, the mobile-overflow fix commit) - read commit
-  messages there for anything this skill doesn't cover yet, rather than
-  assuming the feature set is frozen at what's written above.
+  year ledger partitioning, manager collections, invoice edit/login-history,
+  Indian amount formatting, and the `th:data-*`/`T(...)` production
+  incident and fix (`fbd9bf0` as of 2026-07-29) - read commit messages there
+  for anything this skill doesn't cover yet, rather than assuming the
+  feature set is frozen at what's written above.
 
-## Still open / not yet done (updated 2026-07-28)
+## Still open / not yet done (updated 2026-07-29)
 
+- **Verify `fbd9bf0` (the th:data-*/T(...) truncation fix) is actually live
+  on Render** before assuming production is healthy - the deploy pipeline
+  was in an unusual state that session (manual rollback appeared to pause
+  auto-deploy, needing a manual "Deploy latest commit" click; see the
+  Deployment section's rollback note above). Confirm via the Render
+  dashboard's Events tab showing this commit as the current live deploy,
+  not just that a push happened.
 - **Neon does not have the 2026-07-28 ShivShakti historical import** (FY22-23
   through FY24-25) - local only. See that section above before assuming the
   two databases are in sync on party/invoice/payment counts.
