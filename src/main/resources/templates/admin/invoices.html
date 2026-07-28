@@ -297,7 +297,8 @@
                                                  th:if="${!#strings.isEmpty(inv.transportNumber)}"
                                                  th:text="${inv.transportNumber}"></div>
                                         </td>
-                                        <td style="display:flex;gap:6px">
+                                        <td>
+                                          <div style="display:flex;gap:6px;flex-wrap:wrap">
                                             <a th:href="@{/admin/invoices/{id}/edit(id=${inv.id})}" class="btn btn-sm" style="background:var(--overlay-3);color:var(--text);border:1px solid var(--border)">✏️</a>
                                             <form th:action="@{/admin/invoices/{id}/delete(id=${inv.id})}"
                                                   method="post"
@@ -306,6 +307,7 @@
                                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                                 <button type="submit" class="btn btn-danger btn-sm">🗑</button>
                                             </form>
+                                          </div>
                                         </td>
                                     </tr>
                                 </tbody>

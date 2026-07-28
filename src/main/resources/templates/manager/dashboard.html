@@ -36,7 +36,7 @@
         .sidebar-footer { padding:16px 12px; border-top:1px solid var(--border); }
         .logout-btn { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; text-decoration:none; color:var(--muted); font-size:14px; font-weight:500; transition:all 0.15s; width:100%; cursor:pointer; background:transparent; border:none; font-family:'DM Sans',sans-serif; }
         .logout-btn:hover { background:rgba(248,113,113,0.1); color:var(--red); }
-        .main { margin-left:240px; flex:1; }
+        .main { margin-left:240px; flex:1; min-width:0; }
         .topbar { background:var(--surface); border-bottom:1px solid var(--border); padding:16px 32px; display:flex; align-items:center; justify-content:space-between; }
         .topbar-title { font-family:'Syne',sans-serif; font-size:20px; font-weight:700; }
         .topbar-date { font-size:13px; color:var(--muted); }
@@ -50,6 +50,7 @@
         .stat-value.green { color:var(--green); }
         .stat-icon { font-size:22px; margin-bottom:8px; }
         .two-col { display:grid; grid-template-columns:1fr 1.2fr; gap:24px; }
+        .two-col > * { min-width:0; }
         @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }
         .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:24px; position:relative; max-width:100%; }
         .section-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; row-gap:10px; margin-bottom:20px; }
@@ -87,7 +88,7 @@
         .badge-rtgs{background:rgba(251,146,60,0.15);color:var(--orange)}
         .badge-bank{background:rgba(56,189,248,0.15);color:#38bdf8}
         .badge-dd{background:rgba(248,113,113,0.15);color:var(--red)}
-        .inv-actions{display:flex;gap:6px;align-items:center;white-space:nowrap}
+        .inv-actions-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
         .invoice-view-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;align-items:center;justify-content:center;padding:20px}
         .invoice-view-overlay.show{display:flex}
         .invoice-view-modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:380px;width:100%}
@@ -150,6 +151,8 @@
             .stat-value{font-size:20px}
             .stat-icon{font-size:18px;margin-bottom:5px}
             .ledger-tab{padding:9px 14px;font-size:12.5px}
+            .inv-actions-row{gap:4px}
+            .inv-actions-row .badge{padding:3px 7px;font-size:10.5px}
         }
     </style>
 </head>
@@ -329,21 +332,23 @@
                                 <td th:text="${inv.partyName}"></td>
                                 <td class="amount">₹<span th:text="${#numbers.formatDecimal(inv.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
                                 <td><span class="badge" th:text="${inv.deliveryMode}"></span></td>
-                                <td class="inv-actions"
+                                <td
                                     th:data-invno="${inv.invoiceNumber}" th:data-party="${inv.partyName}"
                                     th:data-bags="${inv.bags != null ? inv.bags : '—'}"
                                     th:data-rate="${inv.ratePerBag != null ? inv.ratePerBag : '—'}"
                                     th:data-amount="${#numbers.formatDecimal(inv.amount, 1, 'COMMA', 2, 'POINT')}"
                                     th:data-desc="${inv.description != null ? inv.description : '—'}"
                                     th:data-transport="${inv.transportNumber != null ? inv.transportNumber : '—'}">
-                                    <button type="button" class="badge" style="cursor:pointer;border:none" onclick="showInvoiceView(this.closest('td'))">👁 View</button>
-                                    <a th:href="@{/manager/invoices/{id}/edit(id=${inv.id})}" class="badge" style="cursor:pointer;text-decoration:none">✏️ Edit</a>
-                                    <form th:action="@{/manager/invoices/{id}/delete(id=${inv.id})}" method="post"
-                                          onsubmit="return confirm('Delete invoice ' + this.dataset.inv + '?')"
-                                          th:data-inv="${inv.invoiceNumber}" style="display:inline;margin:0">
-                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <button type="submit" style="background:rgba(248,113,113,0.15);color:var(--red);border:none;border-radius:20px;padding:3px 10px;font-size:11.5px;cursor:pointer;font-family:'DM Sans',sans-serif">🗑</button>
-                                    </form>
+                                    <div class="inv-actions-row">
+                                        <button type="button" class="badge" style="cursor:pointer;border:none" onclick="showInvoiceView(this.closest('td'))">👁 View</button>
+                                        <a th:href="@{/manager/invoices/{id}/edit(id=${inv.id})}" class="badge" style="cursor:pointer;text-decoration:none">✏️ Edit</a>
+                                        <form th:action="@{/manager/invoices/{id}/delete(id=${inv.id})}" method="post"
+                                              onsubmit="return confirm('Delete invoice ' + this.dataset.inv + '?')"
+                                              th:data-inv="${inv.invoiceNumber}" style="display:inline;margin:0">
+                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <button type="submit" style="background:rgba(248,113,113,0.15);color:var(--red);border:none;border-radius:20px;padding:3px 10px;font-size:11.5px;cursor:pointer;font-family:'DM Sans',sans-serif">🗑</button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>
@@ -397,21 +402,23 @@
                             <td th:text="${inv.partyName}"></td>
                             <td class="amount">₹<span th:text="${#numbers.formatDecimal(inv.amount, 1, 'COMMA', 2, 'POINT')}"></span></td>
                             <td><span class="badge" th:text="${inv.deliveryMode}"></span></td>
-                            <td class="inv-actions"
+                            <td
                                 th:data-invno="${inv.invoiceNumber}" th:data-party="${inv.partyName}"
                                 th:data-bags="${inv.bags != null ? inv.bags : '—'}"
                                 th:data-rate="${inv.ratePerBag != null ? inv.ratePerBag : '—'}"
                                 th:data-amount="${#numbers.formatDecimal(inv.amount, 1, 'COMMA', 2, 'POINT')}"
                                 th:data-desc="${inv.description != null ? inv.description : '—'}"
                                 th:data-transport="${inv.transportNumber != null ? inv.transportNumber : '—'}">
-                                <button type="button" class="badge" style="cursor:pointer;border:none" onclick="showInvoiceView(this.closest('td'))">👁 View</button>
-                                <a th:href="@{/manager/invoices/{id}/edit(id=${inv.id})}" class="badge" style="cursor:pointer;text-decoration:none">✏️ Edit</a>
-                                <form th:action="@{/manager/invoices/{id}/delete(id=${inv.id})}" method="post"
-                                      onsubmit="return confirm('Delete invoice ' + this.dataset.inv + '?')"
-                                      th:data-inv="${inv.invoiceNumber}" style="display:inline;margin:0">
-                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <button type="submit" style="background:rgba(248,113,113,0.15);color:var(--red);border:none;border-radius:20px;padding:3px 10px;font-size:11.5px;cursor:pointer;font-family:'DM Sans',sans-serif">🗑</button>
-                                </form>
+                                <div class="inv-actions-row">
+                                    <button type="button" class="badge" style="cursor:pointer;border:none" onclick="showInvoiceView(this.closest('td'))">👁 View</button>
+                                    <a th:href="@{/manager/invoices/{id}/edit(id=${inv.id})}" class="badge" style="cursor:pointer;text-decoration:none">✏️ Edit</a>
+                                    <form th:action="@{/manager/invoices/{id}/delete(id=${inv.id})}" method="post"
+                                          onsubmit="return confirm('Delete invoice ' + this.dataset.inv + '?')"
+                                          th:data-inv="${inv.invoiceNumber}" style="display:inline;margin:0">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button type="submit" style="background:rgba(248,113,113,0.15);color:var(--red);border:none;border-radius:20px;padding:3px 10px;font-size:11.5px;cursor:pointer;font-family:'DM Sans',sans-serif">🗑</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
