@@ -5,6 +5,9 @@ import com.empmgmt.entity.User;
 import com.empmgmt.repository.LoginSessionRepository;
 import com.empmgmt.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,10 +23,27 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class LoginSessionService {
 
     private final LoginSessionRepository loginSessionRepository;
     private final UserRepository userRepository;
+
+    /**
+     * Every row still open ("logout_at IS NULL") when a fresh JVM boots is guaranteed stale -
+     * a brand-new process has zero live HTTP sessions, so none of them can possibly still be
+     * real. Without this, a row orphaned by a killed process (Render free-tier spin-down, a
+     * redeploy, a local restart) shows "🟢 Active" forever, since neither the 30-minute
+     * inactivity timeout nor SessionActivityListener ever gets a chance to run for a process
+     * that's already dead.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void closeSessionsOrphanedByRestart() {
+        int closed = loginSessionRepository.closeAllOpenSessions(LocalDateTime.now());
+        if (closed > 0) {
+            log.info("[LoginSessionService] Closed {} login_sessions row(s) left open by the previous process.", closed);
+        }
+    }
 
     public void recordLogin(String username, BigDecimal latitude, BigDecimal longitude) {
         User user = userRepository.findByUsername(username).orElse(null);

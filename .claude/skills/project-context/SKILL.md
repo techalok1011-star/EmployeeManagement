@@ -885,9 +885,25 @@ then a direct DB check) - test row deleted after.
   scripted `sed` pass matching both the plain and
   `sec:authorize="hasRole('ADMIN')"` variants of the existing Audit Log link
   - if adding a 20th admin template later, copy this link too.
-- Sessions where the app restarted before a real logout stay permanently
-  `logout_at IS NULL` (shown as "🟢 Active" even though the user is long
-  gone) - no cleanup/expiry job exists for this yet.
+- **Fixed 2026-07-31**: sessions where the app restarted before a real
+  logout used to stay permanently `logout_at IS NULL` ("🟢 Active" for
+  days, e.g. 40-65h durations spotted live - Render's free-tier spin-down/
+  redeploys/local dev restarts all kill the JVM before the 30-min
+  inactivity timeout or `SessionActivityListener`
+  (`config/SessionActivityListener.java`, an `HttpSessionListener` that
+  already correctly closes out a row when a session times out **while the
+  process stays alive**) ever gets a chance to run - a killed process
+  can't fire any callback. Fixed with
+  `LoginSessionService.closeSessionsOrphanedByRestart()`, an
+  `@EventListener(ApplicationReadyEvent.class)` that bulk-closes **every**
+  still-open row at boot via `LoginSessionRepository.closeAllOpenSessions()`
+  - safe because a brand-new JVM has zero live HTTP sessions, so every
+  such row is guaranteed stale, no exceptions. Verified locally: killed the
+  running process with 19 rows still open, restarted, confirmed all 19
+  closed automatically (`logout_at` set to the restart moment) with zero
+  code touching the DB in between. This complements, not replaces,
+  `SessionActivityListener` - that one still handles the case where the
+  JVM stays up long enough for a real 30-min timeout to occur.
 
 ## Concurrency: what's actually protected vs. not (as of 2026-07-18)
 
@@ -1468,9 +1484,9 @@ one above.
 - Notification bell/activity feed is ADMIN-only, not extended to ACCOUNTANT,
   per the original request wording. Login History (added 2026-07-28) follows
   the same ADMIN-only precedent.
-- `login_sessions` rows never get a `logout_at` if the app/server restarts
-  before a real logout - no expiry/cleanup job exists, so very old "🟢
-  Active" badges on `/admin/login-history` may just be stale, not real.
+- ~~`login_sessions` rows never get a `logout_at` if the app/server
+  restarts before a real logout~~ **Fixed 2026-07-31** - see the Login
+  History section above (`closeSessionsOrphanedByRestart()`).
 - **`empdb2` exists only locally** - no Neon equivalent, not deployed
   anywhere, not referenced by `render.yaml`/any env var. If asked to deploy
   this FY2026-27 data or make it visible on the live Render app, that's new
