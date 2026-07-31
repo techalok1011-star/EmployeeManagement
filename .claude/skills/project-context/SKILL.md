@@ -49,16 +49,43 @@ payments, `TALLY-S-FY2026-27-<vchNo>`) had already been applied to *both*
 local and Neon before this session started - discovered while building the
 2026-07-28 import's invoice-numbering scheme, not previously captured here.
 
+**Major data event, 2026-07-30/31**: a **second local database, `empdb2`**,
+was created alongside `empdb` (which remains completely untouched) and now
+holds a from-scratch, PDF-verified FY2026-27 (1-Apr-26 to 28-Jul-26) ledger
+for the same ShivShakti business - 252 parties, 755 invoices, 1,991
+payment_entries, containing *only* this ledger's data (none of `empdb`'s
+FY22-26 history was carried over). **The running local app is currently
+pointed at `empdb2`, not `empdb`** (`spring.datasource.url` was switched -
+see "Running it / connecting" below) - don't assume "local" means `empdb`
+without checking the datasource URL first. Full details - including the
+party-outstanding data-entry error and the party-ledger Dr/Cr display bug
+found and fixed along the way - in the "FY2026-27 ledger + `empdb2`"
+section below.
+
 ## Running it / connecting
 
 - Maven, Java 17, Spring Boot 3.2.0. `mvn spring-boot:run` or run
   `EmployeeManagementApplication` from the IDE. Serves on `localhost:8080`.
-- **Postgres** `empdb` on `localhost:5432`, user `postgres`. Password is a
-  plaintext local-dev credential in `src/main/resources/application.properties`
-  (`spring.datasource.password`) - read it from that file rather than assuming
-  it's unchanged, then connect via:
+- **Postgres, two local databases now** on `localhost:5432`, user `postgres`.
+  Password is a plaintext local-dev credential in
+  `src/main/resources/application.properties` (`spring.datasource.password`)
+  - read it from that file rather than assuming it's unchanged. Connect via:
   `"C:\Program Files\PostgreSQL\13\bin\psql.exe" -h localhost -U postgres -d empdb`
-  (no GUI psql/pgAdmin on this machine - always use this CLI path).
+  or `-d empdb2` (no GUI psql/pgAdmin on this machine - always use this CLI path).
+  - `empdb` - the original, full-history database (FY22-23 through FY26-27,
+    everything described in "Current data snapshot" below). Untouched since
+    2026-07-30/31's `empdb2` work - always verify this assumption still holds
+    (`SELECT count(*) FROM invoices` etc.) rather than trusting it blindly.
+  - `empdb2` - created 2026-07-30/31, schema-cloned from `empdb` (`pg_dump`/
+    restore) but with `parties`/`invoices`/`payment_entries`/`transaction_logs`/
+    `audit_logs`/`notification_logs`/`admin_notifications`/`payment_receipts`
+    wiped and rebuilt from *only* the FY2026-27 ledger data (`users`/
+    `notification_settings`/`login_sessions` were left as cloned from `empdb`).
+    See the "FY2026-27 ledger + `empdb2`" section below for the full story.
+  - **`spring.datasource.url` currently points at `empdb2`** (switched
+    2026-07-31) - check this value before assuming which DB a running local
+    instance is actually using; it's easy to flip back to `empdb` by editing
+    that one line + restarting.
 - `spring.jpa.hibernate.ddl-auto=update` - schema auto-migrates new
   tables/columns on boot, but **never** rewrites existing CHECK constraints,
   indexes, or drops columns. See the enum gotcha below.
@@ -195,13 +222,20 @@ gains a new constant.
 ## Services (`service/` package)
 
 - **`ExcelPartyService`** - imports party master data from Excel (Apache POI)
-  on startup (`party.import.on-startup=true`, default file
+  on startup (`party.import.on-startup`, default file
   `Party_wise_Sales_Summary.xlsx`) or via re-upload
   (`/api/parties/upload-import`). Auto-detects header row, GSTIN column,
   amount column by text heuristics; accumulates per-party totals across
   sheets. `ensureExists(combined)` lazily creates a `Party` row when a new
   name is typed into a form. `cleanupInvalidEntries()` strips junk rows
-  (bare numbers, stray header text).
+  (bare numbers, stray header text). **`party.import.on-startup` is currently
+  `false`** (flipped 2026-07-31, was `true` before) - it kept re-adding
+  parties from that old seed Excel file into `empdb2` on every restart (3
+  parties it found missing there, since `empdb2` doesn't have `empdb`'s
+  original GST-registered party set - see "FY2026-27 ledger + `empdb2`"
+  below). This is a global property, not scoped to either database - if
+  the app is ever pointed back at `empdb`, that file still won't re-sync
+  there either unless this is flipped back to `true`.
 - **`InvoiceService`** - CRUD + the core financial logic:
   `getPartyOutstandingSummary()` (invoiced − paid per party, the central
   number everywhere - only returns parties with ≥1 invoice or payment, so
@@ -291,9 +325,15 @@ gains a new constant.
   accident.
 - **Cold start**: free Render instances sleep after ~15 min idle; first
   request after that is slow (the container has to boot). **Keep-alive is
-  now built** (added 2026-07-18, see its own section above) - a GitHub
-  Actions workflow pings `GET /health` every ~10 min but only 06:00-22:00
-  IST, so the instance is *deliberately* still allowed to sleep overnight.
+  NOT a GitHub Actions workflow** (one was added 2026-07-18, then removed
+  2026-07-19, commit `544e940` - GH Actions' schedule trigger doesn't
+  reliably honor sub-hourly cron, actual gaps averaged ~2 hours instead of
+  10 minutes, so it wasn't actually working). Replaced by an **external
+  cron-job.org ping** hitting `GET /health` every ~10 min, 6 AM-10 PM IST -
+  this lives entirely outside the repo (no file here to check/edit), so
+  verify/adjust it by logging into cron-job.org directly, not by looking
+  for a workflow file. The instance is still *deliberately* allowed to
+  sleep overnight/outside that window.
 - **Known deployment gotchas already hit and fixed** (useful if a future
   redeploy breaks the same way):
   - Render can misdetect the runtime as Node if the service was created
@@ -803,10 +843,27 @@ expression into a forbidden one there specifically.
 
 Net-new feature - nothing tracked login/logout timing before this. New
 `login_sessions` table (see Tables list above), `LoginSessionService`
-(`recordLogin(username)` / `recordLogout(username)` / `getRecentSessions()`
-returning `List<Map<String,Object>>` with a computed `durationText` and
-`active` flag - not a formal DTO class, kept simple since it's read-only and
-single-purpose).
+(`recordLogin(username, latitude, longitude)` / `recordLogout(username)` /
+`getRecentSessions()` returning `List<Map<String,Object>>` with a computed
+`durationText` and `active` flag - not a formal DTO class, kept simple since
+it's read-only and single-purpose).
+
+**Geo-tagged logins (added 2026-07-31)**: `login_sessions` gained nullable
+`latitude`/`longitude` columns (`BigDecimal`, precision 10 scale 7 - same
+convention as `PaymentReceipt`). `login.html` requests
+`navigator.geolocation.getCurrentPosition()` **on page load** (not on
+submit, unlike the receipt-photo geo-tag which fires on file-select) so the
+permission prompt has time to resolve before the user finishes typing
+credentials - two hidden `latitude`/`longitude` inputs get populated if/when
+it resolves, blank otherwise. Optional, same as every other geo-tag in this
+app - denied/unavailable never blocks login. `SecurityConfig`'s
+`successHandler` reads `req.getParameter("latitude"/"longitude")` via a
+small `parseCoordinate()` helper (blank/malformed → `null`, never throws)
+and passes them into `recordLogin()`. `admin/login-history.html` shows a
+"📍 View" map link (`google.com/maps?q=lat,lng`, same pattern as the receipt
+photo's location link on `admin/entries.html`) when both are present, "—"
+otherwise. Verified via curl (login POST with `latitude`/`longitude` fields,
+then a direct DB check) - test row deleted after.
 
 - **Wired into `SecurityConfig`**, not any controller: the existing
   role-based-redirect `successHandler` lambda now also calls
@@ -861,22 +918,84 @@ rather than re-deriving it:
   warning. Accepted as reasonable for this app's small-team, low-
   concurrency usage rather than a real risk; revisit if the user base grows.
 
-## Keep-alive (added 2026-07-18) - the "Still open" note below about this is now stale, kept for history
+## Keep-alive (added 2026-07-18, GitHub Actions version removed 2026-07-19) - now external
 
 - **New `GET /health`** (`AuthController`, `permitAll` in `SecurityConfig`)
   - deliberately touches neither DB nor session, just proves the JVM/
   servlet container is up.
-- **`.github/workflows/keep-alive.yml`**: pings `/health` every ~10 minutes
-  but **only during 00:30-16:30 UTC (06:00-22:00 IST)** - three separate
-  `cron:` entries to hit that exact half-hour-aligned window (cron can't
-  express "every 10 min from :30 to :30" as one expression). Outside that
-  window there's simply no scheduled entry, so the free Render instance is
-  **allowed to idle-sleep overnight by design** (explicit user choice, not
-  an oversight) - it wakes on the first 6 AM ping or an earlier real
-  visitor. Also has `workflow_dispatch: {}` for manual triggering/testing
-  from the GitHub Actions tab.
+- **The original `.github/workflows/keep-alive.yml` was deleted in
+  `544e940` (2026-07-19)** - GitHub Actions' `schedule:` trigger doesn't
+  reliably honor sub-hourly cron; actual gaps between runs averaged ~2
+  hours instead of the configured 10 minutes, so it wasn't preventing
+  sleep during the day at all. **Do not re-add a GH Actions workflow
+  expecting sub-hourly reliability** - this was already tried and
+  confirmed not to work. A once-daily GH Actions job (see
+  `morning-wakeup.yml` below) is a different reliability profile and is
+  fine - it only needs to land sometime in the early morning, not on a
+  precise 10-minute cadence.
+- **`.github/workflows/morning-wakeup.yml` (added 2026-07-31)**: the real
+  bug behind "the site won't wake up on its own overnight, only works once
+  someone opens it manually" - the user confirmed cron-job.org's actual
+  failed-check log reads **"Failed (output too large)"** for the morning
+  wake-up attempt: cron-job.org's monitor has a response-size cap, and
+  Render's cold-boot interstitial page (served while the real app isn't up
+  yet) is bigger than that cap - so cron-job.org marks it a failure, while
+  a real browser (no such cap) just reads through it and gets the real app
+  once it's ready. `/health` itself is unaffected - it always returns a
+  plain 2-byte `"OK"`, this is purely a cron-job.org-side limitation on the
+  intermediate Render page. A plain `curl` (used by this workflow) has no
+  response-size limit, so it isn't affected the same way.
+  - **A single ping is not enough** - repo owner caught this directly: this
+    job fires once (~04:40 IST, `10 23 * * *` UTC), comfortably before
+    cron-job.org's window opens at ~05:30 IST (`*/10 0-16 * * *` UTC - i.e.
+    hour 0 UTC = 5:30 IST is the *first* ping of the day). If it only
+    pinged once and then went quiet, the instance would fall back asleep
+    after Render's ~15-min idle threshold, and cron-job.org's first real
+    ping ~40-50 min later would hit the identical cold-boot/output-too-large
+    problem again. Fixed by having the job **ping once (patient retry to
+    survive the cold boot), then keep nudging `/health` every 8 minutes**
+    (comfortably under the 15-min sleep threshold) **for ~72 more minutes**
+    inside the same job run, bridging the gap until cron-job.org's own
+    10-min cadence has clearly taken over.
+  - **Deliberately doesn't lean on GitHub's schedule-trigger precision for
+    the bridging part** - only the initial `schedule:` firing time is
+    approximate (some drift is fine, it just needs to land in the early
+    morning); the repeated pings happen via `sleep` inside one already-
+    running job, which isn't subject to the same scheduling imprecision
+    that got the original every-10-minutes GH Actions workflow removed
+    (`544e940`, see above).
+  - **Confirmed the repo is public** (`techalok1011-star/EmployeeManagement`)
+    before choosing an ~80-minute-per-day job runtime - GitHub Actions
+    minutes are unlimited/free for public repos, so this doesn't eat into
+    any minutes budget. If the repo is ever made private, revisit this -
+    private repos only get a limited free minutes allowance per month.
+  - **Root-cause note, unrelated bug found the same session**:
+    `NotificationScheduler.runDailyReminders()`'s `@Scheduled(cron = "0 0 17
+    * * *")` had no explicit `zone`, so on Render's UTC-default container it
+    fired at 22:30 IST instead of 5 PM IST - fixed by adding `zone =
+    "Asia/Kolkata"`. This is a *separate* issue (the reminder job silently
+    not running on schedule) from the site failing to wake up overnight
+    (this workflow's job) - don't conflate the two if either resurfaces.
+- **Replaced by an external cron-job.org job** pinging `/health` every ~10
+  min, 6 AM-10 PM IST - configured entirely on cron-job.org's own
+  dashboard, nothing in this repo to inspect/edit. Outside that window
+  there's no ping, so the free Render instance is **allowed to idle-sleep
+  overnight by design** (explicit user choice, not an oversight).
 - Render's free-tier ~750 instance-hours/month easily covers a ~16h/day
   active window, so this doesn't risk exceeding the free plan.
+- **Root-cause bug found and fixed 2026-07-31**: `NotificationScheduler
+  .runDailyReminders()`'s `@Scheduled(cron = "0 0 17 * * *")` had no
+  explicit `zone` - on Render's container (`eclipse-temurin` base image,
+  no `TZ` env var set anywhere) this resolved in UTC, so "17:00" actually
+  fired at **22:30 IST**, half an hour after the cron-job.org keep-alive
+  window closes (10 PM IST) - right when the free-tier instance is falling
+  asleep, so the daily WhatsApp reminder job silently failed to run most
+  days unless someone happened to have the site open around then. Fixed
+  by adding `zone = "Asia/Kolkata"` to the `@Scheduled` annotation so it
+  now genuinely fires at 5 PM IST, safely inside the keep-alive window.
+  **Any future `@Scheduled` cron added to this app needs an explicit
+  `zone = "Asia/Kolkata"`** - the container's default timezone is UTC, not
+  IST, and nothing here sets `TZ` globally.
 
 ## Current data snapshot (point-in-time, end of day 2026-07-28 - re-query live, don't trust these numbers as still current)
 
@@ -1014,6 +1133,187 @@ Collisions" sheet.
   historical import as of end of session 2026-07-28.** Don't assume it's
   done; re-check party/invoice/payment counts against Neon before trusting
   any "is Neon in sync" assumption.
+
+## FY2026-27 ledger + `empdb2` (2026-07-30/31) - durable facts
+
+Two source PDFs for this same ShivShakti business, both in
+`C:\Users\ay036\Downloads\`: `LEDGER ALL PARTY 2627.pdf` (309-page Tally
+"Ledger Account" export, 1-Apr-26 to 28-Jul-26 - the real source) and
+`PARTY DETAILS.pdf` (turned out to just be Tally's own alphabetical index of
+the ledger PDF's page numbers, not a separate master-data file - useful only
+as a cross-check on party count, not a data source itself).
+
+### Parsing the ledger PDF
+
+- No Python on this machine (per its own recurring note elsewhere in this
+  skill) - used `pdf-parse` v2 (`PDFParse` class + `getText()`, **not** the
+  v1 `pdf(buffer)` function-call API some docs/examples still show) in a
+  scratch Node project, plus `exceljs` for writing the workbook.
+- 309 page-blocks in the PDF, but only **252 are real parties** - the rest
+  are the business's own internal ledgers that happen to print in the same
+  "Ledger Account" report format and must be excluded by name:
+  `Sales Account`, `Profit & Loss A/c` (both literally have `kindLine =
+  "Ledger Account"`, indistinguishable from a real party except by name), and
+  `Cash`/`Cash Book` (35 pages alone, distinguishable by kind line - the
+  business's entire cash receipts book, multi-page).
+- **Multi-page party ledgers** (10 of the 252) continue onto a following PDF
+  page whose header line is subtly different from a fresh party's - it reads
+  `SHIV SHAKTI CEMENT SUPPLY AGENCY` / `"<PartyName> Ledger Account : <period>
+  \tPage N"` (a continuation-page artifact of the PDF export) instead of the
+  normal `<PartyName>` / `"Ledger Account"` two-line header. First line after
+  that header is `Brought Forward <credit>\t<debit>` instead of `Opening
+  Balance`. Any future re-parse of a Tally "Ledger Account" (not Register)
+  export needs to handle this continuation format, not just single-page
+  blocks.
+- Within a party block, **"To" = Debit column, "By" = Credit column** for
+  every row type uniformly (Opening Balance, Sales, Receipt, and the
+  Closing-Balance plug row alike) - this holds even though the plug row's
+  prefix looks "backwards" at first glance. Don't try to read Dr/Cr meaning
+  from the plug row's own prefix; compute the running balance yourself from
+  real transaction rows (`opening + Σdebit − Σcredit`) and use the printed
+  Closing Balance line only as a numeric cross-check, not as the source of
+  truth for sign.
+- Zero-balance parties (opening exactly cancels transactions) get **no**
+  printed Closing Balance line at all (Tally only prints the plug when
+  needed to balance the columns) - don't treat a missing closing line as a
+  parse failure, treat it as balance = 0.
+- Verified byte-exact: 541 Sales transactions summing ₹4,69,76,062.40, 1,970
+  Receipt transactions summing ₹4,58,43,821.00, 235 parties with a nonzero
+  1-Apr-26 opening balance (214 Dr summing ₹4,70,45,039.22, 21 Cr summing
+  ₹11,82,254.91), grand net outstanding ₹4,69,95,025.71 across all 252
+  parties - re-derive these from `parties.json` (see "Files" below) rather
+  than trusting this snapshot if the workbook or DB is ever rebuilt.
+
+### `Party_Outstanding_FY2026-27_Apr-Jul.xlsx` workbook
+
+In `C:\Users\ay036\Downloads\` - built across two sessions. Three sheets:
+
+1. **Party Outstanding** - one row per party (Sl. No./Party/Ledger Code/
+   Opening/Closing/Balance Type/Outstanding), built in an earlier session
+   from this same ledger PDF, sorted by Outstanding descending.
+2. **Party Ledger** (added 2026-07-30) - full transaction detail per party,
+   mirrors the [[register-reconciliation]] skill's styling conventions
+   (navy header, Sales rows red/Receipt rows green, party subtotal/grand
+   total rows) but with a single Vch No. + Type column pair rather than
+   separate Sales/Receipt Vch No. columns, since this source's own "Vch
+   No." column already covers both under one `Vch Type`.
+3. **Missing Trailing Numbers** (added 2026-07-30) - the 46 parties whose
+   Ledger Code came back blank, cross-checked against local `empdb`'s
+   `trailing_number` column.
+
+**Two real data problems found and fixed in the Party Outstanding sheet**
+while cross-verifying the new Party Ledger sheet against it:
+- **`BRIJENDRA YADAV PADRI`** had Outstanding = ₹15,61,87,678 in the
+  original sheet (by far the largest party, which should itself have been a
+  red flag) - the ledger PDF itself shows a real closing balance of only
+  ₹18,500. Root cause not identified (predates this session's Excel), just
+  corrected. This one error alone accounted for the entire gap between the
+  sheet's original grand total and the newly-computed one - a useful
+  sanity-check technique if a similar mismatch ever shows up again: diff the
+  two grand totals and see if it equals exactly one party's error.
+- **`USMANI BM (MUBARKHPUR) 404`** vs **`USMANI B M (MUBARKHPUR) 404`** -
+  same party (identical outstanding amount), just a missing space; the
+  ledger PDF and its index both use the spaced form. Renamed to match.
+- Both fixes triggered a full re-sort (Sl. No. renumbered 1-252) and
+  footer-totals recompute (`Total Outstanding Receivable (Dr)`, `Total
+  Advance Held (Cr)`, `Net Outstanding`).
+
+**Trailing-number recovery**: of the 46 parties with a blank Ledger Code,
+checking exact name matches against local `empdb.parties.trailing_number`
+found only 1. Re-checking for the **"name + trailing digits appended"**
+pattern (a real, recurring convention in this business's data - the same
+party sometimes gets a DB row named e.g. `"BRIJENDRA YADAV PADRI 228"`
+instead of storing `228` in the `trailing_number` column) found **12 more**
+this way, for 13 total recovered and written back into the Party Outstanding
+sheet. The other 33 either exist in `empdb` with no trailing number recorded
+anywhere, or don't exist in `empdb` at all - a plain exact/normalized-name
+match on `parties.name` will systematically miss this embedded-code pattern;
+always also check for it explicitly.
+
+### `admin/party-ledger.html` / `admin/full-ledger.html` Dr/Cr display bug (fixed)
+
+Found while cross-checking a live party (`R.K TRADERS (SIDHARI) 351`,
+Total Paid > Total Invoiced) against the Excel: both templates computed
+their "Outstanding" stat tile as `ledger.outstanding.abs()` - **unconditionally
+discarding the sign** - and distinguished Dr from Cr only by a subtle color
+change (`red` vs the *same* neutral color used for the unrelated "Total
+Invoiced" tile). A party the business owes money **to** looked visually
+identical to a party that owes the business money, with no way to tell them
+apart short of reading the raw ledger rows. Fixed in both templates: label
+switches to "Advance Held" and a green **Cr** suffix appears whenever
+`outstanding < 0`; positive balances unchanged. `admin/invoices.html` and
+`admin/payment-behavior.html` already had a separate "Credit" badge column
+next to their outstanding amount, so they didn't have this bug.
+
+### `empdb2` - a from-scratch local database seeded from this ledger
+
+Built after the user explicitly wanted this data usable by the project but
+**without modifying `empdb` at all**. Final approach (after an initial
+false start - see below): `CREATE DATABASE empdb2`, `pg_dump`/restore
+`empdb`'s **schema** into it (so table structure/columns match exactly),
+then `TRUNCATE` the financial tables and rebuild them from *only* the 252
+ledger parties - **not** a merge/reconcile against `empdb`'s existing party
+history, despite that being the original plan. `users`/`notification_settings`/
+`login_sessions` were left as cloned from `empdb` so the DB is usable by the
+app immediately (needs an admin login to exist).
+
+- **False start, worth remembering if this pattern comes up again**: the
+  first approach (per an earlier, since-superseded plan) fully cloned
+  `empdb`'s *data* too, then tried to reconcile the 252 ledger parties
+  against `empdb`'s ~668 existing ones by name - this surfaced real,
+  pre-existing duplication inside `empdb` itself (the same real party
+  sitting under 2-3 differently-spelled `parties` rows, e.g. `SURAJ B. M
+  (DEWAIT) 358` / `Suraj B. M ( Dewait) 358` / `M/S SURAJ B/M (RAM BUJH
+  DRIVER)` all trailing-numbered 358, holding separate disconnected
+  history) with no single obviously-correct canonical name to reconcile to.
+  The user then clarified they didn't want `empdb`'s transaction history in
+  `empdb2` at all - simplifying things considerably, since the whole
+  reconciliation problem became moot. **If `empdb`'s duplicate-party
+  problem is ever tackled directly (as its own task, not via this ledger
+  import), the flagged list from that abandoned reconciliation pass is a
+  useful starting point** - though it wasn't saved anywhere durable, it
+  would need re-running.
+- **Synthetic opening-balance rows**: since `empdb2` has no pre-2026-04-01
+  history at all, every one of the 235 parties with a nonzero ledger opening
+  balance needed a synthetic entry dated `2026-04-01` to avoid silently
+  losing that balance - a Dr opening became an `invoices` row
+  (`invoice_number = 'TALLY-S-FY2026-27-OPEN-<party-slug>'`), a Cr opening
+  became a `payment_entries` row (no `receipt_vch_no`, identified instead by
+  `remarks LIKE 'Opening balance%'`). 214 Dr + 21 Cr = 235, matching exactly.
+- **Real transactions** use the established convention from the earlier
+  Tally imports: `invoice_number = 'TALLY-S-FY2026-27-' || vchNo`,
+  `sales_vch_no`/`receipt_vch_no` = the ledger's own Vch No., `delivery_mode
+  = 'TRUCK'`, `mode_of_payment = 'CASH'` (only mode present in this source),
+  `employee_id = 1` (the `admin` user), description/remarks text copied
+  **verbatim** from the existing partial-FY2026-27-import rows already in
+  `empdb` (`"Imported from ShivShakti Sales Register (Tally) - FY2026-27"` /
+  `"...Receipt Register... - payment mode not specified, defaulted to CASH"`)
+  rather than reinvented, so any future full-text search for this import
+  convention works across both.
+- **Final `empdb2` counts**: 252 parties, 755 invoices (541 real + 214
+  synthetic), 1,991 payment_entries (1,970 real + 21 synthetic). Confirmed
+  0 duplicate `invoice_number`s, 0 orphan `party_name`s, and per-party
+  outstanding recomputed from the raw DB rows matched the PDF-verified
+  ledger closing balance **exact to the paisa for all 252 parties** (an
+  independent validation pass, not just the build script's self-report -
+  worth repeating this pattern, a self-reported "done" from an import
+  script should not be taken as verification on its own).
+- `empdb` itself confirmed unchanged throughout (row counts, sums, and date
+  ranges for every table matched the pre-existing baseline exactly; no
+  table's on-disk mtime moved except from an unrelated read-only `pg_dump`
+  checkpoint flush).
+- **Files** (session scratchpad, not the repo - ephemeral, don't assume
+  these paths still exist in a future session): the parsed/verified
+  `parties.json` (ground truth for all of the above), the applied
+  `rebuild_fy2627.sql`, and an **abandoned, never-run script
+  `generate_import.js`** from the false-start approach above that contains
+  unqualified `DELETE FROM invoices`/`DELETE FROM payment_entries`
+  statements with no database guard - confirmed never pointed at `empdb`,
+  but flagged as worth deleting outright if it's still sitting there,
+  rather than left around as a footgun.
+- **`spring.datasource.url` was switched to point at `empdb2`** after this
+  build (see "Running it / connecting" above) - the running local app now
+  serves from `empdb2`, not `empdb`.
 
 ## PWA + mobile responsiveness (added 2026-07-15)
 
@@ -1171,3 +1471,26 @@ one above.
 - `login_sessions` rows never get a `logout_at` if the app/server restarts
   before a real logout - no expiry/cleanup job exists, so very old "🟢
   Active" badges on `/admin/login-history` may just be stale, not real.
+- **`empdb2` exists only locally** - no Neon equivalent, not deployed
+  anywhere, not referenced by `render.yaml`/any env var. If asked to deploy
+  this FY2026-27 data or make it visible on the live Render app, that's new
+  work, not something already done.
+- **The local app currently points at `empdb2`, not `empdb`** (see "Running
+  it / connecting" above) - `empdb`'s full FY22-27 history is not visible in
+  the running local instance right now unless `spring.datasource.url` is
+  switched back.
+- `party.import.on-startup` was set to `false` globally (2026-07-31, see the
+  `ExcelPartyService` note above) - if the app is ever pointed back at
+  `empdb`, the startup Excel-seed sync that used to run every boot won't
+  fire anymore unless this is flipped back to `true`.
+- **`empdb`'s own duplicate-party problem, surfaced but not fixed**: an
+  abandoned reconciliation pass during the `empdb2` build (see that section
+  above) found real parties sitting under 2-3 differently-spelled `parties`
+  rows in `empdb` with disconnected history (e.g. the `SURAJ B. M (DEWAIT)
+  358` example) - on top of the already-known, separately-flagged "403
+  parties share a `trailing_number`" issue above. Neither has been merged or
+  cleaned up.
+- The abandoned `generate_import.js` script (unqualified `DELETE FROM
+  invoices`/`payment_entries`, see the `empdb2` section above) may still be
+  sitting in the session scratchpad - worth confirming it's gone before
+  trusting any future scratchpad script that looks similar.

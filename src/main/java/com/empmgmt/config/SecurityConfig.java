@@ -19,6 +19,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
+import java.math.BigDecimal;
+
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -87,7 +89,9 @@ public class SecurityConfig {
                     } else {
                         redirect = "/employee/dashboard";
                     }
-                    loginSessionService.recordLogin(auth.getName());
+                    loginSessionService.recordLogin(auth.getName(),
+                            parseCoordinate(req.getParameter("latitude")),
+                            parseCoordinate(req.getParameter("longitude")));
                     res.sendRedirect(redirect);
                 })
                 .failureUrl("/login?error=true")
@@ -118,5 +122,16 @@ public class SecurityConfig {
             );
 
         return http.build();
+    }
+
+    // Login form's optional geolocation fields — blank/missing (permission denied,
+    // unsupported browser) or malformed input should never break login, just omit the location.
+    private static BigDecimal parseCoordinate(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return new BigDecimal(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

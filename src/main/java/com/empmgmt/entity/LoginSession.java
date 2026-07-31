@@ -3,6 +3,7 @@ package com.empmgmt.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /** One row per login, closed out with a logoutAt timestamp when the user signs out (or left null if the session is still open / the app restarted before logout). */
@@ -32,4 +33,10 @@ public class LoginSession {
 
     @Column(name = "logout_at")
     private LocalDateTime logoutAt;
+
+    @Column(precision = 10, scale = 7)
+    private BigDecimal latitude;
+
+    @Column(precision = 10, scale = 7)
+    private BigDecimal longitude;
 }

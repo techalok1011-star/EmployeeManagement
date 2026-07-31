@@ -1,0 +1,55 @@
+name: Morning wake-up
+
+# Render's free-tier instance spins down after ~15 min idle overnight (the
+# cron-job.org keep-alive ping — every 10 min, `*/10 0-16 * * *` in UTC,
+# i.e. ~5:30 AM-10:30 PM IST — is deliberately paused outside that window).
+#
+# Waking a fully-spun-down free instance can take longer than a simple
+# health-check monitor's timeout/response-size limit allows: cron-job.org's
+# very first ping of the day has been observed failing with "output too
+# large", almost certainly Render's own cold-boot interstitial page (bigger
+# than cron-job.org will accept) rather than our /health endpoint itself
+# (which always returns a plain 2-byte "OK"). A plain `curl` has no such
+# response-size cap, so it rides through that page fine.
+#
+# A single early ping isn't enough on its own though: if this job fires at
+# ~4:50 AM and nothing touches the site again until cron-job.org's window
+# opens at ~5:30 AM, the instance falls back asleep after 15 min idle and
+# cron-job.org's first real ping hits the exact same cold-boot problem all
+# over again. So this job pings once to survive the cold boot, then keeps
+# nudging the instance every few minutes — comfortably under the 15-min
+# sleep threshold — until cron-job.org's own pings have clearly taken over.
+#
+# Note: this is intentionally NOT relying on GitHub's schedule-trigger
+# precision for the bridging part. An earlier every-10-minutes GitHub
+# Actions workflow was removed (see git history, commit 544e940) because
+# Actions' `schedule:` trigger doesn't reliably fire that often — gaps
+# drifted to ~2 hours. Here, only the initial trigger uses `schedule:` (and
+# some drift in exactly when it fires is fine — it just needs to land
+# sometime in the early morning); the repeated nudging happens via `sleep`
+# inside a single already-running job, which isn't subject to that
+# scheduling imprecision at all.
+
+on:
+  schedule:
+    - cron: '10 23 * * *' # ~04:40 IST — margin before cron-job.org's window opens at ~05:30 IST (00:00 UTC)
+  workflow_dispatch: {}
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake the instance, then hold it awake until cron-job.org's window takes over
+        run: |
+          URL="https://employeemanagement-q6h3.onrender.com/health"
+
+          echo "Cold-start wake-up (patient — survives Render's boot splash + transient errors)..."
+          curl --retry 8 --retry-delay 15 --retry-all-errors --max-time 100 -sS -f "$URL"
+          echo "Instance is awake."
+
+          echo "Bridging the gap until cron-job.org's own 10-min pings take over..."
+          for i in $(seq 1 9); do
+            sleep 480  # 8 minutes — under Render's ~15-min idle sleep threshold
+            curl --max-time 30 -sS -f "$URL" || true
+          done
+          echo "Done — cron-job.org's window should now have taken over."

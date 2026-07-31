@@ -311,6 +311,8 @@
                     </div>
                 </div>
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input type="hidden" name="latitude" id="latitudeInput"/>
+                <input type="hidden" name="longitude" id="longitudeInput"/>
                 <button type="submit" class="btn-login" id="loginBtn">
                     <span class="spinner" id="loginSpinner"></span>
                     <span id="loginBtnText">Sign In →</span>
@@ -380,6 +382,20 @@
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+        }
+
+        // Requested as soon as the page loads (not on submit) so the browser's permission
+        // prompt has time to resolve before the user finishes typing credentials — login
+        // itself is never blocked or delayed waiting on this, it's purely best-effort.
+        if ('geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    document.getElementById('latitudeInput').value = pos.coords.latitude;
+                    document.getElementById('longitudeInput').value = pos.coords.longitude;
+                },
+                () => {}, // denied/unavailable — login proceeds without a location
+                { enableHighAccuracy: true, timeout: 8000 }
+            );
         }
     </script>
 </body>

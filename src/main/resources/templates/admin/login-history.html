@@ -144,6 +144,7 @@
                                 <th>Role</th>
                                 <th>Login At</th>
                                 <th>Logout At</th>
+                                <th>Location</th>
                                 <th>Duration</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -158,6 +159,12 @@
                                 <td><span th:if="${s.role != null}" class="role-pill" th:text="${s.role}"></span></td>
                                 <td class="text-muted" th:text="${#temporals.format(s.loginAt,'dd MMM yyyy, hh:mm a')}"></td>
                                 <td class="text-muted" th:text="${s.logoutAt != null ? #temporals.format(s.logoutAt,'dd MMM yyyy, hh:mm a') : '—'}"></td>
+                                <td>
+                                    <a th:if="${s.latitude != null and s.longitude != null}"
+                                       th:href="'https://www.google.com/maps?q=' + ${s.latitude} + ',' + ${s.longitude}"
+                                       target="_blank" style="text-decoration:none" title="View location on map">📍 View</a>
+                                    <span th:unless="${s.latitude != null and s.longitude != null}" class="text-muted">—</span>
+                                </td>
                                 <td class="text-muted" th:text="${s.durationText}"></td>
                                 <td>
                                     <span th:if="${s.active}" class="badge badge-active">🟢 Active</span>
