@@ -29,4 +29,17 @@
             btn.textContent = icon;
         });
     });
+
+    // Modern mobile browsers (iOS and Android) can restore a killed installed-app
+    // process from the back/forward cache instead of re-fetching from the network —
+    // `Cache-Control: no-store` (which Spring Security sends on every response) no
+    // longer reliably prevents this. A bfcache-restored page keeps whatever CSRF
+    // token was baked into its HTML at original render time; if that page sits
+    // closed for a while, the session (and its CSRF token) expires server-side, and
+    // submitting the stale page's form gets rejected with a bare 403. Forcing a
+    // reload on restore guarantees a fresh page — and a fresh, valid CSRF token —
+    // every time, on every page, since this script is loaded everywhere.
+    window.addEventListener('pageshow', function (e) {
+        if (e.persisted) location.reload();
+    });
 })();

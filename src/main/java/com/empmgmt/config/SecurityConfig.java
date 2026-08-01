@@ -65,6 +65,14 @@ public class SecurityConfig {
         http
             .authenticationProvider(authenticationProvider())
             .authorizeHttpRequests(auth -> auth
+                // Plain path match, independent of query string — formLogin()/logout()'s own
+                // permitAll() only auto-permits the *exact* configured URL strings (e.g.
+                // "/login?error=true"), not "/login" with any other query string. Without this,
+                // "/login?logout=true" and "/login?expired=true" (the actual redirect targets
+                // used by the logout handler, concurrent-session expiry, and the CSRF handler
+                // below) silently required authentication and bounced through an extra
+                // redirect to a bare, message-less /login.
+                .requestMatchers("/login").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/h2-console/**",
                         "/manifest.json", "/manager-manifest.json", "/sw.js", "/icons/**", "/health").permitAll()
                 .requestMatchers("/api/parties/suggest", "/api/parties").authenticated()
@@ -119,6 +127,20 @@ public class SecurityConfig {
             )
             .headers(headers -> headers
                 .frameOptions(frame -> frame.sameOrigin())
+            )
+            .exceptionHandling(ex -> ex
+                // A mobile browser can restore a killed installed-app page from its
+                // back/forward cache with a CSRF token baked in from hours earlier; if the
+                // session has since expired, that token no longer validates. Rather than
+                // show a bare 403 Whitelabel page (confusing, and indistinguishable from a
+                // real problem), treat any CSRF rejection as "just sign in again."
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    if (accessDeniedException instanceof org.springframework.security.web.csrf.CsrfException) {
+                        response.sendRedirect(request.getContextPath() + "/login?expired=true");
+                    } else {
+                        response.sendError(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);
+                    }
+                })
             );
 
         return http.build();

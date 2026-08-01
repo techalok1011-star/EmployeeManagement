@@ -26,6 +26,7 @@ public class AuthController {
     @GetMapping("/login")
     public String loginPage(@RequestParam(value = "error", required = false) String error,
                             @RequestParam(value = "logout", required = false) String logout,
+                            @RequestParam(value = "expired", required = false) String expired,
                             HttpServletRequest request,
                             Model model) {
         // Force the session (and with it, the CSRF token) to exist before the view starts
@@ -40,6 +41,9 @@ public class AuthController {
         }
         if (logout != null) {
             model.addAttribute("logoutMsg", "You have been logged out successfully.");
+        }
+        if (expired != null) {
+            model.addAttribute("errorMsg", "Your session has expired. Please sign in again.");
         }
         return "login";
     }
