@@ -38,7 +38,9 @@ public class EmployeeController {
         model.addAttribute("user", userService.getUserByUsername(username));
         model.addAttribute("summary", paymentEntryService.getDailySummaryForEmployee(username));
         model.addAttribute("todayEntries", paymentEntryService.getTodayEntriesForEmployee(username));
-        model.addAttribute("newEntry", new PaymentEntryDTO.Request());
+        if (!model.containsAttribute("newEntry")) {
+            model.addAttribute("newEntry", new PaymentEntryDTO.Request());
+        }
         model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
         model.addAttribute("today", LocalDate.now());
         return "employee/dashboard";
@@ -53,16 +55,11 @@ public class EmployeeController {
                            @RequestParam(required = false) BigDecimal latitude,
                            @RequestParam(required = false) BigDecimal longitude,
                            Authentication auth,
-                           Model model,
                            RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
-            String username = auth.getName();
-            model.addAttribute("user", userService.getUserByUsername(username));
-            model.addAttribute("summary", paymentEntryService.getDailySummaryForEmployee(username));
-            model.addAttribute("todayEntries", paymentEntryService.getTodayEntriesForEmployee(username));
-            model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
-            model.addAttribute("today", LocalDate.now());
-            return "employee/dashboard";
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.newEntry", result);
+            redirectAttributes.addFlashAttribute("newEntry", request);
+            return "redirect:/employee/dashboard";
         }
         // Always force today's date — employees cannot add past/future entries
         request.setEntryDate(LocalDate.now());
@@ -127,7 +124,9 @@ public class EmployeeController {
             req.setEntryDate(entry.getEntryDate());
             req.setReceiptVchNo(entry.getReceiptVchNo());
             model.addAttribute("entry", entry);
-            model.addAttribute("editRequest", req);
+            if (!model.containsAttribute("editRequest")) {
+                model.addAttribute("editRequest", req);
+            }
             model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
             model.addAttribute("user", userService.getUserByUsername(auth.getName()));
             return "employee/edit-entry";
@@ -142,14 +141,11 @@ public class EmployeeController {
                             @Valid @ModelAttribute("editRequest") PaymentEntryDTO.Request request,
                             BindingResult result,
                             Authentication auth,
-                            Model model,
                             RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
-            PaymentEntryDTO.Response entry = paymentEntryService.getEntryById(id);
-            model.addAttribute("entry", entry);
-            model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
-            model.addAttribute("user", userService.getUserByUsername(auth.getName()));
-            return "employee/edit-entry";
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.editRequest", result);
+            redirectAttributes.addFlashAttribute("editRequest", request);
+            return "redirect:/employee/entries/" + id + "/edit";
         }
         try {
             // Employees cannot change the entry date — always keep it as today

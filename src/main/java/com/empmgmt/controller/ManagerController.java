@@ -53,15 +53,21 @@ public class ManagerController {
         String username = auth.getName();
         model.addAttribute("user", userService.getUserByUsername(username));
         addDashboardAttributes(model, username, parseDateOrToday(date), parseMonthOrCurrent(month));
-        InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
-        newInvoice.setInvoiceDate(LocalDate.now());
-        newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
-        model.addAttribute("newInvoice", newInvoice);
-        model.addAttribute("newEntry", new PaymentEntryDTO.Request());
+        if (!model.containsAttribute("newInvoice")) {
+            InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
+            newInvoice.setInvoiceDate(LocalDate.now());
+            newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
+            model.addAttribute("newInvoice", newInvoice);
+        }
+        if (!model.containsAttribute("newEntry")) {
+            model.addAttribute("newEntry", new PaymentEntryDTO.Request());
+        }
         model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
         model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
         model.addAttribute("today", LocalDate.now());
-        model.addAttribute("activeTab", "invoices");
+        if (!model.containsAttribute("activeTab")) {
+            model.addAttribute("activeTab", "invoices");
+        }
         return "manager/dashboard";
     }
 
@@ -124,18 +130,13 @@ public class ManagerController {
     public String addInvoice(@Valid @ModelAttribute("newInvoice") InvoiceDTO.Request request,
                              BindingResult result,
                              Authentication auth,
-                             Model model,
                              RedirectAttributes redirectAttributes) {
         String username = auth.getName();
         if (result.hasErrors()) {
-            model.addAttribute("user", userService.getUserByUsername(username));
-            addDashboardAttributes(model, username, LocalDate.now(), YearMonth.now());
-            model.addAttribute("newEntry", new PaymentEntryDTO.Request());
-            model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
-            model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
-            model.addAttribute("today", LocalDate.now());
-            model.addAttribute("activeTab", "invoices");
-            return "manager/dashboard";
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.newInvoice", result);
+            redirectAttributes.addFlashAttribute("newInvoice", request);
+            redirectAttributes.addFlashAttribute("activeTab", "invoices");
+            return "redirect:/manager/dashboard";
         }
         try {
             invoiceService.createInvoice(request, username);
@@ -185,7 +186,9 @@ public class ManagerController {
             req.setDeliveryMode(findDeliveryModeByDisplayName(invoice.getDeliveryMode()));
             req.setTransportNumber(invoice.getTransportNumber());
             model.addAttribute("invoice", invoice);
-            model.addAttribute("editRequest", req);
+            if (!model.containsAttribute("editRequest")) {
+                model.addAttribute("editRequest", req);
+            }
             model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
             model.addAttribute("user", userService.getUserByUsername(auth.getName()));
             return "manager/edit-invoice";
@@ -200,7 +203,6 @@ public class ManagerController {
                               @Valid @ModelAttribute("editRequest") InvoiceDTO.Request request,
                               BindingResult result,
                               Authentication auth,
-                              Model model,
                               RedirectAttributes redirectAttributes) {
         InvoiceDTO.Response existing = invoiceService.getInvoiceById(id);
         if (!auth.getName().equals(existing.getCreatedBy())) {
@@ -208,10 +210,9 @@ public class ManagerController {
             return "redirect:/manager/invoices";
         }
         if (result.hasErrors()) {
-            model.addAttribute("invoice", existing);
-            model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
-            model.addAttribute("user", userService.getUserByUsername(auth.getName()));
-            return "manager/edit-invoice";
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.editRequest", result);
+            redirectAttributes.addFlashAttribute("editRequest", request);
+            return "redirect:/manager/invoices/" + id + "/edit";
         }
         try {
             invoiceService.updateInvoice(id, request, auth.getName());
@@ -249,21 +250,13 @@ public class ManagerController {
                            @RequestParam(required = false) BigDecimal latitude,
                            @RequestParam(required = false) BigDecimal longitude,
                            Authentication auth,
-                           Model model,
                            RedirectAttributes redirectAttributes) {
         String username = auth.getName();
         if (result.hasErrors()) {
-            model.addAttribute("user", userService.getUserByUsername(username));
-            addDashboardAttributes(model, username, LocalDate.now(), YearMonth.now());
-            InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
-            newInvoice.setInvoiceDate(LocalDate.now());
-            newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
-            model.addAttribute("newInvoice", newInvoice);
-            model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
-            model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
-            model.addAttribute("today", LocalDate.now());
-            model.addAttribute("activeTab", "collections");
-            return "manager/dashboard";
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.newEntry", result);
+            redirectAttributes.addFlashAttribute("newEntry", request);
+            redirectAttributes.addFlashAttribute("activeTab", "collections");
+            return "redirect:/manager/dashboard";
         }
         PaymentEntryDTO.Response saved = paymentEntryService.createEntryForManager(request, username);
 
@@ -324,7 +317,9 @@ public class ManagerController {
             req.setEntryDate(entry.getEntryDate());
             req.setReceiptVchNo(entry.getReceiptVchNo());
             model.addAttribute("entry", entry);
-            model.addAttribute("editRequest", req);
+            if (!model.containsAttribute("editRequest")) {
+                model.addAttribute("editRequest", req);
+            }
             model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
             model.addAttribute("user", userService.getUserByUsername(auth.getName()));
             return "manager/edit-entry";
@@ -339,14 +334,11 @@ public class ManagerController {
                             @Valid @ModelAttribute("editRequest") PaymentEntryDTO.Request request,
                             BindingResult result,
                             Authentication auth,
-                            Model model,
                             RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
-            PaymentEntryDTO.Response entry = paymentEntryService.getEntryById(id);
-            model.addAttribute("entry", entry);
-            model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
-            model.addAttribute("user", userService.getUserByUsername(auth.getName()));
-            return "manager/edit-entry";
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.editRequest", result);
+            redirectAttributes.addFlashAttribute("editRequest", request);
+            return "redirect:/manager/entries/" + id + "/edit";
         }
         try {
             paymentEntryService.updateEntryByEmployee(id, request, auth.getName());

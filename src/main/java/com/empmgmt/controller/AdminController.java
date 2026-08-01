@@ -84,20 +84,20 @@ public class AdminController {
         model.addAttribute("employees", userService.getAllEmployees());
         model.addAttribute("accountants", userService.getAllAccountants());
         model.addAttribute("managers", userService.getAllManagers());
-        model.addAttribute("newEmployee", new UserDTO.CreateRequest());
+        if (!model.containsAttribute("newEmployee")) {
+            model.addAttribute("newEmployee", new UserDTO.CreateRequest());
+        }
         return "admin/employees";
     }
 
     @PostMapping("/employees/add")
     public String addEmployee(@Valid @ModelAttribute("newEmployee") UserDTO.CreateRequest request,
                               BindingResult result,
-                              Model model,
                               RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
-            model.addAttribute("employees", userService.getAllEmployees());
-            model.addAttribute("accountants", userService.getAllAccountants());
-            model.addAttribute("managers", userService.getAllManagers());
-            return "admin/employees";
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.newEmployee", result);
+            redirectAttributes.addFlashAttribute("newEmployee", request);
+            return "redirect:/admin/employees";
         }
         try {
             userService.createEmployee(request);
@@ -168,13 +168,15 @@ public class AdminController {
         model.addAttribute("entry", entry);
         model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
 
-        PaymentEntryDTO.Request req = new PaymentEntryDTO.Request();
-        req.setPartyName(entry.getPartyName());
-        req.setAmount(entry.getAmount());
-        req.setRemarks(entry.getRemarks());
-        req.setEntryDate(entry.getEntryDate());
-        req.setReceiptVchNo(entry.getReceiptVchNo());
-        model.addAttribute("editRequest", req);
+        if (!model.containsAttribute("editRequest")) {
+            PaymentEntryDTO.Request req = new PaymentEntryDTO.Request();
+            req.setPartyName(entry.getPartyName());
+            req.setAmount(entry.getAmount());
+            req.setRemarks(entry.getRemarks());
+            req.setEntryDate(entry.getEntryDate());
+            req.setReceiptVchNo(entry.getReceiptVchNo());
+            model.addAttribute("editRequest", req);
+        }
         return "admin/edit-entry";
     }
 
@@ -184,12 +186,11 @@ public class AdminController {
                             @Valid @ModelAttribute("editRequest") PaymentEntryDTO.Request request,
                             BindingResult result,
                             Authentication auth,
-                            Model model,
                             RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
-            model.addAttribute("entry", paymentEntryService.getEntryById(id));
-            model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
-            return "admin/edit-entry";
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.editRequest", result);
+            redirectAttributes.addFlashAttribute("editRequest", request);
+            return "redirect:/admin/entries/" + id + "/edit";
         }
         paymentEntryService.updateEntry(id, request, auth.getName());
         redirectAttributes.addFlashAttribute("successMsg", "Entry updated successfully!");
@@ -324,9 +325,11 @@ public class AdminController {
         model.addAttribute("to", to);
         model.addAttribute("createdBy", createdBy);
         model.addAttribute("outstandingSummary", invoiceService.getPartyOutstandingSummary());
-        InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
-        newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
-        model.addAttribute("newInvoice", newInvoice);
+        if (!model.containsAttribute("newInvoice")) {
+            InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
+            newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
+            model.addAttribute("newInvoice", newInvoice);
+        }
         model.addAttribute("deliveryModes", com.empmgmt.entity.Invoice.DeliveryMode.values());
         invoiceService.getInvoicePageStats().forEach(model::addAttribute);
         model.addAttribute("recentNotifications", notificationLogRepository.findTop30ByOrderBySentAtDesc());
@@ -338,17 +341,12 @@ public class AdminController {
     @PostMapping("/invoices/add")
     public String addInvoice(@Valid @ModelAttribute("newInvoice") InvoiceDTO.Request request,
                              BindingResult result,
-                             Model model,
                              Authentication auth,
                              RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
-            model.addAttribute("invoices", invoiceService.getAllInvoices());
-            model.addAttribute("outstandingSummary", invoiceService.getPartyOutstandingSummary());
-            model.addAttribute("deliveryModes", com.empmgmt.entity.Invoice.DeliveryMode.values());
-            invoiceService.getInvoicePageStats().forEach(model::addAttribute);
-            model.addAttribute("recentNotifications", notificationLogRepository.findTop30ByOrderBySentAtDesc());
-            model.addAttribute("adminName", auth.getName());
-            return "admin/invoices";
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.newInvoice", result);
+            redirectAttributes.addFlashAttribute("newInvoice", request);
+            return "redirect:/admin/invoices";
         }
         try {
             invoiceService.createInvoice(request, auth.getName());
@@ -381,7 +379,9 @@ public class AdminController {
         req.setDeliveryMode(findDeliveryModeByDisplayName(invoice.getDeliveryMode()));
         req.setTransportNumber(invoice.getTransportNumber());
         model.addAttribute("invoice", invoice);
-        model.addAttribute("editRequest", req);
+        if (!model.containsAttribute("editRequest")) {
+            model.addAttribute("editRequest", req);
+        }
         model.addAttribute("deliveryModes", com.empmgmt.entity.Invoice.DeliveryMode.values());
         model.addAttribute("adminName", auth.getName());
         return "admin/edit-invoice";
@@ -393,13 +393,11 @@ public class AdminController {
                               @Valid @ModelAttribute("editRequest") InvoiceDTO.Request request,
                               BindingResult result,
                               Authentication auth,
-                              Model model,
                               RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
-            model.addAttribute("invoice", invoiceService.getInvoiceById(id));
-            model.addAttribute("deliveryModes", com.empmgmt.entity.Invoice.DeliveryMode.values());
-            model.addAttribute("adminName", auth.getName());
-            return "admin/edit-invoice";
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.editRequest", result);
+            redirectAttributes.addFlashAttribute("editRequest", request);
+            return "redirect:/admin/invoices/" + id + "/edit";
         }
         try {
             invoiceService.updateInvoice(id, request, auth.getName());
@@ -589,7 +587,9 @@ public class AdminController {
                 ? partyRepository.findTop50ByCombinedContainingIgnoreCase(q)
                 : partyRepository.findAll(Sort.by("name"));
         model.addAttribute("parties", parties);
-        model.addAttribute("newParty", new PartyDTO.Request());
+        if (!model.containsAttribute("newParty")) {
+            model.addAttribute("newParty", new PartyDTO.Request());
+        }
         model.addAttribute("q", q);
         model.addAttribute("adminName", auth.getName());
         return "admin/parties";
@@ -600,13 +600,11 @@ public class AdminController {
     public String addParty(@Valid @ModelAttribute("newParty") PartyDTO.Request request,
                            BindingResult result,
                            Authentication auth,
-                           Model model,
                            RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
-            model.addAttribute("parties", partyRepository.findAll(
-                    Sort.by("name")));
-            model.addAttribute("adminName", auth.getName());
-            return "admin/parties";
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.newParty", result);
+            redirectAttributes.addFlashAttribute("newParty", request);
+            return "redirect:/admin/parties";
         }
         try {
             String gstin    = request.getGstin() != null ? request.getGstin().trim() : "";
@@ -648,7 +646,9 @@ public class AdminController {
                 .whatsappOptIn(party.isWhatsappOptIn())
                 .build();
         model.addAttribute("party", party);
-        model.addAttribute("editRequest", req);
+        if (!model.containsAttribute("editRequest")) {
+            model.addAttribute("editRequest", req);
+        }
         model.addAttribute("adminName", auth.getName());
         return "admin/edit-party";
     }
@@ -659,12 +659,11 @@ public class AdminController {
                             @Valid @ModelAttribute("editRequest") PartyDTO.Request request,
                             BindingResult result,
                             Authentication auth,
-                            Model model,
                             RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
-            model.addAttribute("party", partyRepository.findById(id).orElse(null));
-            model.addAttribute("adminName", auth.getName());
-            return "admin/edit-party";
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.editRequest", result);
+            redirectAttributes.addFlashAttribute("editRequest", request);
+            return "redirect:/admin/parties/" + id + "/edit";
         }
         partyRepository.findById(id).ifPresent(party -> {
             String before = party.getCombined();
