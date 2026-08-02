@@ -76,7 +76,8 @@ public class SecurityConfig {
                 // redirect to a bare, message-less /login.
                 .requestMatchers("/login").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/h2-console/**",
-                        "/manifest.json", "/manager-manifest.json", "/sw.js", "/icons/**", "/health").permitAll()
+                        "/manifest.json", "/manager-manifest.json", "/admin-manifest.json", "/accountant-manifest.json",
+                        "/sw.js", "/icons/**", "/health").permitAll()
                 .requestMatchers("/api/parties/suggest", "/api/parties").authenticated()
                 .requestMatchers("/api/parties/import", "/api/parties/cleanup", "/api/parties/upload-import").hasAnyRole("ADMIN", "ACCOUNTANT")
                 .requestMatchers("/admin/**").hasAnyRole("ADMIN", "ACCOUNTANT")
