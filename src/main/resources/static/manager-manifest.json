@@ -2,7 +2,7 @@
   "name": "PayTrack Manager",
   "short_name": "PayTrack",
   "description": "Invoice entry for managers",
-  "start_url": "/manager/dashboard",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0d0f14",

@@ -4,7 +4,13 @@
 // cached page instead of hitting the network would be actively misleading.
 // Only the static app-shell assets (icons, manifest) are safe to cache.
 
-const CACHE_NAME = 'paytrack-shell-v1';
+// Bumped to v2: manifest.json's start_url changed to /login (was /employee/dashboard) -
+// browsers only re-check a service worker for updates when its own bytes change, so without
+// bumping this, a browser that already cached the old manifest.json would keep serving it
+// forever, even after "Add to Home Screen" is redone. Changing CACHE_NAME forces byte-diff
+// detection, which reruns install/activate: install re-fetches manifest.json fresh, and the
+// existing activate handler already deletes any cache not matching the current CACHE_NAME.
+const CACHE_NAME = 'paytrack-shell-v2';
 const SHELL_ASSETS = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',

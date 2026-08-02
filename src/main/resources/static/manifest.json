@@ -2,7 +2,7 @@
   "name": "PayTrack",
   "short_name": "PayTrack",
   "description": "Payment entry and collections tracking for employees and admins",
-  "start_url": "/employee/dashboard",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0d0f14",

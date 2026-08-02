@@ -2,7 +2,7 @@
   "name": "PayTrack Accountant",
   "short_name": "PayTrack",
   "description": "Invoices and collections for PayTrack accountants",
-  "start_url": "/admin/invoices",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0d0f14",
