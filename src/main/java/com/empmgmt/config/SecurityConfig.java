@@ -3,6 +3,7 @@ package com.empmgmt.config;
 import com.empmgmt.security.CustomUserDetailsService;
 import com.empmgmt.service.LoginSessionService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -25,6 +26,7 @@ import java.math.BigDecimal;
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
+@Slf4j
 public class SecurityConfig {
 
     private final CustomUserDetailsService userDetailsService;
@@ -135,6 +137,12 @@ public class SecurityConfig {
                 // show a bare 403 Whitelabel page (confusing, and indistinguishable from a
                 // real problem), treat any CSRF rejection as "just sign in again."
                 .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    var principal = org.springframework.security.core.context.SecurityContextHolder
+                            .getContext().getAuthentication();
+                    log.warn("AccessDenied: {} {} user={} exception={}", request.getMethod(),
+                            request.getRequestURI() + (request.getQueryString() != null ? "?" + request.getQueryString() : ""),
+                            principal != null ? principal.getName() : "anonymous",
+                            accessDeniedException.getClass().getName());
                     if (accessDeniedException instanceof org.springframework.security.web.csrf.CsrfException) {
                         response.sendRedirect(request.getContextPath() + "/login?expired=true");
                     } else {
