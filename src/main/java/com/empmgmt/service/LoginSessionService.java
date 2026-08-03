@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,6 +26,12 @@ import java.util.Map;
 @Transactional
 @Slf4j
 public class LoginSessionService {
+
+    // login_at/logout_at are plain LocalDateTime (no zone stored) - must always be captured as
+    // IST wall-clock time explicitly, since the JVM's system-default zone is UTC on Render's
+    // container (same root cause already hit and fixed for NotificationScheduler's cron).
+    // LocalDateTime.now() alone would silently store UTC time there, 5.5h behind actual IST.
+    private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
     private final LoginSessionRepository loginSessionRepository;
     private final UserRepository userRepository;
@@ -39,7 +46,7 @@ public class LoginSessionService {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void closeSessionsOrphanedByRestart() {
-        int closed = loginSessionRepository.closeAllOpenSessions(LocalDateTime.now());
+        int closed = loginSessionRepository.closeAllOpenSessions(LocalDateTime.now(IST));
         if (closed > 0) {
             log.info("[LoginSessionService] Closed {} login_sessions row(s) left open by the previous process.", closed);
         }
@@ -51,7 +58,7 @@ public class LoginSessionService {
                 .username(username)
                 .fullName(user != null ? user.getFullName() : username)
                 .role(user != null ? user.getRole().name() : null)
-                .loginAt(LocalDateTime.now())
+                .loginAt(LocalDateTime.now(IST))
                 .latitude(latitude)
                 .longitude(longitude)
                 .build());
@@ -61,7 +68,7 @@ public class LoginSessionService {
         if (username == null) return;
         loginSessionRepository.findTopByUsernameAndLogoutAtIsNullOrderByLoginAtDesc(username)
                 .ifPresent(session -> {
-                    session.setLogoutAt(LocalDateTime.now());
+                    session.setLogoutAt(LocalDateTime.now(IST));
                     loginSessionRepository.save(session);
                 });
     }
@@ -79,7 +86,7 @@ public class LoginSessionService {
             row.put("latitude", s.getLatitude());
             row.put("longitude", s.getLongitude());
             row.put("active", s.getLogoutAt() == null);
-            LocalDateTime end = s.getLogoutAt() != null ? s.getLogoutAt() : LocalDateTime.now();
+            LocalDateTime end = s.getLogoutAt() != null ? s.getLogoutAt() : LocalDateTime.now(IST);
             row.put("durationText", formatDuration(Duration.between(s.getLoginAt(), end)));
             result.add(row);
         }
