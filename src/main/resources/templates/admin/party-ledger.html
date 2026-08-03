@@ -81,6 +81,11 @@
         .form-control:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,142,255,0.12)}
         .form-control::placeholder{color:var(--muted2)}
         .form-control:disabled{opacity:0.6;cursor:not-allowed}
+        .autocomplete-wrapper{position:relative}
+        .autocomplete-list{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:9px;z-index:200;max-height:200px;overflow-y:auto;display:none;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+        .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--overlay-2)}
+        .autocomplete-item:last-child{border-bottom:none}
+        .autocomplete-item:hover{background:rgba(108,142,255,0.1);color:var(--accent)}
         select.form-control option{background:var(--surface)}
         .form-error{font-size:12px;color:var(--red);margin-bottom:10px;margin-top:-10px}
         .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -385,18 +390,11 @@
                 <div class="form-error" th:if="${#fields.hasErrors('deliveryMode')}" th:errors="*{deliveryMode}"></div>
 
                 <label class="form-label">Truck / Trolley / Vehicle No. <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
-                <input type="text" class="form-control" th:field="*{transportNumber}" placeholder="e.g. MH12AB1234" list="truckNumberOptions"/>
-                <datalist id="truckNumberOptions">
-                    <option value="UP50BT2371"></option>
-                    <option value="UP50BT1717"></option>
-                    <option value="UP50F4777"></option>
-                    <option value="UP50BT8471"></option>
-                    <option value="UP50BT6571"></option>
-                    <option value="UP50AT9771"></option>
-                    <option value="UP50AT0154"></option>
-                    <option value="UP50DT0171"></option>
-                    <option value="UP50AT7730"></option>
-                </datalist>
+                <div class="autocomplete-wrapper">
+                    <input type="text" id="transportNumberInput" class="form-control" th:field="*{transportNumber}"
+                           placeholder="e.g. MH12AB1234" autocomplete="off" style="margin-bottom:0"/>
+                    <div class="autocomplete-list" id="truckDropdown"></div>
+                </div>
                 <div class="form-error" th:if="${#fields.hasErrors('transportNumber')}" th:errors="*{transportNumber}"></div>
 
                 <button type="submit" class="btn btn-primary">🧾 Save Invoice</button>
@@ -461,6 +459,37 @@
         if (to) url += '&to=' + to;
         window.location.href = url;
     }
+</script>
+<script>
+(function(){
+    // Truck number autocomplete (native <datalist> barely works on mobile Safari/Chrome-iOS)
+    var truckNumbers = ['UP50BT2371','UP50BT1717','UP50F4777','UP50BT8471','UP50BT6571','UP50AT9771','UP50AT0154','UP50DT0171','UP50AT7730'];
+    var truckInput = document.getElementById('transportNumberInput');
+    var truckDropdown = document.getElementById('truckDropdown');
+    if (!truckInput) return;
+    truckInput.addEventListener('input', function() {
+        var q = this.value.toLowerCase().trim();
+        truckDropdown.innerHTML = '';
+        var matches = q ? truckNumbers.filter(function(n){ return n.toLowerCase().indexOf(q) !== -1; }) : truckNumbers;
+        if (!matches.length) { truckDropdown.style.display = 'none'; return; }
+        matches.forEach(function(n) {
+            var row = document.createElement('div');
+            row.className = 'autocomplete-item';
+            row.textContent = n;
+            row.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                truckInput.value = n;
+                truckDropdown.style.display = 'none';
+            });
+            truckDropdown.appendChild(row);
+        });
+        truckDropdown.style.display = 'block';
+    });
+    truckInput.addEventListener('focus', function() { this.dispatchEvent(new Event('input')); });
+    truckInput.addEventListener('blur', function() {
+        setTimeout(function(){ truckDropdown.style.display = 'none'; }, 150);
+    });
+})();
 </script>
 <script>
 (function(){

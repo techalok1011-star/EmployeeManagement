@@ -44,6 +44,11 @@
         .form-control:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,142,255,0.12)}
         .form-control::placeholder{color:var(--muted2)}
         .form-control:disabled{opacity:0.55;cursor:not-allowed}
+        .autocomplete-wrapper{position:relative}
+        .autocomplete-list{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:9px;z-index:200;max-height:200px;overflow-y:auto;display:none;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+        .autocomplete-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--overlay-2)}
+        .autocomplete-item:last-child{border-bottom:none}
+        .autocomplete-item:hover{background:rgba(108,142,255,0.1);color:var(--accent)}
         .form-error{font-size:12px;color:var(--red);margin-top:5px}
         .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
         .btn{padding:10px 20px;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
@@ -197,18 +202,11 @@
 
                 <div class="form-group">
                     <label class="form-label">Truck / Trolley / Vehicle No. <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted2)">(optional)</span></label>
-                    <input type="text" class="form-control" th:field="*{transportNumber}" placeholder="e.g. MH12AB1234" list="truckNumberOptions"/>
-                    <datalist id="truckNumberOptions">
-                        <option value="UP50BT2371"></option>
-                        <option value="UP50BT1717"></option>
-                        <option value="UP50F4777"></option>
-                        <option value="UP50BT8471"></option>
-                        <option value="UP50BT6571"></option>
-                        <option value="UP50AT9771"></option>
-                        <option value="UP50AT0154"></option>
-                        <option value="UP50DT0171"></option>
-                        <option value="UP50AT7730"></option>
-                    </datalist>
+                    <div class="autocomplete-wrapper">
+                        <input type="text" id="transportNumberInput" class="form-control" th:field="*{transportNumber}"
+                               placeholder="e.g. MH12AB1234" autocomplete="off" style="margin-bottom:0"/>
+                        <div class="autocomplete-list" id="truckDropdown"></div>
+                    </div>
                     <div class="form-error" th:if="${#fields.hasErrors('transportNumber')}" th:errors="*{transportNumber}"></div>
                 </div>
 
@@ -270,6 +268,36 @@
             }, 180);
         });
         function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+    })();
+
+    (function(){
+        // Truck number autocomplete (native <datalist> barely works on mobile Safari/Chrome-iOS)
+        const truckNumbers = ['UP50BT2371','UP50BT1717','UP50F4777','UP50BT8471','UP50BT6571','UP50AT9771','UP50AT0154','UP50DT0171','UP50AT7730'];
+        const truckInput = document.getElementById('transportNumberInput');
+        const truckDropdown = document.getElementById('truckDropdown');
+        if (!truckInput) return;
+        truckInput.addEventListener('input', function() {
+            const q = this.value.toLowerCase().trim();
+            truckDropdown.innerHTML = '';
+            const matches = q ? truckNumbers.filter(n => n.toLowerCase().includes(q)) : truckNumbers;
+            if (!matches.length) { truckDropdown.style.display = 'none'; return; }
+            matches.forEach(n => {
+                const row = document.createElement('div');
+                row.className = 'autocomplete-item';
+                row.textContent = n;
+                row.addEventListener('mousedown', e => {
+                    e.preventDefault();
+                    truckInput.value = n;
+                    truckDropdown.style.display = 'none';
+                });
+                truckDropdown.appendChild(row);
+            });
+            truckDropdown.style.display = 'block';
+        });
+        truckInput.addEventListener('focus', function() { this.dispatchEvent(new Event('input')); });
+        truckInput.addEventListener('blur', () => {
+            setTimeout(() => truckDropdown.style.display = 'none', 150);
+        });
     })();
 
     (function() {

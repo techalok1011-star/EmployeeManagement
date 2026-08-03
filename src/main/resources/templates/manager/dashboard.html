@@ -291,18 +291,11 @@
                     <div class="form-error" th:if="${#fields.hasErrors('deliveryMode')}" th:errors="*{deliveryMode}"></div>
 
                     <label class="form-label">Truck / Trolley / Vehicle No. <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
-                    <input type="text" class="form-control" th:field="*{transportNumber}" placeholder="e.g. MH12AB1234" list="truckNumberOptions"/>
-                    <datalist id="truckNumberOptions">
-                        <option value="UP50BT2371"></option>
-                        <option value="UP50BT1717"></option>
-                        <option value="UP50F4777"></option>
-                        <option value="UP50BT8471"></option>
-                        <option value="UP50BT6571"></option>
-                        <option value="UP50AT9771"></option>
-                        <option value="UP50AT0154"></option>
-                        <option value="UP50DT0171"></option>
-                        <option value="UP50AT7730"></option>
-                    </datalist>
+                    <div class="autocomplete-wrapper">
+                        <input type="text" id="transportNumberInput" class="form-control" th:field="*{transportNumber}"
+                               placeholder="e.g. MH12AB1234" autocomplete="off" style="margin-bottom:0"/>
+                        <div class="autocomplete-list" id="truckDropdown"></div>
+                    </div>
                     <div class="form-error" th:if="${#fields.hasErrors('transportNumber')}" th:errors="*{transportNumber}"></div>
 
                     <label class="form-label">Description <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
@@ -647,6 +640,36 @@ function wirePartyAutocomplete(inputEl, dropdownEl, allPartiesRef) {
 
     wirePartyAutocomplete(document.getElementById('partyInput'), document.getElementById('partyDropdown'), allPartiesRef);
     wirePartyAutocomplete(document.getElementById('entryPartyInput'), document.getElementById('entryPartyDropdown'), allPartiesRef);
+})();
+
+(function(){
+    // Truck number autocomplete (native <datalist> barely works on mobile Safari/Chrome-iOS)
+    const truckNumbers = ['UP50BT2371','UP50BT1717','UP50F4777','UP50BT8471','UP50BT6571','UP50AT9771','UP50AT0154','UP50DT0171','UP50AT7730'];
+    const truckInput = document.getElementById('transportNumberInput');
+    const truckDropdown = document.getElementById('truckDropdown');
+    if (!truckInput) return;
+    truckInput.addEventListener('input', function() {
+        const q = this.value.toLowerCase().trim();
+        truckDropdown.innerHTML = '';
+        const matches = q ? truckNumbers.filter(n => n.toLowerCase().includes(q)) : truckNumbers;
+        if (!matches.length) { truckDropdown.style.display = 'none'; return; }
+        matches.forEach(n => {
+            const row = document.createElement('div');
+            row.className = 'autocomplete-item';
+            row.textContent = n;
+            row.addEventListener('mousedown', e => {
+                e.preventDefault();
+                truckInput.value = n;
+                truckDropdown.style.display = 'none';
+            });
+            truckDropdown.appendChild(row);
+        });
+        truckDropdown.style.display = 'block';
+    });
+    truckInput.addEventListener('focus', function() { this.dispatchEvent(new Event('input')); });
+    truckInput.addEventListener('blur', () => {
+        setTimeout(() => truckDropdown.style.display = 'none', 150);
+    });
 })();
 
 function recalcAmount() {
