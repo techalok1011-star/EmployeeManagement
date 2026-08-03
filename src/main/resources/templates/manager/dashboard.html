@@ -291,7 +291,18 @@
                     <div class="form-error" th:if="${#fields.hasErrors('deliveryMode')}" th:errors="*{deliveryMode}"></div>
 
                     <label class="form-label">Truck / Trolley / Vehicle No. <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
-                    <input type="text" class="form-control" th:field="*{transportNumber}" placeholder="e.g. MH12AB1234"/>
+                    <input type="text" class="form-control" th:field="*{transportNumber}" placeholder="e.g. MH12AB1234" list="truckNumberOptions"/>
+                    <datalist id="truckNumberOptions">
+                        <option value="UP50BT2371"></option>
+                        <option value="UP50BT1717"></option>
+                        <option value="UP50F4777"></option>
+                        <option value="UP50BT8471"></option>
+                        <option value="UP50BT6571"></option>
+                        <option value="UP50AT9771"></option>
+                        <option value="UP50AT0154"></option>
+                        <option value="UP50DT0171"></option>
+                        <option value="UP50AT7730"></option>
+                    </datalist>
                     <div class="form-error" th:if="${#fields.hasErrors('transportNumber')}" th:errors="*{transportNumber}"></div>
 
                     <label class="form-label">Description <span style="color:var(--muted2);font-size:10px;text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>

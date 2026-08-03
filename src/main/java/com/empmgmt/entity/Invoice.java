@@ -86,7 +86,9 @@ public class Invoice {
     public enum DeliveryMode {
         TRUCK("Truck"),
         SELF_PICKUP("Self Pickup"),
-        TROLLEY("Trolley");
+        TROLLEY("Trolley"),
+        TRACTOR("Tractor"),
+        YODHA_PICKUP("Yodha Pickup");
 
         private final String displayName;
 

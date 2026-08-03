@@ -1331,38 +1331,50 @@ app immediately (needs an admin login to exist).
   build (see "Running it / connecting" above) - the running local app now
   serves from `empdb2`, not `empdb`.
 
-## PWA + mobile responsiveness (added 2026-07-15)
+## PWA + mobile responsiveness (added 2026-07-15, manifests reworked 2026-08-02)
 
 - Goal: employees install the site to their phone home screen (like a
   native app) and use it without a cramped fixed-sidebar layout. Chose PWA
   over a native Android app (no Android SDK/emulator available to build or
   verify one; PWA reuses the existing server-rendered app as-is).
-- **New static assets**: `static/manifest.json` (name "PayTrack",
-  `start_url: /employee/dashboard`, standalone display), `static/sw.js`
-  (deliberately minimal service worker - caches only the icons + manifest,
-  **never** HTML/data pages, to avoid ever serving stale financial figures
-  offline), `static/icons/icon-192.png` / `icon-512.png` /
+- **Static assets**: four manifests - `static/manifest.json` (Employee),
+  `static/manager-manifest.json`, `static/admin-manifest.json`,
+  `static/accountant-manifest.json` (the last two added 2026-08-02) -
+  plus `static/sw.js` (deliberately minimal service worker - caches only
+  the icons + manifest, **never** HTML/data pages, to avoid ever serving
+  stale financial figures offline; `CACHE_NAME` is at `paytrack-shell-v2`
+  as of 2026-08-02, bumped from `v1` - see the incident writeup below for
+  why bumping this matters), `static/icons/icon-192.png` / `icon-512.png` /
   `icon-512-maskable.png` (generated via a `pngjs`-based Node script, not
   checked in as source - just the PNG output).
-- **`SecurityConfig.java`**'s `permitAll()` matcher list must include
-  `/manifest.json`, `/sw.js`, `/icons/**` - forgetting this makes Spring
-  Security 302-redirect them to `/login`, silently breaking installability
-  even though the files exist and are otherwise correct. Already fixed;
-  watch for this regressing if the matcher list is ever refactored.
+- **Every manifest's `start_url` is `/login`** (changed 2026-08-02, was
+  role-specific dashboards before) - by explicit user decision: swipe-
+  closing the installed app and reopening it should always land on the
+  login page, for every role, rather than trying to jump back into
+  whatever dashboard the icon points at. See the incident writeup below -
+  this turned out to be **cosmetic** on iOS/Chrome-iOS specifically (see
+  why), but is still correct/harmless and is what Android Chrome's real
+  PWA install actually honors.
+- **`SecurityConfig.java`**'s `permitAll()` matcher list must include all
+  four manifest filenames, `/sw.js`, `/icons/**` - forgetting one makes
+  Spring Security 302-redirect it to `/login`, silently breaking
+  installability even though the file exists and is otherwise correct.
+  Already fixed; watch for this regressing if the matcher list is ever
+  refactored, and add any new manifest file here too.
 - **Off-canvas responsive sidebar** pattern (CSS `transform:
   translateX(-100%)` + `.open` class + a `.sidebar-overlay` click-to-close
   div + a `.menu-toggle` hamburger button + `toggleSidebar()` JS,
-  `@media(max-width:768px)`), plus the manifest `<link>`/theme-color
-  `<meta>`/apple-touch-icon `<link>` and SW-registration script - all
-  copy-pasted identically across the templates listed below. If adding
-  this to a new template, copy the exact block from one of these rather
-  than reinventing it.
-- **Currently applied to**: `login.html` and the 4 employee-facing
-  templates (`employee/dashboard.html`, `employee/entries.html`,
-  `employee/edit-entry.html`, `employee/history.html`) - these are what
-  employees actually use day-to-day. **Not yet applied** to any of the 16
-  admin-facing templates (`admin/*.html`) - deliberately deferred, only do
-  this if asked, since admins were assumed to be on desktop.
+  `@media(max-width:768px)`) is still only on `login.html` + the 4
+  employee-facing templates + `manager/*` - **not** on any of the 21
+  `admin/*.html` templates (deliberately deferred, admins assumed desktop).
+- **The manifest `<link>`/theme-color `<meta>`/apple-touch-icon `<link>`
+  and SW-registration `<script>` block, however, now IS on all 21
+  `admin/*.html` templates** (added 2026-08-02, see incident writeup) -
+  each template links whichever manifest matches the current role via
+  `sec:authorize="hasRole('ADMIN')"` / `hasRole('ACCOUNTANT')` on two
+  separate `<link rel="manifest">` tags. Don't confuse this with the
+  off-canvas sidebar CSS above - admin pages got the *installability*
+  head tags, not the *mobile-responsive layout* treatment.
 - Verified by creating a temporary test `EMPLOYEE` user + one test payment
   entry through the running app (via `/admin/employees/add` and the
   employee entry form), logging in as that user, curling all 4 pages
@@ -1372,6 +1384,81 @@ app immediately (needs an admin login to exist).
   no other way to actually exercise an authenticated employee session.
   Reuse this same create-test-employee-then-delete approach for any future
   employee-only-page verification.
+
+### Incident: Whitelabel 403 on mobile app reopen - root cause was the bookmarked URL, not the code (2026-08-01/02)
+
+**Symptom**: user (Admin) swipes the installed home-screen PayTrack icon
+away, reopens it, gets a raw `Whitelabel Error Page - status=403 Forbidden`.
+Reported as happening across all roles.
+
+**Plausible-looking fixes that were NOT the actual cause** (all still
+deployed, all legitimate improvements, but none of them fixed this
+specific report - don't assume any of these are "the fix" if a similar
+report comes in again):
+- Converted 12 POST handlers across Admin/Manager/Employee controllers
+  from "render template directly on validation error" to proper
+  Post-Redirect-Get (`a5d4497`) - real bug (a browser resubmitting a
+  stale POST on tab-restore could 403 on CSRF), but not this one.
+- `theme.js` now forces `location.reload()` on `pageshow` with
+  `event.persisted` (bfcache restore) so a stale CSRF token can never be
+  submitted from a cached page; `SecurityConfig` gained a CSRF-specific
+  `AccessDeniedHandler` that redirects to `/login?expired=true` instead of
+  a bare 403; and a genuine separate bug was found and fixed alongside it
+  - `formLogin()`'s auto-`permitAll()` for `failureUrl("/login?error=true")`
+  only permitted that *exact* query string, not `/login` with any other
+  query string, so `/login?logout=true` and `/login?expired=true` (the
+  real redirect targets after logout / session expiry) silently required
+  auth and bounced through an extra redirect to a message-less login page
+  (`81eca20`). Fixed via an explicit `.requestMatchers("/login").permitAll()`.
+  Real bug, real fix, **still not what caused the reported 403**.
+
+**What actually cracked it**: adding one `log.warn(...)` line inside the
+`AccessDeniedHandler` in `SecurityConfig.java`, logging the method, full
+URI+query string, current principal's username, and the exception's
+concrete class name (`ad79163`) - visible at the *default* production log
+level (WARN), no need to enable Spring Security DEBUG logging. The very
+next reproduction showed, in Render's logs:
+
+```
+AccessDenied: GET /employee/dashboard user=admin exception=org.springframework.security.access.AccessDeniedException
+```
+
+Plain role mismatch - the Admin's home-screen icon was pointing at
+`/employee/dashboard`, and `/employee/**` requires the EMPLOYEE role
+specifically. Nothing to do with CSRF, bfcache, or session age at all.
+**Lesson: when a 403/Whitelabel report resists a first fix, add exactly
+this kind of one-line WARN log before reasoning further - it turns
+"which of my three theories is right" into a fact in about one more
+reproduction cycle.**
+
+**Why the icon was wrong, and why manifest `start_url` changes didn't fix
+it**: iOS Safari's/Chrome-iOS's "Add to Home Screen" (both are WebKit
+under the hood - Apple requires this for every iOS browser) does **not**
+honor the Web App Manifest's `start_url` the way a real Android Chrome PWA
+install does. It simply bookmarks whatever URL is open in the tab **at
+the moment "Add to Home Screen" is tapped**. So:
+- Changing `admin-manifest.json`'s (or any manifest's) `start_url` has
+  **zero effect** on an iOS/Chrome-iOS user's already-installed icon, and
+  zero effect on a *newly*-added one too, if they added it while a
+  different page was open.
+- The only real fix on iOS/Chrome-iOS: delete the old icon, open the
+  browser app itself (not the installed shortcut), navigate directly to
+  the intended URL, **visually confirm** that page is on screen, *then*
+  tap Share -> Add to Home Screen.
+- The manifest `start_url` unification (all four manifests now point at
+  `/login`, see above) is still worth keeping - it's what a real Android
+  Chrome PWA install *does* honor, and it's harmless either way - but
+  don't expect it alone to fix an iOS/Chrome-iOS report. If a similar
+  report comes in again, the fix is "re-add the icon from the correct
+  page," not another manifest/security-config change.
+- **How this was actually confirmed fixed**: not by re-checking code, but
+  by asking the user to do a *real* test - log in, swipe-close, reopen -
+  since simply reopening a freshly-added icon that had never been logged
+  into yet would trivially show the login page regardless of whether
+  anything was fixed. Worth remembering as a general pattern: a user
+  report of "X now works" after a fix can still be describing a no-op
+  test: confirm the repro actually exercises the changed code path before
+  taking a "it worked" as verification.
 
 ### Flex/grid `min-width:auto` gotcha - a recurring class of mobile bug (2026-07-26, extended 2026-07-28)
 
@@ -1462,10 +1549,12 @@ one above.
   decisions have been made yet. If asked to act on this, don't assume every
   row is a duplicate - see the historical-import section above for why
   code reuse across years is expected, not automatically wrong.
-- PWA/responsive treatment not yet applied to the 18 admin-facing
-  templates (now 20 with `edit-invoice.html`/`login-history.html` added
-  2026-07-28, both also un-treated) - only login + the 4 employee pages +
-  `manager/*` have it.
+- **Off-canvas responsive sidebar CSS** (the mobile hamburger-menu layout)
+  still not applied to any of the 21 `admin/*.html` templates - only
+  login + the 4 employee pages + `manager/*` have it. (Note: as of
+  2026-08-02 the admin templates *do* have the manifest/installability
+  head tags - see "PWA + mobile responsiveness" above - just not this
+  layout treatment.)
 - `SINGH BUILDNG MATERIAL (LALGANG)` (DB id 59) party-matching ambiguity
   from the 2026-07-12 Tally import - still unresolved, see "Tally import"
   section above.
