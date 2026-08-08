@@ -1,5 +1,6 @@
 package com.empmgmt.entity;
 
+import com.empmgmt.util.IstClock;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -42,6 +43,6 @@ public class PaymentReceipt {
 
     @PrePersist
     protected void onCreate() {
-        capturedAt = LocalDateTime.now();
+        capturedAt = IstClock.now();
     }
 }

@@ -4,6 +4,7 @@ import com.empmgmt.dto.UserDTO;
 import com.empmgmt.entity.User;
 import com.empmgmt.repository.PaymentEntryRepository;
 import com.empmgmt.repository.UserRepository;
+import com.empmgmt.util.IstClock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -112,9 +113,9 @@ public class UserService {
     private UserDTO.Response mapToResponse(User user) {
         // Get today's stats
         BigDecimal totalAmount = paymentEntryRepository
-                .sumAmountByEmployeeAndDate(user, LocalDate.now());
+                .sumAmountByEmployeeAndDate(user, IstClock.today());
         long totalEntries = paymentEntryRepository
-                .countByEmployeeAndDate(user, LocalDate.now());
+                .countByEmployeeAndDate(user, IstClock.today());
 
         return UserDTO.Response.builder()
                 .id(user.getId())

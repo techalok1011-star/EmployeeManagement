@@ -12,6 +12,7 @@ import com.empmgmt.repository.PaymentEntryRepository;
 import com.empmgmt.repository.PaymentReceiptRepository;
 import com.empmgmt.repository.TransactionLogRepository;
 import com.empmgmt.repository.UserRepository;
+import com.empmgmt.util.IstClock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -57,11 +58,11 @@ public class PaymentEntryService {
     @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
     public PaymentEntryDTO.Response createEntry(PaymentEntryDTO.Request request, String username) {
         // Employees can only create entries for today
-        if (request.getEntryDate() != null && !request.getEntryDate().equals(LocalDate.now())) {
+        if (request.getEntryDate() != null && !request.getEntryDate().equals(IstClock.today())) {
             throw new RuntimeException("Entries can only be added for today's date.");
         }
         // Always stamp today's date regardless
-        request.setEntryDate(LocalDate.now());
+        request.setEntryDate(IstClock.today());
         User employee = findUserByUsername(username);
 
         // ensure party exists in parties table (accepts "Name" or "Name_GSTIN")
@@ -189,7 +190,7 @@ public class PaymentEntryService {
     public List<PaymentEntryDTO.Response> getTodayEntriesForEmployee(String username) {
         User employee = findUserByUsername(username);
         return paymentEntryRepository
-                .findByEmployeeAndEntryDateOrderByCreatedAtDesc(employee, LocalDate.now())
+                .findByEmployeeAndEntryDateOrderByCreatedAtDesc(employee, IstClock.today())
                 .stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
@@ -212,7 +213,7 @@ public class PaymentEntryService {
     @Transactional(readOnly = true)
     public PaymentEntryDTO.DailySummary getDailySummaryForEmployee(String username) {
         User employee = findUserByUsername(username);
-        LocalDate today = LocalDate.now();
+        LocalDate today = IstClock.today();
         BigDecimal total = paymentEntryRepository.sumAmountByEmployeeAndDate(employee, today);
         long count = paymentEntryRepository.countByEmployeeAndDate(employee, today);
         return PaymentEntryDTO.DailySummary.builder()
@@ -263,7 +264,7 @@ public class PaymentEntryService {
     @Transactional(readOnly = true)
     public List<PaymentEntryDTO.Response> getFilteredEntriesForAdmin(LocalDate from, LocalDate to, Long employeeId) {
         LocalDate start = from != null ? from : LocalDate.of(2000, 1, 1);
-        LocalDate end   = to   != null ? to   : LocalDate.now();
+        LocalDate end   = to   != null ? to   : IstClock.today();
         if (employeeId != null) {
             return paymentEntryRepository.findByEmployeeIdAndDateRange(employeeId, start, end)
                     .stream().map(this::mapToResponse).collect(Collectors.toList());
@@ -276,7 +277,7 @@ public class PaymentEntryService {
     public List<PaymentEntryDTO.DayGroup> getFilteredEntriesGroupedByDayForEmployee(String username, LocalDate from, LocalDate to) {
         User employee = findUserByUsername(username);
         LocalDate start = from != null ? from : LocalDate.of(2000, 1, 1);
-        LocalDate end   = to   != null ? to   : LocalDate.now();
+        LocalDate end   = to   != null ? to   : IstClock.today();
         List<PaymentEntryDTO.Response> all = paymentEntryRepository
                 .findByEmployeeIdAndDateRange(employee.getId(), start, end)
                 .stream().map(this::mapToResponse).collect(Collectors.toList());
@@ -347,7 +348,7 @@ public class PaymentEntryService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> getDashboardStats() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = IstClock.today();
         LocalDate since30 = today.minusDays(29);
         DateTimeFormatter labelFmt = DateTimeFormatter.ofPattern("dd MMM").withLocale(Locale.ENGLISH);
 
@@ -423,7 +424,7 @@ public class PaymentEntryService {
      */
     @Transactional(readOnly = true)
     public List<EmployeeCollectionSummaryDTO> getEmployeeCollectionSummaries() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = IstClock.today();
         LocalDate monthStart = today.withDayOfMonth(1);
 
         Map<Long, Object[]> allTimeByEmployee = paymentEntryRepository.sumAndCountGroupedByEmployee().stream()
@@ -482,7 +483,7 @@ public class PaymentEntryService {
                 ? request.getReceiptVchNo().trim() : null);
         entry.setEdited(true);
         entry.setEditedBy("ADMIN");
-        entry.setEditedAt(java.time.LocalDateTime.now());
+        entry.setEditedAt(IstClock.now());
 
         entry = paymentEntryRepository.save(entry);
         logAction("UPDATE", entry, performedBy, diff);
@@ -502,7 +503,7 @@ public class PaymentEntryService {
         if (!entry.getEmployee().getUsername().equals(username)) {
             throw new AccessDeniedException("You can only edit your own entries");
         }
-        if (!entry.getEntryDate().equals(LocalDate.now())) {
+        if (!entry.getEntryDate().equals(IstClock.today())) {
             throw new RuntimeException("You can only edit today's entries. Past entries cannot be modified.");
         }
 
@@ -519,7 +520,7 @@ public class PaymentEntryService {
                 ? request.getReceiptVchNo().trim() : null);
         entry.setEdited(true);
         entry.setEditedBy("EMPLOYEE");
-        entry.setEditedAt(java.time.LocalDateTime.now());
+        entry.setEditedAt(IstClock.now());
 
         entry = paymentEntryRepository.save(entry);
         logAction("UPDATE", entry, username, diff);

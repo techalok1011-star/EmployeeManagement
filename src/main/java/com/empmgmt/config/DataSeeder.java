@@ -4,6 +4,7 @@ import com.empmgmt.entity.PaymentEntry;
 import com.empmgmt.entity.User;
 import com.empmgmt.repository.PaymentEntryRepository;
 import com.empmgmt.repository.UserRepository;
+import com.empmgmt.util.IstClock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -81,7 +82,7 @@ public class DataSeeder implements CommandLineRunner {
         userRepository.save(emp3);
 
         // Seed some sample entries
-        LocalDate today = LocalDate.now();
+        LocalDate today = IstClock.today();
         LocalDate yesterday = today.minusDays(1);
 
         paymentEntryRepository.save(PaymentEntry.builder()

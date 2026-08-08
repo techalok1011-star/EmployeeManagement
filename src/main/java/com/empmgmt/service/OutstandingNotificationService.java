@@ -10,6 +10,7 @@ import com.empmgmt.entity.NotificationSettings;
 import com.empmgmt.repository.NotificationLogRepository;
 import com.empmgmt.repository.NotificationSettingsRepository;
 import com.empmgmt.repository.PartyRepository;
+import com.empmgmt.util.IstClock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -118,7 +119,7 @@ public class OutstandingNotificationService {
         double successRate = (sent + failed) > 0 ? (sent * 100.0 / (sent + failed)) : 0.0;
 
         List<NotificationLog> recent = notificationLogRepository
-                .findBySentAtAfterOrderBySentAtDesc(LocalDateTime.now().minusDays(30));
+                .findBySentAtAfterOrderBySentAtDesc(IstClock.now().minusDays(30));
 
         Map<String, Long> reasonCounts = recent.stream()
                 .filter(n -> n.getStatus() == Status.FAILED && n.getErrorMessage() != null && !n.getErrorMessage().isBlank())
@@ -131,7 +132,7 @@ public class OutstandingNotificationService {
                 .collect(Collectors.toList());
 
         DateTimeFormatter dayFmt = DateTimeFormatter.ofPattern("dd MMM");
-        LocalDate today = LocalDate.now();
+        LocalDate today = IstClock.today();
         List<String> dailyLabels = new ArrayList<>();
         List<Long> dailySent = new ArrayList<>();
         List<Long> dailyFailed = new ArrayList<>();
@@ -237,7 +238,7 @@ public class OutstandingNotificationService {
                         .build());
         settings.setDailyReminderEnabled(!settings.isDailyReminderEnabled());
         settings.setUpdatedBy(updatedBy);
-        settings.setUpdatedAt(LocalDateTime.now());
+        settings.setUpdatedAt(IstClock.now());
         notificationSettingsRepository.save(settings);
         return settings.isDailyReminderEnabled();
     }
@@ -263,7 +264,7 @@ public class OutstandingNotificationService {
 
     private NotificationLog sendAndLog(PartyOutstandingDTO p, String triggeredBy) {
         WhatsAppService.SendResult result = whatsAppService.sendPaymentReminder(
-                p.getPhone(), p.getDisplayName(), p.getOutstanding(), LocalDate.now());
+                p.getPhone(), p.getDisplayName(), p.getOutstanding(), IstClock.today());
 
         Status status = result.isDryRun() ? Status.DRY_RUN
                       : result.isSuccess() ? Status.SENT
@@ -276,7 +277,7 @@ public class OutstandingNotificationService {
                 .status(status)
                 .errorMessage(result.getError())
                 .triggeredBy(triggeredBy)
-                .sentAt(LocalDateTime.now())
+                .sentAt(IstClock.now())
                 .build();
         return notificationLogRepository.save(logEntry);
     }
@@ -292,7 +293,7 @@ public class OutstandingNotificationService {
     /** Most recent NotificationLog per party, considering only logs from the last {@code days} days. */
     private Map<String, NotificationLog> latestNotificationByParty(int days) {
         List<NotificationLog> recent = notificationLogRepository
-                .findBySentAtAfterOrderBySentAtDesc(LocalDateTime.now().minusDays(days));
+                .findBySentAtAfterOrderBySentAtDesc(IstClock.now().minusDays(days));
 
         Map<String, NotificationLog> latest = new LinkedHashMap<>();
         for (NotificationLog n : recent) {

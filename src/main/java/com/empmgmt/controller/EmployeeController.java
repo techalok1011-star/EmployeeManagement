@@ -4,6 +4,7 @@ import com.empmgmt.dto.PaymentEntryDTO;
 import com.empmgmt.entity.PaymentEntry;
 import com.empmgmt.service.PaymentEntryService;
 import com.empmgmt.service.UserService;
+import com.empmgmt.util.IstClock;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,7 +43,7 @@ public class EmployeeController {
             model.addAttribute("newEntry", new PaymentEntryDTO.Request());
         }
         model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
-        model.addAttribute("today", LocalDate.now());
+        model.addAttribute("today", IstClock.today());
         return "employee/dashboard";
     }
 
@@ -62,7 +63,7 @@ public class EmployeeController {
             return "redirect:/employee/dashboard";
         }
         // Always force today's date — employees cannot add past/future entries
-        request.setEntryDate(LocalDate.now());
+        request.setEntryDate(IstClock.today());
         PaymentEntryDTO.Response saved = paymentEntryService.createEntry(request, auth.getName());
 
         // Receipt photo is optional — a problem attaching it should never block the entry itself.
@@ -112,7 +113,7 @@ public class EmployeeController {
                 return "redirect:/employee/entries";
             }
             // Restriction: employees can only edit today's entries
-            if (!entry.getEntryDate().equals(LocalDate.now())) {
+            if (!entry.getEntryDate().equals(IstClock.today())) {
                 redirectAttributes.addFlashAttribute("errorMsg",
                         "You can only edit today's entries. Past entries are locked.");
                 return "redirect:/employee/entries";
@@ -149,7 +150,7 @@ public class EmployeeController {
         }
         try {
             // Employees cannot change the entry date — always keep it as today
-            request.setEntryDate(LocalDate.now());
+            request.setEntryDate(IstClock.today());
             paymentEntryService.updateEntryByEmployee(id, request, auth.getName());
             redirectAttributes.addFlashAttribute("successMsg", "Entry updated successfully!");
         } catch (Exception e) {

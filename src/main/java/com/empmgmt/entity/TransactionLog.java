@@ -1,5 +1,6 @@
 package com.empmgmt.entity;
 
+import com.empmgmt.util.IstClock;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -62,6 +63,6 @@ public class TransactionLog {
 
     @PrePersist
     protected void onCreate() {
-        performedAt = LocalDateTime.now();
+        performedAt = IstClock.now();
     }
 }

@@ -1,5 +1,6 @@
 package com.empmgmt.entity;
 
+import com.empmgmt.util.IstClock;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -74,13 +75,13 @@ public class Invoice {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
+        createdAt = IstClock.now();
+        updatedAt = IstClock.now();
     }
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        updatedAt = IstClock.now();
     }
 
     public enum DeliveryMode {

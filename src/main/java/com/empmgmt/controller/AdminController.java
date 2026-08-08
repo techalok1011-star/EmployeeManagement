@@ -16,6 +16,7 @@ import com.empmgmt.service.LoginSessionService;
 import com.empmgmt.service.OutstandingNotificationService;
 import com.empmgmt.service.PaymentEntryService;
 import com.empmgmt.service.UserService;
+import com.empmgmt.util.IstClock;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,6 +72,8 @@ public class AdminController {
         model.addAttribute("employees", employees);
         model.addAttribute("activeEmployeeCount",
                 employees.stream().filter(e -> e.isActive()).count());
+        model.addAttribute("accountants", userService.getAllAccountants());
+        model.addAttribute("managers", userService.getAllManagers());
         model.addAttribute("adminName", auth.getName());
         Map<String, Object> stats = paymentEntryService.getDashboardStats();
         stats.forEach(model::addAttribute);
@@ -252,7 +255,7 @@ public class AdminController {
     public ResponseEntity<byte[]> exportAuditCsv() {
         var logs = paymentEntryService.getAllTransactionLogs();
         byte[] data = exportService.exportAuditLogToCsv(logs);
-        String filename = "audit-log_" + LocalDate.now() + ".csv";
+        String filename = "audit-log_" + IstClock.today() + ".csv";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                 .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
@@ -261,7 +264,7 @@ public class AdminController {
 
     private String buildExportFilename(String prefix, LocalDate from, LocalDate to) {
         String f = from != null ? from.toString() : "all";
-        String t = to   != null ? to.toString()   : LocalDate.now().toString();
+        String t = to   != null ? to.toString()   : IstClock.today().toString();
         return prefix + "_" + f + "_to_" + t;
     }
 
@@ -428,13 +431,13 @@ public class AdminController {
         model.addAttribute("ledger", invoiceService.getPartyLedger(partyName));
         model.addAttribute("adminName", auth.getName());
         PaymentEntryDTO.Request newPayment = new PaymentEntryDTO.Request();
-        newPayment.setEntryDate(LocalDate.now());
+        newPayment.setEntryDate(IstClock.today());
         model.addAttribute("newPayment", newPayment);
         model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
 
         InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
         newInvoice.setPartyName(partyName);
-        newInvoice.setInvoiceDate(LocalDate.now());
+        newInvoice.setInvoiceDate(IstClock.today());
         newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
         model.addAttribute("newInvoice", newInvoice);
         model.addAttribute("deliveryModes", com.empmgmt.entity.Invoice.DeliveryMode.values());
@@ -584,7 +587,7 @@ public class AdminController {
     public String listParties(Model model, Authentication auth,
                               @RequestParam(required = false) String q) {
         var parties = (q != null && !q.isBlank())
-                ? partyRepository.findTop50ByCombinedContainingIgnoreCase(q)
+                ? partyRepository.findTop50ByNameContainingIgnoreCaseOrTrailingNumberContainingIgnoreCase(q, q)
                 : partyRepository.findAll(Sort.by("name"));
         model.addAttribute("parties", parties);
         if (!model.containsAttribute("newParty")) {
@@ -890,7 +893,7 @@ public class AdminController {
         long neverContactedCount = worklist.stream().filter(w -> w.getLastReminderSentAt() == null).count();
         long contactedRecentCount = worklist.stream()
                 .filter(w -> w.getLastReminderSentAt() != null
-                        && w.getLastReminderSentAt().isAfter(java.time.LocalDateTime.now().minusDays(7)))
+                        && w.getLastReminderSentAt().isAfter(IstClock.now().minusDays(7)))
                 .count();
 
         model.addAttribute("worklist", worklist);

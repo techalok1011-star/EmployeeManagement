@@ -16,6 +16,7 @@ import com.empmgmt.repository.InvoiceRepository;
 import com.empmgmt.repository.PartyRepository;
 import com.empmgmt.repository.PaymentEntryRepository;
 import com.empmgmt.repository.UserRepository;
+import com.empmgmt.util.IstClock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -167,7 +168,7 @@ public class InvoiceService {
      */
     @Transactional(readOnly = true)
     public String getNextInvoiceNumber() {
-        String prefix = "INV-" + LocalDate.now().getYear() + "-";
+        String prefix = "INV-" + IstClock.today().getYear() + "-";
         int maxSeq = invoiceRepository.findByInvoiceNumberStartingWith(prefix).stream()
                 .map(inv -> inv.getInvoiceNumber().substring(prefix.length()))
                 .mapToInt(suffix -> {
@@ -312,7 +313,7 @@ public class InvoiceService {
      */
     @Transactional(readOnly = true)
     public List<InvoiceCreatorSummaryDTO> getInvoiceCreatorSummaries() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = IstClock.today();
         LocalDate monthStart = today.withDayOfMonth(1);
 
         Map<String, Object[]> allTimeByCreator = invoiceRepository.sumAndCountGroupedByCreatedBy().stream()
@@ -568,7 +569,7 @@ public class InvoiceService {
     @Cacheable(AGING_REPORT)
     @Transactional(readOnly = true)
     public List<PartyAgingDTO> getAgingReport() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = IstClock.today();
         List<PartyAgingDTO> result = new ArrayList<>();
 
         for (PartyOutstandingDTO summary : getPartyOutstandingSummary()) {
@@ -630,7 +631,7 @@ public class InvoiceService {
     @Cacheable(PAYMENT_BEHAVIOR)
     @Transactional(readOnly = true)
     public List<PartyPaymentBehaviorDTO> getPartyPaymentBehavior() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = IstClock.today();
         List<PartyPaymentBehaviorDTO> result = new ArrayList<>();
 
         for (PartyOutstandingDTO summary : getPartyOutstandingSummary()) {
@@ -746,7 +747,7 @@ public class InvoiceService {
         BigDecimal totalCollected = paymentEntryRepository.sumAllAmounts();
         BigDecimal totalOutstanding = totalInvoiced.subtract(totalCollected);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = IstClock.today();
         BigDecimal todayCollections = paymentEntryRepository.sumAmountByDate(today);
         if (todayCollections == null) {
             todayCollections = BigDecimal.ZERO;

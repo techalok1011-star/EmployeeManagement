@@ -230,27 +230,62 @@
             </div>
         </div>
 
-        <!-- Import Parties from Excel -->
-        <div class="card">
+        <!-- Accountant Cards -->
+        <div class="card" th:if="${!#lists.isEmpty(accountants)}">
             <div class="section-header">
-                <div>
-                    <div class="section-title">📥 Import Parties from Excel</div>
-                    <div style="font-size:12px;color:var(--muted);margin-top:4px;">Upload a .xlsx file — party names &amp; GSTINs are auto-detected. Duplicates are skipped.</div>
+                <div class="section-title">🧮 Accountant Overview (Today)</div>
+                <a href="/admin/employees" class="btn btn-primary">Manage →</a>
+            </div>
+            <div class="emp-grid">
+                <div class="emp-card" th:each="acc : ${accountants}">
+                    <div class="emp-avatar">👤</div>
+                    <div class="emp-name" th:text="${acc.fullName}"></div>
+                    <div class="emp-username" th:text="'@' + ${acc.username}"></div>
+                    <div class="emp-stats">
+                        <div class="emp-stat-item">
+                            <div class="label">Today Entries</div>
+                            <div class="value blue" th:text="${acc.totalEntries}">0</div>
+                        </div>
+                        <div class="emp-stat-item">
+                            <div class="label">Today Amount</div>
+                            <div class="value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(acc.totalAmount)}">0</span></div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+                        <span class="badge" th:classappend="${acc.active} ? 'badge-active' : 'badge-inactive'" th:text="${acc.active} ? 'Active' : 'Inactive'"></span>
+                        <a th:href="@{/admin/employees/{id}(id=${acc.id})}" class="btn btn-ghost">View Details</a>
+                    </div>
                 </div>
             </div>
-            <form th:action="@{/api/parties/upload-import}" method="post" enctype="multipart/form-data"
-                  style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                <label style="display:flex;align-items:center;gap:10px;background:var(--overlay-2);border:1px dashed var(--border);border-radius:10px;padding:10px 16px;cursor:pointer;flex:1;min-width:200px;">
-                    <span style="font-size:20px;">📂</span>
-                    <span id="fileLabel" style="font-size:13px;color:var(--muted);">Choose Excel file (.xlsx / .xls)</span>
-                    <input type="file" name="file" accept=".xlsx,.xls" style="display:none;"
-                           onchange="document.getElementById('fileLabel').textContent = this.files[0]?.name || 'Choose Excel file'"/>
-                </label>
-                <button type="submit" class="btn btn-primary" style="white-space:nowrap;">
-                    ⬆ Import Parties
-                </button>
-            </form>
+        </div>
+
+        <!-- Manager Cards -->
+        <div class="card" th:if="${!#lists.isEmpty(managers)}">
+            <div class="section-header">
+                <div class="section-title">📦 Manager Overview (Today)</div>
+                <a href="/admin/employees" class="btn btn-primary">Manage →</a>
+            </div>
+            <div class="emp-grid">
+                <div class="emp-card" th:each="mgr : ${managers}">
+                    <div class="emp-avatar">👤</div>
+                    <div class="emp-name" th:text="${mgr.fullName}"></div>
+                    <div class="emp-username" th:text="'@' + ${mgr.username}"></div>
+                    <div class="emp-stats">
+                        <div class="emp-stat-item">
+                            <div class="label">Today Entries</div>
+                            <div class="value blue" th:text="${mgr.totalEntries}">0</div>
+                        </div>
+                        <div class="emp-stat-item">
+                            <div class="label">Today Amount</div>
+                            <div class="value green">₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(mgr.totalAmount)}">0</span></div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+                        <span class="badge" th:classappend="${mgr.active} ? 'badge-active' : 'badge-inactive'" th:text="${mgr.active} ? 'Active' : 'Inactive'"></span>
+                        <a th:href="@{/admin/employees/{id}(id=${mgr.id})}" class="btn btn-ghost">View Details</a>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Top 5 Parties -->

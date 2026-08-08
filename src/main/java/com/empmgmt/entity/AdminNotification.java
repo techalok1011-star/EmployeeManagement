@@ -1,5 +1,6 @@
 package com.empmgmt.entity;
 
+import com.empmgmt.util.IstClock;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -60,7 +61,7 @@ public class AdminNotification {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        createdAt = IstClock.now();
     }
 
     public enum NotificationType {

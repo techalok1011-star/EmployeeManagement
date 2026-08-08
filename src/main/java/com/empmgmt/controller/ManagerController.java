@@ -7,6 +7,7 @@ import com.empmgmt.entity.PaymentEntry;
 import com.empmgmt.service.InvoiceService;
 import com.empmgmt.service.PaymentEntryService;
 import com.empmgmt.service.UserService;
+import com.empmgmt.util.IstClock;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,7 +56,7 @@ public class ManagerController {
         addDashboardAttributes(model, username, parseDateOrToday(date), parseMonthOrCurrent(month));
         if (!model.containsAttribute("newInvoice")) {
             InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
-            newInvoice.setInvoiceDate(LocalDate.now());
+            newInvoice.setInvoiceDate(IstClock.today());
             newInvoice.setInvoiceNumber(invoiceService.getNextInvoiceNumber());
             model.addAttribute("newInvoice", newInvoice);
         }
@@ -64,7 +65,7 @@ public class ManagerController {
         }
         model.addAttribute("deliveryModes", Invoice.DeliveryMode.values());
         model.addAttribute("paymentModes", PaymentEntry.ModeOfPayment.values());
-        model.addAttribute("today", LocalDate.now());
+        model.addAttribute("today", IstClock.today());
         if (!model.containsAttribute("activeTab")) {
             model.addAttribute("activeTab", "invoices");
         }
@@ -72,11 +73,11 @@ public class ManagerController {
     }
 
     private LocalDate parseDateOrToday(String date) {
-        if (date == null || date.isBlank()) return LocalDate.now();
+        if (date == null || date.isBlank()) return IstClock.today();
         try {
             return LocalDate.parse(date);
         } catch (Exception e) {
-            return LocalDate.now();
+            return IstClock.today();
         }
     }
 
@@ -305,7 +306,7 @@ public class ManagerController {
                 redirectAttributes.addFlashAttribute("errorMsg", "You can only edit your own collections.");
                 return "redirect:/manager/entries";
             }
-            if (!entry.getEntryDate().equals(LocalDate.now())) {
+            if (!entry.getEntryDate().equals(IstClock.today())) {
                 redirectAttributes.addFlashAttribute("errorMsg",
                         "You can only edit today's collections. Past entries are locked.");
                 return "redirect:/manager/entries";

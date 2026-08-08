@@ -1,5 +1,6 @@
 package com.empmgmt.entity;
 
+import com.empmgmt.util.IstClock;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -60,6 +61,6 @@ public class AuditLog {
 
     @PrePersist
     protected void onCreate() {
-        performedAt = LocalDateTime.now();
+        performedAt = IstClock.now();
     }
 }
