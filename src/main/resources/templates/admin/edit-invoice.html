@@ -155,7 +155,8 @@
                 <div class="form-error" th:if="${#fields.hasErrors('invoiceNumber')}" th:errors="*{invoiceNumber}"></div>
 
                 <label class="form-label">Invoice Date</label>
-                <input type="date" class="form-control" th:field="*{invoiceDate}"/>
+                <input type="date" class="form-control" name="invoiceDate"
+                       th:value="${#temporals.format(invoice.invoiceDate, 'yyyy-MM-dd')}"/>
                 <div class="form-error" th:if="${#fields.hasErrors('invoiceDate')}" th:errors="*{invoiceDate}"></div>
 
                 <label class="form-label">Party Name / Trailing No.</label>

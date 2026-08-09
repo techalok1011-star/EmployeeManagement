@@ -319,7 +319,8 @@
                     </div>
                     <div>
                         <label class="form-label">Date</label>
-                        <input type="date" class="form-control" th:field="*{entryDate}"/>
+                        <input type="date" class="form-control" name="entryDate"
+                               th:value="${newPayment.entryDate != null ? #temporals.format(newPayment.entryDate, 'yyyy-MM-dd') : ''}"/>
                         <div class="form-error" th:if="${#fields.hasErrors('entryDate')}" th:errors="*{entryDate}"></div>
                     </div>
                 </div>
