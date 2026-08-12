@@ -256,6 +256,12 @@ public class InvoiceService {
         Map<String, Party> partyLookup = partyRepository.findByCombinedIn(allParties)
                 .stream().collect(Collectors.toMap(Party::getCombined, p -> p));
 
+        // 5. Drop any party_name with no live Party record - invoices/payments store this as
+        // free text with no FK, so a deleted or renamed-without-migration Party otherwise keeps
+        // showing up here (and everywhere downstream: Full Ledger, Aging, WhatsApp reminders...)
+        // as an un-editable, un-deletable ghost.
+        allParties.retainAll(partyLookup.keySet());
+
         return allParties.stream().map(combined -> {
             BigDecimal invoiced    = invoicedMap.getOrDefault(combined, BigDecimal.ZERO);
             BigDecimal paid        = paidMap.getOrDefault(combined, BigDecimal.ZERO);
