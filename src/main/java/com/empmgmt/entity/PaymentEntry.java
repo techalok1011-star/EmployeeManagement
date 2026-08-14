@@ -8,7 +8,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "payment_entries")
+@Table(name = "payment_entries", indexes = {
+        // Mirrors Invoice's indexes. Without these the table had only its primary key, so every
+        // party-wise ledger/report lookup sequential-scanned the whole table, and the dashboard's
+        // 30-day window filtered by date with no index to help it.
+        @Index(columnList = "party_name"),
+        @Index(columnList = "entry_date")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
