@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -352,13 +353,12 @@ public class PaymentEntryService {
         LocalDate since30 = today.minusDays(29);
         DateTimeFormatter labelFmt = DateTimeFormatter.ofPattern("dd MMM").withLocale(Locale.ENGLISH);
 
-        List<PaymentEntry> allEntries = paymentEntryRepository.findAll();
-
-        // Daily totals for last 30 days (fill zeros for missing days)
-        Map<LocalDate, BigDecimal> dailyMap = new java.util.LinkedHashMap<>();
-        allEntries.stream()
-                .filter(e -> !e.getEntryDate().isBefore(since30) && !e.getEntryDate().isAfter(today))
-                .forEach(e -> dailyMap.merge(e.getEntryDate(), e.getAmount(), BigDecimal::add));
+        // Daily totals for the last 30 days. The query returns only days that have entries,
+        // so gaps are zero-filled here, exactly as the previous in-memory version did.
+        Map<LocalDate, BigDecimal> dailyMap = new LinkedHashMap<>();
+        for (Object[] row : paymentEntryRepository.sumAmountGroupedByEntryDate(since30, today)) {
+            dailyMap.put((LocalDate) row[0], (BigDecimal) row[1]);
+        }
         List<String> dailyLabels = new ArrayList<>();
         List<Double> dailyAmounts = new ArrayList<>();
         for (int i = 29; i >= 0; i--) {
@@ -367,44 +367,41 @@ public class PaymentEntryService {
             dailyAmounts.add(dailyMap.getOrDefault(d, BigDecimal.ZERO).doubleValue());
         }
 
-        // Mode breakdown (all-time), sorted desc
-        Map<String, BigDecimal> modeMap = new java.util.LinkedHashMap<>();
-        allEntries.forEach(e -> modeMap.merge(e.getModeOfPayment().getDisplayName(), e.getAmount(), BigDecimal::add));
-        List<Map.Entry<String, BigDecimal>> sortedModes = modeMap.entrySet().stream()
+        // Mode breakdown (all-time), sorted desc. Grouped by the enum in SQL, then mapped to the
+        // human-readable display name here — every ModeOfPayment has a distinct display name, so
+        // this can't collapse two modes into one bucket.
+        List<Map.Entry<String, BigDecimal>> sortedModes = paymentEntryRepository.sumAmountGroupedByMode()
+                .stream()
+                .map(row -> Map.entry(((PaymentEntry.ModeOfPayment) row[0]).getDisplayName(),
+                                      (BigDecimal) row[1]))
                 .sorted(Map.Entry.<String, BigDecimal>comparingByValue().reversed())
                 .collect(Collectors.toList());
         List<String> modeLabels = sortedModes.stream().map(Map.Entry::getKey).collect(Collectors.toList());
         List<Double> modeAmounts = sortedModes.stream().map(e -> e.getValue().doubleValue()).collect(Collectors.toList());
 
-        // Top 5 parties (all-time), sorted desc
-        Map<String, BigDecimal> partyMap = new java.util.LinkedHashMap<>();
-        allEntries.forEach(e -> partyMap.merge(e.getPartyName(), e.getAmount(), BigDecimal::add));
-        List<Map<String, Object>> top5Parties = partyMap.entrySet().stream()
-                .sorted(Map.Entry.<String, BigDecimal>comparingByValue().reversed())
-                .limit(5)
-                .map(e -> {
-                    Map<String, Object> m = new java.util.LinkedHashMap<>();
-                    m.put("name", e.getKey());
-                    m.put("amount", e.getValue());
+        // Top 5 parties (all-time) — ordered and capped by the database.
+        List<Map<String, Object>> top5Parties = paymentEntryRepository
+                .sumAmountGroupedByPartyNameOrdered(PageRequest.of(0, 5))
+                .stream()
+                .map(row -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("name", row[0]);
+                    m.put("amount", row[1]);
                     return m;
                 })
                 .collect(Collectors.toList());
 
-        // Today's total and count
-        BigDecimal todayTotal = allEntries.stream()
-                .filter(e -> e.getEntryDate().equals(today))
-                .map(PaymentEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-        long todayCount = allEntries.stream().filter(e -> e.getEntryDate().equals(today)).count();
+        BigDecimal todayTotalAgg = paymentEntryRepository.sumAmountByDate(today);
+        BigDecimal todayTotal = todayTotalAgg != null ? todayTotalAgg : BigDecimal.ZERO;
+        long todayCount = paymentEntryRepository.countByEntryDate(today);
 
-        // Recent entries (top 10, by createdAt desc) — replaces second DB call in controller
-        List<PaymentEntryDTO.Response> recentEntries = allEntries.stream()
-                .sorted(Comparator.comparing(PaymentEntry::getCreatedAt,
-                        Comparator.nullsLast(Comparator.reverseOrder())))
-                .limit(10)
+        List<PaymentEntryDTO.Response> recentEntries = paymentEntryRepository
+                .findRecentWithEmployee(PageRequest.of(0, 10))
+                .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
 
-        Map<String, Object> stats = new java.util.LinkedHashMap<>();
+        Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("dailyLabels", dailyLabels);
         stats.put("dailyAmounts", dailyAmounts);
         stats.put("modeLabels", modeLabels);
@@ -413,7 +410,7 @@ public class PaymentEntryService {
         stats.put("todayTotal", todayTotal);
         stats.put("todayCount", todayCount);
         stats.put("recentEntries", recentEntries);
-        stats.put("totalEntries", (long) allEntries.size());
+        stats.put("totalEntries", paymentEntryRepository.count());
         return stats;
     }
 

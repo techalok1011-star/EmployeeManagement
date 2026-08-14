@@ -2,6 +2,7 @@ package com.empmgmt.repository;
 
 import com.empmgmt.entity.PaymentEntry;
 import com.empmgmt.entity.User;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -60,4 +61,33 @@ public interface PaymentEntryRepository extends JpaRepository<PaymentEntry, Long
     /** Returns [employeeId, sumAmount, count] triples for entries within the given date range. */
     @Query("SELECT p.employee.id, SUM(p.amount), COUNT(p) FROM PaymentEntry p WHERE p.entryDate BETWEEN :start AND :end GROUP BY p.employee.id")
     List<Object[]> sumAndCountGroupedByEmployeeInRange(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    // ── Dashboard aggregates ──────────────────────────────────────────────────────────────────
+    // These exist so the dashboard doesn't have to pull every PaymentEntry into memory just to
+    // total it up. Only days present in the range come back; the caller zero-fills the gaps.
+
+    /** Returns [entryDate, sumAmount] pairs for entries within the range, one row per day. */
+    @Query("SELECT p.entryDate, SUM(p.amount) FROM PaymentEntry p WHERE p.entryDate BETWEEN :start AND :end GROUP BY p.entryDate")
+    List<Object[]> sumAmountGroupedByEntryDate(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    /** Returns [modeOfPayment, sumAmount] pairs, all-time, one row per mode actually used. */
+    @Query("SELECT p.modeOfPayment, SUM(p.amount) FROM PaymentEntry p GROUP BY p.modeOfPayment")
+    List<Object[]> sumAmountGroupedByMode();
+
+    /** Returns [partyName, sumAmount] pairs, all-time, biggest first. Use a Pageable to cap it. */
+    @Query("SELECT p.partyName, SUM(p.amount) FROM PaymentEntry p GROUP BY p.partyName ORDER BY SUM(p.amount) DESC")
+    List<Object[]> sumAmountGroupedByPartyNameOrdered(Pageable pageable);
+
+    long countByEntryDate(LocalDate date);
+
+    /**
+     * Most recent entries by createdAt, newest first, with nulls last.
+     * <p>
+     * NULLS LAST is deliberate and load-bearing: a large share of rows (the legacy Tally imports)
+     * have a null createdAt, and Postgres sorts NULLs FIRST on a DESC ordering. Without it this
+     * would return nothing but null-dated rows. It matches the Comparator.nullsLast ordering the
+     * in-memory version used. JOIN FETCH avoids an N+1 on the LAZY employee that mapToResponse reads.
+     */
+    @Query("SELECT p FROM PaymentEntry p JOIN FETCH p.employee ORDER BY p.createdAt DESC NULLS LAST")
+    List<PaymentEntry> findRecentWithEmployee(Pageable pageable);
 }
