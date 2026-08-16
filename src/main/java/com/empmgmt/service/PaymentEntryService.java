@@ -265,7 +265,7 @@ public class PaymentEntryService {
     @Transactional(readOnly = true)
     public List<PaymentEntryDTO.Response> getFilteredEntriesForAdmin(LocalDate from, LocalDate to, Long employeeId) {
         LocalDate start = from != null ? from : LocalDate.of(2000, 1, 1);
-        LocalDate end   = to   != null ? to   : IstClock.today();
+        LocalDate end   = to   != null ? to   : LocalDate.of(9999, 12, 31);
         if (employeeId != null) {
             return paymentEntryRepository.findByEmployeeIdAndDateRange(employeeId, start, end)
                     .stream().map(this::mapToResponse).collect(Collectors.toList());
@@ -278,7 +278,7 @@ public class PaymentEntryService {
     public List<PaymentEntryDTO.DayGroup> getFilteredEntriesGroupedByDayForEmployee(String username, LocalDate from, LocalDate to) {
         User employee = findUserByUsername(username);
         LocalDate start = from != null ? from : LocalDate.of(2000, 1, 1);
-        LocalDate end   = to   != null ? to   : IstClock.today();
+        LocalDate end   = to   != null ? to   : LocalDate.of(9999, 12, 31);
         List<PaymentEntryDTO.Response> all = paymentEntryRepository
                 .findByEmployeeIdAndDateRange(employee.getId(), start, end)
                 .stream().map(this::mapToResponse).collect(Collectors.toList());

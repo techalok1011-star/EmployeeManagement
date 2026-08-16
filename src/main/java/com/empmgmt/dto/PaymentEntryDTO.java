@@ -27,6 +27,7 @@ public class PaymentEntryDTO {
         private PaymentEntry.ModeOfPayment modeOfPayment;
 
         @NotNull(message = "Date is required")
+        @PastOrPresent(message = "Entry date cannot be in the future")
         private LocalDate entryDate;
 
         @Size(max = 500, message = "Remarks must not exceed 500 characters")

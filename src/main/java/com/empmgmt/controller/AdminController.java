@@ -178,6 +178,7 @@ public class AdminController {
             req.setRemarks(entry.getRemarks());
             req.setEntryDate(entry.getEntryDate());
             req.setReceiptVchNo(entry.getReceiptVchNo());
+            req.setModeOfPayment(findModeOfPaymentByDisplayName(entry.getModeOfPayment()));
             model.addAttribute("editRequest", req);
         }
         return "admin/edit-entry";
@@ -363,6 +364,14 @@ public class AdminController {
     private com.empmgmt.entity.Invoice.DeliveryMode findDeliveryModeByDisplayName(String displayName) {
         if (displayName == null) return null;
         for (com.empmgmt.entity.Invoice.DeliveryMode mode : com.empmgmt.entity.Invoice.DeliveryMode.values()) {
+            if (mode.getDisplayName().equals(displayName)) return mode;
+        }
+        return null;
+    }
+
+    private PaymentEntry.ModeOfPayment findModeOfPaymentByDisplayName(String displayName) {
+        if (displayName == null) return null;
+        for (PaymentEntry.ModeOfPayment mode : PaymentEntry.ModeOfPayment.values()) {
             if (mode.getDisplayName().equals(displayName)) return mode;
         }
         return null;

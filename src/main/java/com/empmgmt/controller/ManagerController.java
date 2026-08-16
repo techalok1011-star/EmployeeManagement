@@ -166,6 +166,14 @@ public class ManagerController {
         return null;
     }
 
+    private PaymentEntry.ModeOfPayment findModeOfPaymentByDisplayName(String displayName) {
+        if (displayName == null) return null;
+        for (PaymentEntry.ModeOfPayment mode : PaymentEntry.ModeOfPayment.values()) {
+            if (mode.getDisplayName().equals(displayName)) return mode;
+        }
+        return null;
+    }
+
     // ─── Edit Invoice (own invoices, any date) ──────────────────
 
     @GetMapping("/invoices/{id}/edit")
@@ -317,6 +325,7 @@ public class ManagerController {
             req.setRemarks(entry.getRemarks());
             req.setEntryDate(entry.getEntryDate());
             req.setReceiptVchNo(entry.getReceiptVchNo());
+            req.setModeOfPayment(findModeOfPaymentByDisplayName(entry.getModeOfPayment()));
             model.addAttribute("entry", entry);
             if (!model.containsAttribute("editRequest")) {
                 model.addAttribute("editRequest", req);
