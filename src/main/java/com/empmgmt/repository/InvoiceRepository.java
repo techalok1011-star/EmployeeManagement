@@ -2,6 +2,7 @@ package com.empmgmt.repository;
 
 import com.empmgmt.entity.Invoice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -49,4 +50,16 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     /** Same, restricted to a date range - used for the "this month" column. */
     @Query("SELECT i.createdBy, SUM(i.amount), COUNT(i) FROM Invoice i WHERE i.createdBy IS NOT NULL AND i.invoiceDate BETWEEN :start AND :end GROUP BY i.createdBy")
     List<Object[]> sumAndCountGroupedByCreatedByInRange(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    // ── Party merge ────────────────────────────────────────────────────────
+
+    long countByPartyName(String partyName);
+
+    @Query("SELECT COALESCE(SUM(i.amount), 0) FROM Invoice i WHERE i.partyName = :partyName")
+    BigDecimal sumAmountByPartyName(@Param("partyName") String partyName);
+
+    /** Bulk re-point every invoice filed under one party_name text onto another. See PartyMergeService. */
+    @Modifying
+    @Query("UPDATE Invoice i SET i.partyName = :toName WHERE i.partyName = :fromName")
+    int repointPartyName(@Param("fromName") String fromName, @Param("toName") String toName);
 }

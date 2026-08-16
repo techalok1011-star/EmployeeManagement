@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public class PartyDTO {
 
@@ -28,6 +29,10 @@ public class PartyDTO {
         private String phone;   // E.164, optional
 
         private boolean whatsappOptIn;
+
+        /** Balance carried forward as of openingBalanceDate. Positive = Dr, negative = Cr. Optional, defaults to 0. */
+        private BigDecimal openingBalance;
+        private LocalDate openingBalanceDate;
     }
 
     @Data
@@ -42,5 +47,7 @@ public class PartyDTO {
         private BigDecimal totalAmount;
         private String phone;
         private boolean whatsappOptIn;
+        private BigDecimal openingBalance;
+        private LocalDate openingBalanceDate;
     }
 }

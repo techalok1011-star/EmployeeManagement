@@ -15,7 +15,7 @@ public class PartyLedgerDTO {
     @Builder
     public static class Entry {
         private LocalDate date;
-        private String type;        // "INVOICE" | "PAYMENT"
+        private String type;        // "INVOICE" | "PAYMENT" | "OPENING_BALANCE" | "FY_SUMMARY"
         private String reference;   // invoice number, or payment mode display name
         private String description; // invoice description, or remarks
         private String deliveryInfo; // "Truck • MH12AB1234" — invoice rows only, null for payments
@@ -48,6 +48,7 @@ public class PartyLedgerDTO {
         private String trailingNumber;
         private BigDecimal totalInvoiced;
         private BigDecimal totalPaid;
+        private BigDecimal openingBalance;
         private BigDecimal outstanding;
         private List<Entry> entries; // newest first
         private int transactionCount; // real invoice/payment rows, excluding synthetic FY_SUMMARY rows

@@ -265,7 +265,6 @@ public class InvoiceService {
         return allParties.stream().map(combined -> {
             BigDecimal invoiced    = invoicedMap.getOrDefault(combined, BigDecimal.ZERO);
             BigDecimal paid        = paidMap.getOrDefault(combined, BigDecimal.ZERO);
-            BigDecimal outstanding = invoiced.subtract(paid);
 
             // split "Name_GSTIN" → displayName + gstin
             int sep = combined.indexOf('_');
@@ -273,6 +272,8 @@ public class InvoiceService {
             String gstin       = sep > 0 ? combined.substring(sep + 1) : "";
 
             Party party = partyLookup.get(combined);
+            BigDecimal openingBalance = party != null ? party.getOpeningBalance() : BigDecimal.ZERO;
+            BigDecimal outstanding = invoiced.subtract(paid).add(openingBalance);
 
             return PartyOutstandingDTO.builder()
                     .partyId(party != null ? party.getId() : null)
@@ -282,6 +283,8 @@ public class InvoiceService {
                     .trailingNumber(party != null ? party.getTrailingNumber() : null)
                     .totalInvoiced(invoiced)
                     .totalPaid(paid)
+                    .openingBalance(openingBalance)
+                    .openingBalanceDate(party != null ? party.getOpeningBalanceDate() : null)
                     .outstanding(outstanding)
                     .phone(party != null ? party.getPhone() : null)
                     .whatsappOptIn(party != null && party.isWhatsappOptIn())
@@ -366,12 +369,18 @@ public class InvoiceService {
     @Cacheable(value = PARTY_LEDGER, key = "#combinedPartyName")
     @Transactional(readOnly = true)
     public PartyLedgerDTO.Response getPartyLedger(String combinedPartyName) {
+        Party party = partyRepository.findByCombined(combinedPartyName).orElse(null);
         List<Invoice> invoices = invoiceRepository.findByPartyNameOrderByInvoiceDateDescCreatedAtDesc(combinedPartyName);
         List<PaymentEntry> payments = paymentEntryRepository.findByPartyNameOrderByEntryDateDescCreatedAtDesc(combinedPartyName);
 
         List<PartyLedgerDTO.Entry> entries = new ArrayList<>();
         BigDecimal totalInvoiced = BigDecimal.ZERO;
         BigDecimal totalPaid = BigDecimal.ZERO;
+
+        addOpeningBalanceEntry(entries,
+                party != null ? party.getOpeningBalance() : BigDecimal.ZERO,
+                party != null ? party.getOpeningBalanceDate() : null,
+                invoices, payments);
 
         for (Invoice inv : invoices) {
             String deliveryInfo = inv.getDeliveryMode() != null
@@ -407,7 +416,7 @@ public class InvoiceService {
         entries.sort(Comparator.comparing(PartyLedgerDTO.Entry::getDate)
                 .thenComparing(PartyLedgerDTO.Entry::getSortTiebreak, Comparator.nullsFirst(Comparator.naturalOrder())));
 
-        int transactionCount = entries.size();
+        int transactionCount = (int) entries.stream().filter(e -> !"OPENING_BALANCE".equals(e.getType())).count();
         BigDecimal running = BigDecimal.ZERO;
         for (PartyLedgerDTO.Entry e : entries) {
             running = e.getDebit() != null ? running.add(e.getDebit()) : running.subtract(e.getCredit());
@@ -420,7 +429,7 @@ public class InvoiceService {
         String displayName = sep > 0 ? combinedPartyName.substring(0, sep) : combinedPartyName;
         String gstin = sep > 0 ? combinedPartyName.substring(sep + 1) : "";
 
-        Party party = partyRepository.findByCombined(combinedPartyName).orElse(null);
+        BigDecimal openingBalance = party != null ? party.getOpeningBalance() : BigDecimal.ZERO;
 
         return PartyLedgerDTO.Response.builder()
                 .partyId(party != null ? party.getId() : null)
@@ -430,7 +439,8 @@ public class InvoiceService {
                 .trailingNumber(party != null ? party.getTrailingNumber() : null)
                 .totalInvoiced(totalInvoiced)
                 .totalPaid(totalPaid)
-                .outstanding(totalInvoiced.subtract(totalPaid))
+                .openingBalance(openingBalance)
+                .outstanding(totalInvoiced.subtract(totalPaid).add(openingBalance))
                 .entries(entries)
                 .transactionCount(transactionCount)
                 .build();
@@ -459,6 +469,7 @@ public class InvoiceService {
             List<PaymentEntry> payments = paymentsByParty.getOrDefault(combined, List.of());
 
             List<PartyLedgerDTO.Entry> entries = new ArrayList<>();
+            addOpeningBalanceEntry(entries, summary.getOpeningBalance(), summary.getOpeningBalanceDate(), invoices, payments);
             for (Invoice inv : invoices) {
                 String deliveryInfo = inv.getDeliveryMode() != null
                         ? inv.getDeliveryMode().getDisplayName()
@@ -491,6 +502,7 @@ public class InvoiceService {
             entries.sort(Comparator.comparing(PartyLedgerDTO.Entry::getDate)
                     .thenComparing(PartyLedgerDTO.Entry::getSortTiebreak, Comparator.nullsFirst(Comparator.naturalOrder())));
 
+            int transactionCount = (int) entries.stream().filter(e -> !"OPENING_BALANCE".equals(e.getType())).count();
             BigDecimal running = BigDecimal.ZERO;
             for (PartyLedgerDTO.Entry e : entries) {
                 running = e.getDebit() != null ? running.add(e.getDebit()) : running.subtract(e.getCredit());
@@ -505,8 +517,9 @@ public class InvoiceService {
                     .trailingNumber(summary.getTrailingNumber())
                     .totalInvoiced(summary.getTotalInvoiced())
                     .totalPaid(summary.getTotalPaid())
+                    .openingBalance(summary.getOpeningBalance())
                     .outstanding(summary.getOutstanding())
-                    .transactionCount(entries.size())
+                    .transactionCount(transactionCount)
                     .entries(insertFiscalYearTotals(entries))
                     .build());
         }
@@ -520,6 +533,39 @@ public class InvoiceService {
 
     private static String fiscalYearLabel(int startYear) {
         return "FY " + startYear + "-" + String.format("%02d", (startYear + 1) % 100);
+    }
+
+    /**
+     * Prepends a synthetic OPENING_BALANCE entry to a party's (not-yet-sorted) entry list when
+     * that party carries a nonzero {@code Party.openingBalance} - every real ledger has one, and
+     * without this line the running balance silently starts from zero. Positive = debit (Dr, the
+     * party owes us), negative = credit (Cr), same convention as invoice/payment entries, so the
+     * existing generic "debit != null ? add : subtract" running-balance loop needs no special case.
+     * Dated at {@code openingBalanceDate} if set, else falls back to the earliest real transaction
+     * date (or a fixed 1900-01-01 floor if the party somehow has none) so it still anchors first.
+     */
+    private void addOpeningBalanceEntry(List<PartyLedgerDTO.Entry> entries, BigDecimal openingBalance,
+                                         LocalDate openingBalanceDate, List<Invoice> invoices, List<PaymentEntry> payments) {
+        if (openingBalance == null || openingBalance.compareTo(BigDecimal.ZERO) == 0) return;
+        LocalDate date = openingBalanceDate;
+        if (date == null) {
+            date = java.util.stream.Stream.concat(
+                            invoices.stream().map(Invoice::getInvoiceDate),
+                            payments.stream().map(PaymentEntry::getEntryDate))
+                    .min(Comparator.naturalOrder())
+                    .orElse(LocalDate.of(1900, 1, 1));
+        }
+        PartyLedgerDTO.Entry.EntryBuilder entry = PartyLedgerDTO.Entry.builder()
+                .date(date)
+                .type("OPENING_BALANCE")
+                .reference("Opening Balance")
+                .description("Carried forward as of " + date);
+        if (openingBalance.compareTo(BigDecimal.ZERO) > 0) {
+            entry.debit(openingBalance);
+        } else {
+            entry.credit(openingBalance.abs());
+        }
+        entries.add(entry.build());
     }
 
     /**
@@ -586,13 +632,30 @@ public class InvoiceService {
             List<Invoice> invoices = invoiceRepository.findByPartyNameOrderByInvoiceDateDescCreatedAtDesc(summary.getPartyName());
             invoices.sort(Comparator.comparing(Invoice::getInvoiceDate));
 
+            // FIFO debit list: a Dr opening balance is the earliest debit (aged from its own date);
+            // a Cr opening balance behaves like a pre-existing payment, folded into paidRemaining instead.
+            BigDecimal openingBalance = summary.getOpeningBalance() != null ? summary.getOpeningBalance() : BigDecimal.ZERO;
             BigDecimal paidRemaining = summary.getTotalPaid() != null ? summary.getTotalPaid() : BigDecimal.ZERO;
-            LocalDate oldestUnpaidDate = null;
+            List<Map.Entry<LocalDate, BigDecimal>> debits = new ArrayList<>();
+            if (openingBalance.compareTo(BigDecimal.ZERO) > 0) {
+                LocalDate openingDate = summary.getOpeningBalanceDate() != null
+                        ? summary.getOpeningBalanceDate()
+                        : (invoices.isEmpty() ? today : invoices.get(0).getInvoiceDate());
+                debits.add(Map.entry(openingDate, openingBalance));
+            } else if (openingBalance.compareTo(BigDecimal.ZERO) < 0) {
+                paidRemaining = paidRemaining.add(openingBalance.abs());
+            }
             for (Invoice inv : invoices) {
-                if (paidRemaining.compareTo(inv.getAmount()) >= 0) {
-                    paidRemaining = paidRemaining.subtract(inv.getAmount());
+                debits.add(Map.entry(inv.getInvoiceDate(), inv.getAmount()));
+            }
+            debits.sort(Map.Entry.comparingByKey());
+
+            LocalDate oldestUnpaidDate = null;
+            for (Map.Entry<LocalDate, BigDecimal> debit : debits) {
+                if (paidRemaining.compareTo(debit.getValue()) >= 0) {
+                    paidRemaining = paidRemaining.subtract(debit.getValue());
                 } else {
-                    oldestUnpaidDate = inv.getInvoiceDate();
+                    oldestUnpaidDate = debit.getKey();
                     break;
                 }
             }

@@ -69,6 +69,7 @@
         .text-muted{color:var(--muted);font-size:12px}
         .badge-invoice{background:rgba(108,142,255,0.15);color:var(--accent);padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600}
         .badge-payment{background:rgba(52,211,153,0.15);color:var(--green);padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600}
+        .badge-opening{background:rgba(245,200,66,0.15);color:var(--gold);padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600}
         .fy-summary-row td{background:rgba(245,200,66,0.12);color:var(--gold);font-weight:700;border-top:1.5px solid var(--gold);border-bottom:1.5px solid var(--gold)}
         .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
         .empty-icon{font-size:44px;margin-bottom:12px}
@@ -121,6 +122,7 @@
         <a href="/admin/employees" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>👥</span> Employees</a>
         <a href="/admin/entries" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>📋</span> All Entries</a>
         <a href="/admin/parties" class="nav-link"><span>🏢</span> Parties</a>
+        <a href="/admin/parties/merge" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>🔗</span> Merge Parties</a>
         <a href="/admin/employee-collections" class="nav-link"><span>💰</span> Employee Collections</a>
         <a href="/admin/invoice-creators" class="nav-link"><span>🧾</span> Invoices by Creator</a>
         <a href="/admin/invoices" class="nav-link"><span>🧾</span> Invoices</a>
@@ -179,9 +181,10 @@
                 <div class="party-block-meta">
                     <span class="meta-item">Invoiced <b>₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(ledger.totalInvoiced)}"></span></b></span>
                     <span class="meta-item">Paid <b>₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(ledger.totalPaid)}"></span></b></span>
-                    <span class="meta-item">Outstanding
+                    <span class="meta-item"><span th:text="${ledger.outstanding.compareTo(T(java.math.BigDecimal).ZERO) < 0} ? 'Advance Held' : 'Outstanding'">Outstanding</span>
                         <b th:class="${ledger.outstanding.compareTo(T(java.math.BigDecimal).ZERO) > 0} ? 'amount-out-pos' : 'amount-out-neg'">
                             ₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(ledger.outstanding.abs())}"></span>
+                            <span th:if="${ledger.outstanding.compareTo(T(java.math.BigDecimal).ZERO) < 0}">&nbsp;Cr</span>
                         </b>
                     </span>
                     <a th:if="${ledger.partyId != null}" class="text-muted" style="text-decoration:underline"
@@ -235,6 +238,7 @@
                             <td>
                                 <span class="badge-invoice" th:if="${e.type == 'INVOICE'}">🧾 Invoice</span>
                                 <span class="badge-payment" th:if="${e.type == 'PAYMENT'}">💰 Payment</span>
+                                <span class="badge-opening" th:if="${e.type == 'OPENING_BALANCE'}">🏁 Opening Balance</span>
                             </td>
                             <td th:text="${e.reference != null ? e.reference : '—'}"></td>
                             <td class="text-muted" th:text="${e.salesVchNo != null ? e.salesVchNo : '—'}"></td>

@@ -14,6 +14,7 @@ import com.empmgmt.service.ExportService;
 import com.empmgmt.service.InvoiceService;
 import com.empmgmt.service.LoginSessionService;
 import com.empmgmt.service.OutstandingNotificationService;
+import com.empmgmt.service.PartyMergeService;
 import com.empmgmt.service.PaymentEntryService;
 import com.empmgmt.service.UserService;
 import com.empmgmt.util.IstClock;
@@ -63,6 +64,7 @@ public class AdminController {
     private final AuditLogService auditLogService;
     private final LoginSessionService loginSessionService;
     private final SessionRegistry sessionRegistry;
+    private final PartyMergeService partyMergeService;
 
     // ─── Dashboard ────────────────────────────────────────────
 
@@ -636,6 +638,8 @@ public class AdminController {
                     .phone(request.getPhone() != null && !request.getPhone().isBlank()
                             ? request.getPhone().trim() : null)
                     .whatsappOptIn(request.isWhatsappOptIn())
+                    .openingBalance(request.getOpeningBalance() != null ? request.getOpeningBalance() : java.math.BigDecimal.ZERO)
+                    .openingBalanceDate(request.getOpeningBalanceDate())
                     .build());
             logPartyAudit("CREATE", saved, auth.getName(), "Party '" + combined + "' created");
             redirectAttributes.addFlashAttribute("successMsg", "Party added successfully!");
@@ -656,6 +660,8 @@ public class AdminController {
                 .trailingNumber(party.getTrailingNumber())
                 .phone(party.getPhone())
                 .whatsappOptIn(party.isWhatsappOptIn())
+                .openingBalance(party.getOpeningBalance())
+                .openingBalanceDate(party.getOpeningBalanceDate())
                 .build();
         model.addAttribute("party", party);
         if (!model.containsAttribute("editRequest")) {
@@ -694,6 +700,8 @@ public class AdminController {
             party.setPhone(request.getPhone() != null && !request.getPhone().isBlank()
                     ? request.getPhone().trim() : null);
             party.setWhatsappOptIn(request.isWhatsappOptIn());
+            party.setOpeningBalance(request.getOpeningBalance() != null ? request.getOpeningBalance() : java.math.BigDecimal.ZERO);
+            party.setOpeningBalanceDate(request.getOpeningBalanceDate());
             partyRepository.save(party);
             logPartyAudit("UPDATE", party, auth.getName(), "Party '" + before + "' updated to '" + combined + "'");
         });
@@ -733,6 +741,54 @@ public class AdminController {
         String role = userService.getUserByUsername(performedBy).getRole();
         auditLogService.log(action, "PARTY", party.getId(), party.getCombined(),
                 null, description, performedBy, role);
+    }
+
+    // ─── Party Merge ────────────────────────────────────────────
+    // Fixes the free-text-no-FK party_name split (PRASANG/SURAJ/USMANI pattern) that has
+    // otherwise required hand-written SQL + one-at-a-time UI edits every time it's found.
+    // ADMIN only (no @PreAuthorize override - class default already restricts to ADMIN),
+    // deliberately not widened to ACCOUNTANT since this bulk-rewrites ledger history in one shot.
+
+    @GetMapping("/parties/merge")
+    public String mergePartiesForm(Model model, Authentication auth) {
+        model.addAttribute("orphans", partyMergeService.getOrphanedParties());
+        if (!model.containsAttribute("mergeRequest")) {
+            model.addAttribute("mergeRequest", new com.empmgmt.dto.PartyMergeDTO.Request());
+        }
+        model.addAttribute("adminName", auth.getName());
+        return "admin/party-merge";
+    }
+
+    @GetMapping("/parties/merge/preview")
+    @ResponseBody
+    public com.empmgmt.dto.PartyMergeDTO.Preview mergePreview(
+            @RequestParam(required = false) String fromName,
+            @RequestParam(required = false) String toCombined) {
+        return partyMergeService.preview(fromName, toCombined);
+    }
+
+    @PostMapping("/parties/merge")
+    public String mergeParties(@Valid @ModelAttribute("mergeRequest") com.empmgmt.dto.PartyMergeDTO.Request request,
+                               BindingResult result,
+                               Authentication auth,
+                               RedirectAttributes redirectAttributes) {
+        if (result.hasErrors()) {
+            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.mergeRequest", result);
+            redirectAttributes.addFlashAttribute("mergeRequest", request);
+            redirectAttributes.addFlashAttribute("errorMsg", result.getFieldErrors().stream()
+                    .map(FieldError::getDefaultMessage).findFirst().orElse("Invalid merge request."));
+            return "redirect:/admin/parties/merge";
+        }
+        try {
+            var res = partyMergeService.merge(request, auth.getName());
+            redirectAttributes.addFlashAttribute("successMsg",
+                    "Merged '" + res.getFromName() + "' into '" + res.getToCombined() + "': "
+                            + res.getInvoicesMoved() + " invoice(s) + " + res.getPaymentsMoved()
+                            + " payment(s) re-pointed.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/admin/parties/merge";
     }
 
     // ─── Manual Notification Trigger ─────────────────────────

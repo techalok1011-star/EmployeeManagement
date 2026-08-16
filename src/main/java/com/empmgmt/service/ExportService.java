@@ -299,7 +299,8 @@ public class ExportService {
 
         String fromStr = from != null ? from.toString() : "beginning";
         String toStr   = to   != null ? to.toString()   : IstClock.today().toString();
-        long realTxnCount = entries.stream().filter(e -> !"FY_SUMMARY".equals(e.getType())).count();
+        long realTxnCount = entries.stream()
+                .filter(e -> !"FY_SUMMARY".equals(e.getType()) && !"OPENING_BALANCE".equals(e.getType())).count();
         com.lowagie.text.Font subFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(100, 100, 100));
         Paragraph subtitle = new Paragraph(
                 "Period: " + fromStr + "  to  " + toStr + "   •   Transactions: " + realTxnCount, subFont);

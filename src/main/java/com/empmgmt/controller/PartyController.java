@@ -1,5 +1,6 @@
 package com.empmgmt.controller;
 
+import com.empmgmt.repository.PartyRepository;
 import com.empmgmt.service.ExcelPartyService;
 import com.empmgmt.dto.PartySuggestionDTO;
 import lombok.RequiredArgsConstructor;
@@ -16,11 +17,24 @@ import java.util.Map;
 public class PartyController {
 
 	private final ExcelPartyService excelPartyService;
+	private final PartyRepository partyRepository;
 
 	@GetMapping
 	public List<String> search(@RequestParam(name = "q", required = false) String q,
 							   @RequestParam(name = "limit", required = false, defaultValue = "20") int limit) {
 		return excelPartyService.search(q, limit);
+	}
+
+	/**
+	 * Distinct party_name text actually used in invoices/payment_entries - covers orphaned names
+	 * (no parties row) that {@link #suggest} can never find since it only searches the parties table.
+	 * Backs the party-merge tool's "From" autocomplete.
+	 */
+	@GetMapping("/ledger-names/suggest")
+	public List<String> suggestLedgerNames(@RequestParam(name = "q", required = false) String q,
+										   @RequestParam(name = "limit", required = false, defaultValue = "20") int limit) {
+		if (q == null || q.isBlank()) return List.of();
+		return partyRepository.findLedgerPartyNamesMatching(q.trim(), limit);
 	}
 
 	@GetMapping("/suggest")

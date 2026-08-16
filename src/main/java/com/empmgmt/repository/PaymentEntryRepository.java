@@ -4,6 +4,7 @@ import com.empmgmt.entity.PaymentEntry;
 import com.empmgmt.entity.User;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -90,4 +91,16 @@ public interface PaymentEntryRepository extends JpaRepository<PaymentEntry, Long
      */
     @Query("SELECT p FROM PaymentEntry p JOIN FETCH p.employee ORDER BY p.createdAt DESC NULLS LAST")
     List<PaymentEntry> findRecentWithEmployee(Pageable pageable);
+
+    // ── Party merge ────────────────────────────────────────────────────────
+
+    long countByPartyName(String partyName);
+
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM PaymentEntry p WHERE p.partyName = :partyName")
+    BigDecimal sumAmountByPartyName(@Param("partyName") String partyName);
+
+    /** Bulk re-point every payment filed under one party_name text onto another. See PartyMergeService. */
+    @Modifying
+    @Query("UPDATE PaymentEntry p SET p.partyName = :toName WHERE p.partyName = :fromName")
+    int repointPartyName(@Param("fromName") String fromName, @Param("toName") String toName);
 }

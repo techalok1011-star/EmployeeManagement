@@ -3,6 +3,7 @@ package com.empmgmt.dto;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Data
 @NoArgsConstructor
@@ -18,7 +19,9 @@ public class PartyOutstandingDTO {
 
     private BigDecimal totalInvoiced;  // sum of all invoice amounts for this party
     private BigDecimal totalPaid;      // sum of all payment-entry amounts for this party
-    private BigDecimal outstanding;    // totalInvoiced - totalPaid  (negative = credit)
+    private BigDecimal openingBalance; // Party.openingBalance carried forward, 0 if none - see Party entity javadoc
+    private LocalDate openingBalanceDate;
+    private BigDecimal outstanding;    // totalInvoiced - totalPaid + openingBalance  (negative = credit)
 
     private String phone;          // E.164 WhatsApp number, may be null
     private boolean whatsappOptIn; // true = opted in to reminders
