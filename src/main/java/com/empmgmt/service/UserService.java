@@ -6,6 +6,7 @@ import com.empmgmt.repository.PaymentEntryRepository;
 import com.empmgmt.repository.UserRepository;
 import com.empmgmt.util.IstClock;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class UserService {
 
     private final UserRepository userRepository;
@@ -49,6 +51,7 @@ public class UserService {
                 .build();
 
         user = userRepository.save(user);
+        log.info("Account created: id={} username={} role={}", user.getId(), user.getUsername(), role);
         return mapToResponse(user);
     }
 
@@ -93,6 +96,7 @@ public class UserService {
         user.setActive(request.isActive());
 
         user = userRepository.save(user);
+        log.info("Account updated: id={} username={}", user.getId(), user.getUsername());
         return mapToResponse(user);
     }
 
@@ -101,6 +105,8 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
+        // Never log newPassword itself, even at DEBUG - only that a reset happened and for whom.
+        log.warn("Password reset for account: id={} username={}", id, user.getUsername());
     }
 
     public void toggleStatus(Long id) {
@@ -108,6 +114,7 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         user.setActive(!user.isActive());
         userRepository.save(user);
+        log.warn("Account {} : id={} username={}", user.isActive() ? "enabled" : "disabled", id, user.getUsername());
     }
 
     private UserDTO.Response mapToResponse(User user) {

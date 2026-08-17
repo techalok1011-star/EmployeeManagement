@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${status} + ' — PayTrack'">Error — PayTrack</title>
+    <meta name="robots" content="noindex"/>
+    <meta name="theme-color" content="#161a24">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/theme.css}"/>
+    <script th:src="@{/js/theme.js}"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: radial-gradient(circle at 50% 0%, var(--surface) 0%, var(--ink) 60%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .grid-overlay {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(108,142,255,0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(108,142,255,0.035) 1px, transparent 1px);
+            background-size: 40px 40px;
+            mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 40%, transparent 90%);
+        }
+
+        .wrapper {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 460px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        @keyframes riseIn {
+            from { opacity: 0; transform: translateY(18px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes wobble {
+            0%, 100% { transform: rotate(-4deg); }
+            50%      { transform: rotate(4deg); }
+        }
+
+        .mascot {
+            font-size: 64px;
+            display: inline-block;
+            margin-bottom: 18px;
+            animation: riseIn 0.6s cubic-bezier(0.16,1,0.3,1) both, wobble 3.2s ease-in-out 0.6s infinite;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 36px 32px;
+            animation: riseIn 0.6s cubic-bezier(0.16,1,0.3,1) both;
+            animation-delay: 0.08s;
+        }
+
+        .status-tag {
+            display: inline-block;
+            font-family: 'Syne', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--muted);
+            background: var(--overlay-3);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 4px 12px;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            line-height: 1.3;
+        }
+
+        p.detail {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 26px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 22px;
+        }
+
+        .btn {
+            padding: 11px 20px;
+            border-radius: 10px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 13.5px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: white;
+        }
+        .btn-primary:hover { opacity: 0.88; }
+        .btn-ghost {
+            background: var(--overlay-3);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-ghost:hover { background: var(--overlay-5); }
+
+        .trace-row {
+            font-size: 11.5px;
+            color: var(--muted2);
+            font-family: monospace;
+            border-top: 1px dashed var(--border);
+            padding-top: 16px;
+        }
+        .trace-row b { color: var(--muted); font-family: 'DM Sans', sans-serif; font-weight: 600; }
+
+        .contact-row {
+            font-size: 12.5px;
+            color: var(--muted);
+            margin-top: 14px;
+        }
+        .contact-row a {
+            color: var(--accent);
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .contact-row a:hover { text-decoration: underline; }
+
+        .footer-note {
+            margin-top: 20px;
+            font-size: 12px;
+            color: var(--muted2);
+            animation: riseIn 0.6s cubic-bezier(0.16,1,0.3,1) both;
+            animation-delay: 0.16s;
+        }
+    </style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div class="wrapper">
+    <div class="mascot" aria-hidden="true">😥</div>
+    <div class="card">
+        <span class="status-tag" th:text="'ERROR ' + ${status}">ERROR 500</span>
+        <h1 th:text="${headline}">Something went wrong on our side</h1>
+        <p class="detail" th:text="${detail}">This one is on us, not you.</p>
+
+        <div class="actions">
+            <a th:if="${showRetry}" href="javascript:location.reload()" class="btn btn-primary">↻ Try again</a>
+            <a href="/" class="btn btn-ghost">🏠 Go to homepage</a>
+        </div>
+
+        <div class="trace-row">
+            <b>Reference ID:</b> <span th:text="${traceId}">—</span><br/>
+            Having trouble? Share this ID so it can be found in the logs.
+        </div>
+
+        <div class="contact-row">
+            Still stuck? <a href="mailto:techalok999@gmail.com">Contact Alok</a> if the error persists.
+        </div>
+    </div>
+    <div class="footer-note">PayTrack · Payment Entry Management System</div>
+</div>
+</body>
+</html>

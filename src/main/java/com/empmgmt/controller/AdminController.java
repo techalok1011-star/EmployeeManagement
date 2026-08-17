@@ -642,6 +642,7 @@ public class AdminController {
                     .openingBalanceDate(request.getOpeningBalanceDate())
                     .build());
             logPartyAudit("CREATE", saved, auth.getName(), "Party '" + combined + "' created");
+            invoiceService.evictPartyDerivedCaches();
             redirectAttributes.addFlashAttribute("successMsg", "Party added successfully!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
@@ -705,6 +706,7 @@ public class AdminController {
             partyRepository.save(party);
             logPartyAudit("UPDATE", party, auth.getName(), "Party '" + before + "' updated to '" + combined + "'");
         });
+        invoiceService.evictPartyDerivedCaches();
         redirectAttributes.addFlashAttribute("successMsg", "Party updated successfully!");
         return "redirect:/admin/parties";
     }
@@ -716,6 +718,7 @@ public class AdminController {
             partyRepository.deleteById(id);
             logPartyAudit("DELETE", party, auth.getName(), "Party '" + party.getCombined() + "' deleted");
         });
+        invoiceService.evictPartyDerivedCaches();
         redirectAttributes.addFlashAttribute("successMsg", "Party deleted.");
         return "redirect:/admin/parties";
     }
@@ -733,6 +736,7 @@ public class AdminController {
             partyRepository.save(party);
             logPartyAudit("UPDATE", party, auth.getName(), "Party '" + party.getCombined() + "' contact info updated");
         });
+        invoiceService.evictPartyDerivedCaches();
         redirectAttributes.addFlashAttribute("successMsg", "Party contact updated.");
         return "redirect:/admin/invoices";
     }

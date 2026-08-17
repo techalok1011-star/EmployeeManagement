@@ -79,6 +79,8 @@ public class InvoiceService {
         logInvoiceAudit("CREATE", saved, createdBy,
                 "Invoice " + saved.getInvoiceNumber() + " (₹" + amount.toPlainString()
                         + ") created for " + saved.getPartyName());
+        log.info("Invoice created: id={} number={} party='{}' amount={} by={}",
+                saved.getId(), saved.getInvoiceNumber(), saved.getPartyName(), amount, createdBy);
         return toResponse(saved);
     }
 
@@ -115,6 +117,7 @@ public class InvoiceService {
         Invoice saved = invoiceRepository.save(invoice);
         logInvoiceAudit("UPDATE", saved, performedBy,
                 "Invoice " + saved.getInvoiceNumber() + " updated for " + saved.getPartyName() + " (" + diff + ")");
+        log.info("Invoice updated: id={} by={} — {}", id, performedBy, diff);
         return toResponse(saved);
     }
 
@@ -221,6 +224,21 @@ public class InvoiceService {
         logInvoiceAudit("DELETE", invoice, performedBy,
                 "Invoice " + invoice.getInvoiceNumber() + " (₹" + invoice.getAmount().toPlainString()
                         + ") deleted for " + invoice.getPartyName());
+        log.warn("Invoice deleted: id={} number={} party='{}' amount={} by={}",
+                id, invoice.getInvoiceNumber(), invoice.getPartyName(), invoice.getAmount(), performedBy);
+    }
+
+    /**
+     * Clears every party-derived cache. Party rows aren't written through this service (the
+     * admin controller calls PartyRepository directly - there's no PartyService), but renaming,
+     * deleting, or changing a party's opening balance changes what
+     * {@link #getPartyOutstandingSummary()} and every report built on it returns. Without this,
+     * a party edit silently doesn't show up anywhere for up to the 5-minute cache TTL, which
+     * repeatedly reads as "my change didn't save" or "the party disappeared."
+     */
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    public void evictPartyDerivedCaches() {
+        // annotation-only; body intentionally empty
     }
 
     // ─────────────────────────────────────────────────────────

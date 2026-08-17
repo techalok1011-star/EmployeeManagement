@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logging setup, added alongside RequestTraceFilter/CustomErrorController/GlobalExceptionHandler
+  for debuggability. Two constraints drove every choice here:
+
+  1. Must not add latency. The request thread never blocks on I/O for a log line: everything
+     goes through ASYNC-CONSOLE (an AsyncAppender), which hands the event to a background
+     thread and returns immediately. neverBlock=true means that even if the queue fills up
+     under a burst, log calls drop rather than stall the request - a lost debug line is fine,
+     a slower payment entry save is not.
+
+  2. Must not cost space. Console-only - no file appender. Render captures stdout as the log
+     stream on its own infrastructure, so writing to a file here would just duplicate that onto
+     this instance's small (512 MB) disk for zero benefit. Nothing here is written locally.
+
+  Everything actually useful for finding one request's logs later - the traceId from
+  RequestTraceFilter - is in the pattern via %X{traceId}, correlating a user's "reference ID"
+  from the error page straight back to this line.
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProperty scope="context" name="APP_LOG_LEVEL" source="logging.level.com.empmgmt" defaultValue="INFO"/>
+
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{traceId:-'-'}] [%thread] %logger{35} - %msg%n%wEx"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Async wrapper: the request thread hands off and moves on, never waits on stdout I/O.
+         Small queue on purpose - this is a 512 MB instance; a deep queue just holds onto more
+         heap for log events that are, by design, only ever error/slow-request/audit lines. -->
+    <appender name="ASYNC_CONSOLE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>256</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <includeCallerData>false</includeCallerData>
+        <appender-ref ref="CONSOLE"/>
+    </appender>
+
+    <logger name="com.empmgmt" level="${APP_LOG_LEVEL}"/>
+
+    <!-- Framework internals stay at WARN - INFO-level Hibernate/Tomcat/Spring chatter was never
+         actionable here and just crowds out the app's own lines in a small log window. -->
+    <logger name="org.hibernate" level="WARN"/>
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.apache.catalina" level="WARN"/>
+    <logger name="com.zaxxer.hikari" level="WARN"/>
+
+    <root level="INFO">
+        <appender-ref ref="ASYNC_CONSOLE"/>
+    </root>
+</configuration>

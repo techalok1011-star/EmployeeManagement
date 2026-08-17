@@ -74,7 +74,7 @@ public class SecurityConfig {
                 // used by the logout handler, concurrent-session expiry, and the CSRF handler
                 // below) silently required authentication and bounced through an extra
                 // redirect to a bare, message-less /login.
-                .requestMatchers("/login").permitAll()
+                .requestMatchers("/login", "/error").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/h2-console/**",
                         "/manifest.json", "/manager-manifest.json", "/admin-manifest.json", "/accountant-manifest.json",
                         "/sw.js", "/icons/**", "/health").permitAll()
