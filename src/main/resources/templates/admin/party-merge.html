@@ -340,7 +340,7 @@ function escapeHtml(s){ if(!s) return ''; return s.replace(/[&<>"']/g, function(
 
     window.refreshPreview = function(){
         clearTimeout(previewTimer);
-        const from = fromInput.value.trim();
+        const from = fromInput.value;
         const to = toInput.value.trim();
         const panel = document.getElementById('previewPanel');
         const submitBtn = document.getElementById('mergeSubmitBtn');

@@ -91,7 +91,7 @@ public class PartyMergeService {
      */
     @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
     public PartyMergeDTO.Result merge(PartyMergeDTO.Request request, String performedBy) {
-        String fromName = request.getFromName().trim();
+        String fromName = request.getFromName();
         String toCombined = request.getToCombined().trim();
 
         if (fromName.equals(toCombined)) {
