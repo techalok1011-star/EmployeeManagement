@@ -4,6 +4,7 @@ import com.empmgmt.dto.InvoiceDTO;
 import com.empmgmt.dto.PartyDTO;
 import com.empmgmt.dto.PaymentEntryDTO;
 import com.empmgmt.dto.UserDTO;
+import com.empmgmt.dto.VoucherAuditDTO;
 import com.empmgmt.entity.Party;
 import com.empmgmt.entity.PaymentEntry;
 import com.empmgmt.repository.NotificationLogRepository;
@@ -17,7 +18,9 @@ import com.empmgmt.service.OutstandingNotificationService;
 import com.empmgmt.service.PartyMergeService;
 import com.empmgmt.service.PaymentEntryService;
 import com.empmgmt.service.UserService;
+import com.empmgmt.service.VoucherAuditService;
 import com.empmgmt.util.IstClock;
+import com.empmgmt.util.VoucherNumberParser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +68,7 @@ public class AdminController {
     private final LoginSessionService loginSessionService;
     private final SessionRegistry sessionRegistry;
     private final PartyMergeService partyMergeService;
+    private final VoucherAuditService voucherAuditService;
 
     // ─── Dashboard ────────────────────────────────────────────
 
@@ -152,17 +156,25 @@ public class AdminController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Long employeeId,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false, defaultValue = "asc") String dir,
             Model model, Authentication auth) {
         boolean filtered = from != null || to != null || employeeId != null;
         var entries = filtered
                 ? paymentEntryService.getFilteredEntriesForAdmin(from, to, employeeId)
                 : paymentEntryService.getAllEntries();
-        model.addAttribute("entries", paymentEntryService.withReceiptFlags(entries));
+        entries = paymentEntryService.withReceiptFlags(entries);
+        if ("vch".equals(sort)) {
+            entries.sort(VoucherNumberParser.comparator(PaymentEntryDTO.Response::getReceiptVchNo, !"desc".equals(dir)));
+        }
+        model.addAttribute("entries", entries);
         model.addAttribute("employees", userService.getAllEmployees());
         model.addAttribute("adminName", auth.getName());
         model.addAttribute("from", from);
         model.addAttribute("to", to);
         model.addAttribute("selectedEmployeeId", employeeId);
+        model.addAttribute("sort", sort);
+        model.addAttribute("dir", dir);
         return "admin/entries";
     }
 
@@ -317,19 +329,28 @@ public class AdminController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String createdBy,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false, defaultValue = "asc") String dir,
             Model model, Authentication auth) {
         boolean dateFiltered = from != null || to != null;
+        List<InvoiceDTO.Response> invoiceList;
         if (createdBy != null && !createdBy.isBlank()) {
-            model.addAttribute("invoices", invoiceService.getInvoicesByCreatedBy(createdBy, from, to));
+            invoiceList = invoiceService.getInvoicesByCreatedBy(createdBy, from, to);
             model.addAttribute("createdByName", userService.getUserByUsername(createdBy).getFullName());
         } else {
-            model.addAttribute("invoices", dateFiltered
+            invoiceList = dateFiltered
                     ? invoiceService.getInvoicesByDateRange(from, to)
-                    : invoiceService.getAllInvoices());
+                    : invoiceService.getAllInvoices();
         }
+        if ("vch".equals(sort)) {
+            invoiceList.sort(VoucherNumberParser.comparator(InvoiceDTO.Response::getSalesVchNo, !"desc".equals(dir)));
+        }
+        model.addAttribute("invoices", invoiceList);
         model.addAttribute("from", from);
         model.addAttribute("to", to);
         model.addAttribute("createdBy", createdBy);
+        model.addAttribute("sort", sort);
+        model.addAttribute("dir", dir);
         model.addAttribute("outstandingSummary", invoiceService.getPartyOutstandingSummary());
         if (!model.containsAttribute("newInvoice")) {
             InvoiceDTO.Request newInvoice = new InvoiceDTO.Request();
@@ -589,6 +610,57 @@ public class AdminController {
         model.addAttribute("bucketTotals", bucketTotals);
         model.addAttribute("adminName", auth.getName());
         return "admin/aging";
+    }
+
+    // ─── Voucher Audit ─────────────────────────────────────────
+    // ADMIN only (no @PreAuthorize override - class default already restricts to ADMIN).
+
+    @GetMapping("/voucher-audit")
+    public String voucherAudit(Model model, Authentication auth) {
+        var report = voucherAuditService.getCurrentFinancialYearAudit();
+        model.addAttribute("receipts", report.getReceipts());
+        model.addAttribute("sales", report.getSales());
+        model.addAttribute("adminName", auth.getName());
+        return "admin/voucher-audit";
+    }
+
+    @PostMapping("/voucher-audit/acknowledge")
+    public String acknowledgeVoucherGap(@ModelAttribute VoucherAuditDTO.AcknowledgeRequest request,
+                                        Authentication auth, RedirectAttributes redirectAttributes) {
+        try {
+            voucherAuditService.acknowledgeGap(request, auth.getName());
+            redirectAttributes.addFlashAttribute("successMsg",
+                    "Marked " + request.getRangeStart() + "–" + request.getRangeEnd() + " as explained.");
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+        }
+        return "redirect:/admin/voucher-audit";
+    }
+
+    @PostMapping("/voucher-audit/acknowledge/{id}/reopen")
+    public String reopenVoucherAcknowledgement(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        voucherAuditService.reopenAcknowledgement(id);
+        redirectAttributes.addFlashAttribute("successMsg", "Reopened - it's back on the active gaps list.");
+        return "redirect:/admin/voucher-audit";
+    }
+
+    /** Backs the "click a used page in the grid" feature - which exact entry used this number. */
+    @GetMapping("/voucher-audit/lookup")
+    @ResponseBody
+    public List<Map<String, Object>> voucherAuditLookup(@RequestParam VoucherAuditDTO.Series series,
+                                                          @RequestParam long vchNumber) {
+        String editPathTemplate = series == VoucherAuditDTO.Series.RECEIPT
+                ? "/admin/entries/%d/edit" : "/admin/invoices/%d/edit";
+        return voucherAuditService.lookupOccurrences(series, vchNumber).stream()
+                .map(occ -> {
+                    Map<String, Object> row = new java.util.LinkedHashMap<>();
+                    row.put("date", occ.getDate() != null ? occ.getDate().toString() : null);
+                    row.put("amount", occ.getAmount());
+                    row.put("partyName", occ.getPartyName());
+                    row.put("editUrl", String.format(editPathTemplate, occ.getId()));
+                    return row;
+                })
+                .toList();
     }
 
     // ─── Party Management ─────────────────────────────────────

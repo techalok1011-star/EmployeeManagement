@@ -62,4 +62,11 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     @Modifying
     @Query("UPDATE Invoice i SET i.partyName = :toName WHERE i.partyName = :fromName")
     int repointPartyName(@Param("fromName") String fromName, @Param("toName") String toName);
+
+    // ── Voucher audit ──────────────────────────────────────────────────────
+
+    /** Raw [id, salesVchNo, invoiceDate, amount, partyName] rows for one financial year, for VoucherAuditService to parse. */
+    @Query("SELECT i.id, i.salesVchNo, i.invoiceDate, i.amount, i.partyName FROM Invoice i " +
+           "WHERE i.invoiceDate >= :fyStart AND i.salesVchNo IS NOT NULL")
+    List<Object[]> findVoucherRowsFrom(@Param("fyStart") LocalDate fyStart);
 }

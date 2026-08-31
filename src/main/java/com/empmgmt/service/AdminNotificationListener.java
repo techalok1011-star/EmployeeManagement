@@ -1,11 +1,13 @@
 package com.empmgmt.service;
 
+import com.empmgmt.dto.VoucherAuditDTO;
 import com.empmgmt.entity.AdminNotification;
 import com.empmgmt.entity.User;
 import com.empmgmt.event.InvoiceCreatedEvent;
 import com.empmgmt.event.PaymentEntryCreatedEvent;
 import com.empmgmt.repository.AdminNotificationRepository;
 import com.empmgmt.repository.UserRepository;
+import com.empmgmt.util.VoucherNumberParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -14,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.util.Locale;
 
@@ -39,6 +42,7 @@ public class AdminNotificationListener {
 
     private final AdminNotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final VoucherAuditService voucherAuditService;
 
     private static final NumberFormat AMOUNT_FMT = NumberFormat.getNumberInstance(new Locale("en", "IN"));
 
@@ -46,52 +50,137 @@ public class AdminNotificationListener {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onPaymentEntryCreated(PaymentEntryCreatedEvent event) {
         User actor = userRepository.findByUsername(event.getActorUsername()).orElse(null);
-        if (actor == null || actor.getRole() == User.Role.ADMIN) {
-            return; // no self-notifications for admin's own actions
+        var entry = event.getEntry();
+
+        if (actor != null && actor.getRole() != User.Role.ADMIN) {
+            String message = actor.getFullName() + " logged a ₹" + AMOUNT_FMT.format(entry.getAmount())
+                    + " collection from " + entry.getPartyName();
+
+            notificationRepository.save(AdminNotification.builder()
+                    .type(AdminNotification.NotificationType.COLLECTION_ADDED)
+                    .message(message)
+                    .partyName(entry.getPartyName())
+                    .amount(entry.getAmount())
+                    .triggeredBy(actor.getUsername())
+                    .triggeredByRole(actor.getRole().name())
+                    .sourceType("PAYMENT_ENTRY")
+                    .sourceId(entry.getId())
+                    .read(false)
+                    .build());
+            log.info("🔔 Admin notification created for collection entry id={}", entry.getId());
         }
 
-        var entry = event.getEntry();
-        String message = actor.getFullName() + " logged a ₹" + AMOUNT_FMT.format(entry.getAmount())
-                + " collection from " + entry.getPartyName();
-
-        notificationRepository.save(AdminNotification.builder()
-                .type(AdminNotification.NotificationType.COLLECTION_ADDED)
-                .message(message)
-                .partyName(entry.getPartyName())
-                .amount(entry.getAmount())
-                .triggeredBy(actor.getUsername())
-                .triggeredByRole(actor.getRole().name())
-                .sourceType("PAYMENT_ENTRY")
-                .sourceId(entry.getId())
-                .read(false)
-                .build());
-        log.info("🔔 Admin notification created for collection entry id={}", entry.getId());
+        // Unlike the notification above, a duplicate/suspect voucher number is a data-quality
+        // problem worth knowing about even when admin logged it themselves - so this check is
+        // deliberately not gated by the same "skip if actor is ADMIN" rule.
+        checkVoucherAnomaly(VoucherAuditDTO.Series.RECEIPT, entry.getReceiptVchNo(), entry.getPartyName(),
+                entry.getAmount(), entry.getId(), "PAYMENT_ENTRY", actor);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onInvoiceCreated(InvoiceCreatedEvent event) {
         User actor = userRepository.findByUsername(event.getActorUsername()).orElse(null);
-        if (actor == null || actor.getRole() == User.Role.ADMIN) {
-            return; // no self-notifications for admin's own actions
+        var invoice = event.getInvoice();
+
+        if (actor != null && actor.getRole() != User.Role.ADMIN) {
+            String message = actor.getFullName() + " added invoice " + invoice.getInvoiceNumber()
+                    + " for ₹" + AMOUNT_FMT.format(invoice.getAmount())
+                    + " (" + invoice.getPartyName() + ")";
+
+            notificationRepository.save(AdminNotification.builder()
+                    .type(AdminNotification.NotificationType.INVOICE_ADDED)
+                    .message(message)
+                    .partyName(invoice.getPartyName())
+                    .amount(invoice.getAmount())
+                    .triggeredBy(actor.getUsername())
+                    .triggeredByRole(actor.getRole().name())
+                    .sourceType("INVOICE")
+                    .sourceId(invoice.getId())
+                    .read(false)
+                    .build());
+            log.info("🔔 Admin notification created for invoice id={}", invoice.getId());
         }
 
-        var invoice = event.getInvoice();
-        String message = actor.getFullName() + " added invoice " + invoice.getInvoiceNumber()
-                + " for ₹" + AMOUNT_FMT.format(invoice.getAmount())
-                + " (" + invoice.getPartyName() + ")";
+        checkVoucherAnomaly(VoucherAuditDTO.Series.SALES, invoice.getSalesVchNo(), invoice.getPartyName(),
+                invoice.getAmount(), invoice.getId(), "INVOICE", actor);
+    }
 
-        notificationRepository.save(AdminNotification.builder()
-                .type(AdminNotification.NotificationType.INVOICE_ADDED)
-                .message(message)
-                .partyName(invoice.getPartyName())
-                .amount(invoice.getAmount())
-                .triggeredBy(actor.getUsername())
-                .triggeredByRole(actor.getRole().name())
-                .sourceType("INVOICE")
-                .sourceId(invoice.getId())
-                .read(false)
-                .build());
-        log.info("🔔 Admin notification created for invoice id={}", invoice.getId());
+    /**
+     * Silently rings the admin bell when a just-saved voucher number is a duplicate of one
+     * already used this financial year, or is far enough outside the normal range to look like a
+     * typo (the same DUPLICATE/SUSPECT classification VoucherAuditService uses for the audit
+     * dashboard). Deliberately does nothing for AMBIGUOUS/UNPARSEABLE text, and deliberately does
+     * nothing for an ordinary missing number - those are routine and belong on the dashboard for
+     * batch review, not a one-by-one interruption. The person who saved the entry is never shown
+     * anything either way - this only ever reaches the admin notification feed.
+     * <p>
+     * Wrapped so it can never turn into a user-visible failure: this runs synchronously as part of
+     * the same request that just saved the entry/invoice (AFTER_COMMIT still executes inline, not
+     * on a separate thread), so an uncaught exception here would propagate back through
+     * eventPublisher.publishEvent() into the controller action - meaning the entry could be saved
+     * successfully in the DB while the user's screen shows an error. Same defensive principle as
+     * the receipt-photo attach step in PaymentEntryService: a side effect must never blow up the
+     * primary action it's attached to.
+     */
+    private void checkVoucherAnomaly(VoucherAuditDTO.Series series, String rawVch, String partyName,
+                                      BigDecimal amount, Long sourceId, String sourceType, User actor) {
+        try {
+            checkVoucherAnomalyUnsafe(series, rawVch, partyName, amount, sourceId, sourceType, actor);
+        } catch (Exception e) {
+            log.error("Voucher anomaly check failed for {} id={} (entry itself already saved fine)",
+                    sourceType, sourceId, e);
+        }
+    }
+
+    private void checkVoucherAnomalyUnsafe(VoucherAuditDTO.Series series, String rawVch, String partyName,
+                                            BigDecimal amount, Long sourceId, String sourceType, User actor) {
+        if (rawVch == null || rawVch.isBlank()) return;
+        Long vchNumber = VoucherNumberParser.extractNumber(rawVch).orElse(null);
+        if (vchNumber == null) return;
+
+        // Cache was already evicted by the save that triggered this event, so this recomputes
+        // fresh and includes the row just committed.
+        VoucherAuditDTO.Response response = voucherAuditService.getCurrentFinancialYearAudit();
+        VoucherAuditDTO.SeriesReport report = series == VoucherAuditDTO.Series.RECEIPT
+                ? response.getReceipts() : response.getSales();
+
+        for (VoucherAuditDTO.ExceptionRow ex : report.getExceptions()) {
+            if (!vchNumber.equals(ex.getVchNumber())) continue;
+            boolean isDuplicate = "DUPLICATE".equals(ex.getType());
+            boolean isSuspect = "SUSPECT".equals(ex.getType());
+            if (!isDuplicate && !isSuspect) continue;
+
+            String seriesLabel = series == VoucherAuditDTO.Series.RECEIPT ? "Receipt" : "Sales";
+            String actorName = actor != null ? actor.getFullName() : "Someone";
+            String message;
+            AdminNotification.NotificationType type;
+            if (isDuplicate) {
+                type = AdminNotification.NotificationType.VOUCHER_DUPLICATE;
+                int otherOccurrences = ex.getOccurrences().size() - 1;
+                message = actorName + " used " + seriesLabel + " Vch No. " + vchNumber
+                        + " for " + partyName + " - already recorded " + otherOccurrences
+                        + " other time" + (otherOccurrences == 1 ? "" : "s") + " this financial year.";
+            } else {
+                type = AdminNotification.NotificationType.VOUCHER_SUSPECT;
+                message = actorName + " used " + seriesLabel + " Vch No. " + vchNumber
+                        + " for " + partyName + " - far outside this year's normal range, possible typo.";
+            }
+
+            notificationRepository.save(AdminNotification.builder()
+                    .type(type)
+                    .message(message)
+                    .partyName(partyName)
+                    .amount(amount)
+                    .triggeredBy(actor != null ? actor.getUsername() : null)
+                    .triggeredByRole(actor != null ? actor.getRole().name() : null)
+                    .sourceType(sourceType)
+                    .sourceId(sourceId)
+                    .read(false)
+                    .build());
+            log.info("🔔 Admin notification created for {} voucher {} ({}) on {} id={}",
+                    ex.getType(), seriesLabel, vchNumber, sourceType, sourceId);
+            return; // at most one anomaly notification per save
+        }
     }
 }

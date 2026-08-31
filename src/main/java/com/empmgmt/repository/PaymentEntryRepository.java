@@ -103,4 +103,11 @@ public interface PaymentEntryRepository extends JpaRepository<PaymentEntry, Long
     @Modifying
     @Query("UPDATE PaymentEntry p SET p.partyName = :toName WHERE p.partyName = :fromName")
     int repointPartyName(@Param("fromName") String fromName, @Param("toName") String toName);
+
+    // ── Voucher audit ──────────────────────────────────────────────────────
+
+    /** Raw [id, receiptVchNo, entryDate, amount, partyName] rows for one financial year, for VoucherAuditService to parse. */
+    @Query("SELECT p.id, p.receiptVchNo, p.entryDate, p.amount, p.partyName FROM PaymentEntry p " +
+           "WHERE p.entryDate >= :fyStart AND p.receiptVchNo IS NOT NULL")
+    List<Object[]> findVoucherRowsFrom(@Param("fyStart") LocalDate fyStart);
 }

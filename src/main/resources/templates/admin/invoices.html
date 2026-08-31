@@ -53,6 +53,8 @@
         table{width:100%;border-collapse:collapse}
         thead{background:var(--surface)}
         th{padding:10px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+        .th-sort-link{color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+        .th-sort-link:hover{color:var(--text)}
         td{padding:11px 14px;font-size:13px;border-bottom:1px solid var(--overlay-2);vertical-align:middle}
         tr:last-child td{border-bottom:none}
         tr:hover td{background:var(--overlay-1)}
@@ -167,6 +169,7 @@
         <a href="/admin/invoices" class="nav-link active"><span>🧾</span> Invoices</a>
         <a href="/admin/full-ledger" class="nav-link"><span>📚</span> Full Ledger</a>
         <a href="/admin/aging" class="nav-link"><span>⏳</span> Aging Report</a>
+        <a href="/admin/voucher-audit" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>🔢</span> Voucher Audit</a>
         <a href="/admin/payment-behavior" class="nav-link"><span>🏅</span> Payment Behavior</a>
         <a href="/admin/collections" class="nav-link"><span>🎯</span> Collections</a>
         <a href="/admin/notifications" class="nav-link"><span>📲</span> Notifications</a>
@@ -274,7 +277,13 @@
                                     <tr>
                                         <th>#</th>
                                         <th>Invoice No.</th>
-                                        <th>Sales Vch No.</th>
+                                        <th>
+                                            <a th:href="@{/admin/invoices(from=${from},to=${to},createdBy=${createdBy},sort='vch',dir=${sort == 'vch' and dir == 'asc' ? 'desc' : 'asc'})}"
+                                               class="th-sort-link">
+                                                Sales Vch No.
+                                                <span th:if="${sort == 'vch'}" th:text="${dir == 'asc' ? '▲' : '▼'}"></span>
+                                            </a>
+                                        </th>
                                         <th>Date</th>
                                         <th>Party Name / GSTIN</th>
                                         <th>Bags</th>

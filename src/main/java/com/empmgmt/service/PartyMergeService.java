@@ -89,7 +89,7 @@ public class PartyMergeService {
      * would then drop the merged history from every ledger/report/reminder. transaction_logs is
      * deliberately left untouched: it's an immutable point-in-time audit snapshot, not live data.
      */
-    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public PartyMergeDTO.Result merge(PartyMergeDTO.Request request, String performedBy) {
         String fromName = request.getFromName();
         String toCombined = request.getToCombined().trim();

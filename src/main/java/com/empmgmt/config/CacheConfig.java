@@ -29,12 +29,13 @@ public class CacheConfig {
     public static final String AGING_REPORT = "agingReport";
     public static final String PAYMENT_BEHAVIOR = "paymentBehavior";
     public static final String INVOICE_STATS = "invoiceStats";
+    public static final String VOUCHER_AUDIT = "voucherAudit";
 
     @Bean
     public CacheManager cacheManager() {
         CaffeineCacheManager manager = new CaffeineCacheManager(
                 PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER,
-                AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS);
+                AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT);
         manager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(5, TimeUnit.MINUTES)
                 .maximumSize(500));

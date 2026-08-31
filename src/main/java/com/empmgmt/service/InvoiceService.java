@@ -55,7 +55,7 @@ public class InvoiceService {
     // CREATE
     // ─────────────────────────────────────────────────────────
 
-    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public InvoiceDTO.Response createInvoice(InvoiceDTO.Request request, String createdBy) {
         if (invoiceRepository.existsByInvoiceNumber(request.getInvoiceNumber().trim())) {
             throw new IllegalArgumentException(
@@ -88,7 +88,7 @@ public class InvoiceService {
     // UPDATE
     // ─────────────────────────────────────────────────────────
 
-    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public InvoiceDTO.Response updateInvoice(Long id, InvoiceDTO.Request request, String performedBy) {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Invoice not found: " + id));
@@ -216,7 +216,7 @@ public class InvoiceService {
     // DELETE
     // ─────────────────────────────────────────────────────────
 
-    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public void deleteInvoice(Long id, String performedBy) {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Invoice not found: " + id));
@@ -236,7 +236,7 @@ public class InvoiceService {
      * a party edit silently doesn't show up anywhere for up to the 5-minute cache TTL, which
      * repeatedly reads as "my change didn't save" or "the party disappeared."
      */
-    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public void evictPartyDerivedCaches() {
         // annotation-only; body intentionally empty
     }

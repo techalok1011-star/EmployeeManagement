@@ -56,7 +56,7 @@ public class PaymentEntryService {
     // CREATE
     // ─────────────────────────────────────────────────────────
 
-    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public PaymentEntryDTO.Response createEntry(PaymentEntryDTO.Request request, String username) {
         // Employees can only create entries for today
         if (request.getEntryDate() != null && !request.getEntryDate().equals(IstClock.today())) {
@@ -96,7 +96,7 @@ public class PaymentEntryService {
      * since that method is shared with the EMPLOYEE day-entry flow, which still must stay
      * today-only.
      */
-    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public PaymentEntryDTO.Response createEntryForManager(PaymentEntryDTO.Request request, String username) {
         User manager = findUserByUsername(username);
 
@@ -148,7 +148,7 @@ public class PaymentEntryService {
      * employee flow this is not restricted to today's date; remarks are
      * mandatory so the reason for the out-of-band entry is on record.
      */
-    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public PaymentEntryDTO.Response createEntryByStaff(PaymentEntryDTO.Request request, String username) {
         if (request.getRemarks() == null || request.getRemarks().isBlank()) {
             throw new RuntimeException("Remarks are mandatory when adding a payment from the ledger");
@@ -461,7 +461,7 @@ public class PaymentEntryService {
     // ─────────────────────────────────────────────────────────
 
     /** Admin can update any entry (any date). Remarks mandatory. */
-    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public PaymentEntryDTO.Response updateEntry(Long id, PaymentEntryDTO.Request request, String performedBy) {
         if (request.getRemarks() == null || request.getRemarks().isBlank()) {
             throw new RuntimeException("Remarks are mandatory when editing an entry");
@@ -491,7 +491,7 @@ public class PaymentEntryService {
      * Employee can only update their own entry AND only if entryDate == today.
      * Remarks are mandatory.
      */
-    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public PaymentEntryDTO.Response updateEntryByEmployee(Long id, PaymentEntryDTO.Request request, String username) {
         if (request.getRemarks() == null || request.getRemarks().isBlank()) {
             throw new RuntimeException("Remarks are mandatory when editing an entry");
@@ -529,7 +529,7 @@ public class PaymentEntryService {
     // ─────────────────────────────────────────────────────────
 
     /** Admin can delete any entry */
-    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public void deleteEntry(Long id, String performedBy) {
         PaymentEntry entry = findEntryById(id);
         logAction("DELETE", entry, performedBy, "Entry deleted");
@@ -538,7 +538,7 @@ public class PaymentEntryService {
     }
 
     /** Employee can only delete their own entry */
-    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS}, allEntries = true)
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public void deleteEntryByEmployee(Long id, String username) {
         PaymentEntry entry = findEntryById(id);
         if (!entry.getEmployee().getUsername().equals(username)) {

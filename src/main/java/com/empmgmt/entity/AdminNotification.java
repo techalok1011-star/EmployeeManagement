@@ -66,6 +66,10 @@ public class AdminNotification {
 
     public enum NotificationType {
         COLLECTION_ADDED,
-        INVOICE_ADDED
+        INVOICE_ADDED,
+        /** A newly-saved voucher number matches one already used this financial year. */
+        VOUCHER_DUPLICATE,
+        /** A newly-saved voucher number is far outside this year's normal range - likely a typo. */
+        VOUCHER_SUSPECT
     }
 }
