@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -121,6 +122,38 @@ public class VoucherAuditService {
                 .toList();
     }
 
+    /**
+     * Cheap duplicate/suspect check for exactly one just-saved voucher number - what
+     * AdminNotificationListener calls on every payment/invoice save. Deliberately does NOT go
+     * through {@link #getCurrentFinancialYearAudit()} or buildReport(): those build book-grid
+     * DTOs for every page of every book, exception rows for every ambiguous/unparseable value,
+     * and join in every acknowledgement - all irrelevant to "is this one number a problem",
+     * and expensive to redo on every single save on a 0.1-vCPU Render instance. This still
+     * re-fetches and re-parses the year's rows fresh each time (the cache was already evicted
+     * by the save that triggered this check, so there's no valid cached data to reuse), but
+     * skips straight to the shared classify() step and stops there.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Anomaly> checkNewVoucher(VoucherAuditDTO.Series series, long vchNumber) {
+        LocalDate fyStart = currentFinancialYearStart();
+        List<Row> rows = series == VoucherAuditDTO.Series.RECEIPT
+                ? loadRows(paymentEntryRepository.findVoucherRowsFrom(fyStart))
+                : loadRows(invoiceRepository.findVoucherRowsFrom(fyStart));
+
+        Classification c = classify(rows);
+        List<Row> occurrences = c.byValue().get(vchNumber);
+        if (occurrences != null && occurrences.size() > 1) {
+            return Optional.of(new Anomaly("DUPLICATE", occurrences.size() - 1));
+        }
+        if (c.suspectValues().contains(vchNumber)) {
+            return Optional.of(new Anomaly("SUSPECT", 0));
+        }
+        return Optional.empty();
+    }
+
+    /** type is "DUPLICATE" or "SUSPECT"; otherOccurrences only meaningful for DUPLICATE. */
+    public record Anomaly(String type, int otherOccurrences) {}
+
     // ── Acknowledging a gap ──────────────────────────────────────────────────
 
     // allEntries=true is load-bearing here, not decoration: this method's own parameters (request,
@@ -182,27 +215,19 @@ public class VoucherAuditService {
 
     private record Row(Long id, String rawVch, LocalDate date, BigDecimal amount, String partyName) {}
 
-    // ── Core pipeline ────────────────────────────────────────────────────────
+    /** The shared, cheap part of classification: every NUMERIC row grouped by value, which of
+     *  those values are suspect jumps, and the resulting high-water mark. Stops well short of
+     *  building any DTOs - both the full dashboard report and the per-save anomaly check
+     *  (checkNewVoucher) start from this same computation, then do very different amounts of
+     *  work with it. */
+    private record Classification(Map<Long, List<Row>> byValue, Set<Long> suspectValues, long highWaterMark) {}
 
-    private VoucherAuditDTO.SeriesReport buildReport(VoucherAuditDTO.Series series, String fyLabel, List<Row> rows,
-                                                       List<VoucherAcknowledgement> acknowledgements) {
-        List<VoucherAuditDTO.ExceptionRow> unparseable = new ArrayList<>();
-        List<VoucherAuditDTO.ExceptionRow> ambiguous = new ArrayList<>();
+    private Classification classify(List<Row> rows) {
         Map<Long, List<Row>> byValue = new TreeMap<>();
-
         for (Row r : rows) {
-            VoucherNumberParser.Result parsed = VoucherNumberParser.parse(r.rawVch());
-            switch (parsed.status()) {
-                case NUMERIC -> byValue.computeIfAbsent(parsed.value(), v -> new ArrayList<>()).add(r);
-                case AMBIGUOUS -> ambiguous.add(toException("AMBIGUOUS", null, List.of(r)));
-                case BLANK, UNPARSEABLE -> unparseable.add(toException("UNPARSEABLE", null, List.of(r)));
-            }
-        }
-
-        List<VoucherAuditDTO.ExceptionRow> duplicates = new ArrayList<>();
-        for (var e : byValue.entrySet()) {
-            if (e.getValue().size() > 1) {
-                duplicates.add(toException("DUPLICATE", e.getKey(), e.getValue()));
+            if (VoucherNumberParser.parse(r.rawVch()).status() == VoucherNumberParser.Status.NUMERIC) {
+                long value = VoucherNumberParser.extractNumber(r.rawVch()).orElseThrow();
+                byValue.computeIfAbsent(value, v -> new ArrayList<>()).add(r);
             }
         }
 
@@ -218,11 +243,40 @@ public class VoucherAuditService {
                 highWaterMark = Math.max(highWaterMark, v);
             }
         }
+        return new Classification(byValue, suspectValues, highWaterMark);
+    }
+
+    // ── Core pipeline ────────────────────────────────────────────────────────
+
+    private VoucherAuditDTO.SeriesReport buildReport(VoucherAuditDTO.Series series, String fyLabel, List<Row> rows,
+                                                       List<VoucherAcknowledgement> acknowledgements) {
+        List<VoucherAuditDTO.ExceptionRow> unparseable = new ArrayList<>();
+        List<VoucherAuditDTO.ExceptionRow> ambiguous = new ArrayList<>();
+        for (Row r : rows) {
+            VoucherNumberParser.Result parsed = VoucherNumberParser.parse(r.rawVch());
+            switch (parsed.status()) {
+                case AMBIGUOUS -> ambiguous.add(toException("AMBIGUOUS", null, List.of(r)));
+                case BLANK, UNPARSEABLE -> unparseable.add(toException("UNPARSEABLE", null, List.of(r)));
+                case NUMERIC -> { /* handled by classify() below */ }
+            }
+        }
+
+        Classification c = classify(rows);
+        Map<Long, List<Row>> byValue = c.byValue();
+        Set<Long> suspectValues = c.suspectValues();
+        long highWaterMark = c.highWaterMark();
+
+        List<VoucherAuditDTO.ExceptionRow> duplicates = new ArrayList<>();
+        for (var e : byValue.entrySet()) {
+            if (e.getValue().size() > 1) {
+                duplicates.add(toException("DUPLICATE", e.getKey(), e.getValue()));
+            }
+        }
         List<VoucherAuditDTO.ExceptionRow> suspects = suspectValues.stream()
                 .map(v -> toException("SUSPECT", v, byValue.get(v)))
                 .collect(Collectors.toList());
 
-        Set<Long> legitimateUsed = new TreeSet<>(distinctValues);
+        Set<Long> legitimateUsed = new TreeSet<>(byValue.keySet());
         legitimateUsed.removeAll(suspectValues);
 
         Set<Long> acknowledgedNumbers = new TreeSet<>();

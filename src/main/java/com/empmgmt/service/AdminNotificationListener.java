@@ -139,48 +139,41 @@ public class AdminNotificationListener {
         Long vchNumber = VoucherNumberParser.extractNumber(rawVch).orElse(null);
         if (vchNumber == null) return;
 
-        // Cache was already evicted by the save that triggered this event, so this recomputes
-        // fresh and includes the row just committed.
-        VoucherAuditDTO.Response response = voucherAuditService.getCurrentFinancialYearAudit();
-        VoucherAuditDTO.SeriesReport report = series == VoucherAuditDTO.Series.RECEIPT
-                ? response.getReceipts() : response.getSales();
+        // Targeted check, not the full cached dashboard report - see checkNewVoucher's own
+        // Javadoc for why: that report builds book grids and every exception category, which
+        // this doesn't need and can't afford to redo on every single save.
+        var anomaly = voucherAuditService.checkNewVoucher(series, vchNumber);
+        if (anomaly.isEmpty()) return;
 
-        for (VoucherAuditDTO.ExceptionRow ex : report.getExceptions()) {
-            if (!vchNumber.equals(ex.getVchNumber())) continue;
-            boolean isDuplicate = "DUPLICATE".equals(ex.getType());
-            boolean isSuspect = "SUSPECT".equals(ex.getType());
-            if (!isDuplicate && !isSuspect) continue;
-
-            String seriesLabel = series == VoucherAuditDTO.Series.RECEIPT ? "Receipt" : "Sales";
-            String actorName = actor != null ? actor.getFullName() : "Someone";
-            String message;
-            AdminNotification.NotificationType type;
-            if (isDuplicate) {
-                type = AdminNotification.NotificationType.VOUCHER_DUPLICATE;
-                int otherOccurrences = ex.getOccurrences().size() - 1;
-                message = actorName + " used " + seriesLabel + " Vch No. " + vchNumber
-                        + " for " + partyName + " - already recorded " + otherOccurrences
-                        + " other time" + (otherOccurrences == 1 ? "" : "s") + " this financial year.";
-            } else {
-                type = AdminNotification.NotificationType.VOUCHER_SUSPECT;
-                message = actorName + " used " + seriesLabel + " Vch No. " + vchNumber
-                        + " for " + partyName + " - far outside this year's normal range, possible typo.";
-            }
-
-            notificationRepository.save(AdminNotification.builder()
-                    .type(type)
-                    .message(message)
-                    .partyName(partyName)
-                    .amount(amount)
-                    .triggeredBy(actor != null ? actor.getUsername() : null)
-                    .triggeredByRole(actor != null ? actor.getRole().name() : null)
-                    .sourceType(sourceType)
-                    .sourceId(sourceId)
-                    .read(false)
-                    .build());
-            log.info("🔔 Admin notification created for {} voucher {} ({}) on {} id={}",
-                    ex.getType(), seriesLabel, vchNumber, sourceType, sourceId);
-            return; // at most one anomaly notification per save
+        boolean isDuplicate = "DUPLICATE".equals(anomaly.get().type());
+        String seriesLabel = series == VoucherAuditDTO.Series.RECEIPT ? "Receipt" : "Sales";
+        String actorName = actor != null ? actor.getFullName() : "Someone";
+        String message;
+        AdminNotification.NotificationType type;
+        if (isDuplicate) {
+            type = AdminNotification.NotificationType.VOUCHER_DUPLICATE;
+            int otherOccurrences = anomaly.get().otherOccurrences();
+            message = actorName + " used " + seriesLabel + " Vch No. " + vchNumber
+                    + " for " + partyName + " - already recorded " + otherOccurrences
+                    + " other time" + (otherOccurrences == 1 ? "" : "s") + " this financial year.";
+        } else {
+            type = AdminNotification.NotificationType.VOUCHER_SUSPECT;
+            message = actorName + " used " + seriesLabel + " Vch No. " + vchNumber
+                    + " for " + partyName + " - far outside this year's normal range, possible typo.";
         }
+
+        notificationRepository.save(AdminNotification.builder()
+                .type(type)
+                .message(message)
+                .partyName(partyName)
+                .amount(amount)
+                .triggeredBy(actor != null ? actor.getUsername() : null)
+                .triggeredByRole(actor != null ? actor.getRole().name() : null)
+                .sourceType(sourceType)
+                .sourceId(sourceId)
+                .read(false)
+                .build());
+        log.info("🔔 Admin notification created for {} voucher {} ({}) on {} id={}",
+                anomaly.get().type(), seriesLabel, vchNumber, sourceType, sourceId);
     }
 }
