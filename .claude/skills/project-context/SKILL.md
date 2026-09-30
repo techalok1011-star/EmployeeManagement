@@ -17,7 +17,35 @@ are just `User` rows with `role` = `EMPLOYEE`, `ACCOUNTANT`, `MANAGER`, or
 describe an early, much simpler version (Users/PaymentEntry/TransactionLog
 only) and were never updated as Party/Invoice/WhatsApp/export/analytics
 features were added. Verify against `src/main/java/com/empmgmt/` instead.
-Last full re-verification against source: 2026-07-29.
+Last full re-verification against source: 2026-07-29; header/DB/connection
+info and the "Changes since 2026-07-29" section refreshed 2026-09-30 (from
+git log through `897604a`, `application.properties`, and memory notes - the
+older per-feature sections below were NOT all re-read line by line).
+
+## Current state at a glance (2026-09-30) - read this before the older sections
+
+- **Local app points at `empdb`** (`spring.datasource.url=...5432/empdb`), which
+  is a **mirror of live Neon as of 2026-08-12** (280 parties / 1,987 invoices /
+  7,399 payments then) - NOT the old full FY22-27 local history and NOT
+  `empdb2`. Re-query before trusting any count or date range.
+- The FY2022-23..FY2024-25 ShivShakti backfill was **overwritten** by that
+  Neon pull; it survives only in
+  `C:\Users\ay036\Downloads\empdb_PRE-NEON-SYNC_backup_2026-08-12_FY22-26_data.dump`
+  (restore with the v18 `pg_restore`, ideally into a scratch DB). It was never
+  pushed to Neon.
+- **`empdb2` is a repeatable, current-FY-only sync target** (script in a
+  session scratchpad, re-derive from the "empdb2" note below), not the static
+  PDF build described in the 2026-07-30/31 section.
+- **Postgres server is v18** - use `C:\Program Files\PostgreSQL\18\bin\`
+  `pg_dump`/`pg_restore`; the v13 tools fail on version mismatch.
+- **Party identity is still free-text** (`party_name`, no FK). Orphaned /
+  split names are a recurring production problem - use `/admin/parties/merge`
+  first, then verify with a closing-balance reconciliation. See "Changes since
+  2026-07-29" below.
+- Newer roles/features not covered by the older sections: Voucher Audit,
+  party merge tool, native `parties.opening_balance`, universal error page +
+  trace IDs, IST clock, Tractor/Yodha Pickup delivery modes, Accountant/Manager
+  dashboard overview, Invoices-by-Creator page.
 
 **The app is now deployed and live** at
 `https://employeemanagement-q6h3.onrender.com` (Render, free tier, Docker
@@ -43,7 +71,10 @@ FY2024-25, predating the 2026-07-12 import's FY2025-26 start) - was added to
 **local `empdb` only**. 385 new parties, 3,377 invoices, 16,134 payments.
 See the "ShivShakti historical import (2026-07-28)" section below for the
 full details (party-matching approach, invoice-number scheme, what's still
-out of sync with Neon). **Also note**: between the two imports, a smaller,
+out of sync with Neon). **SUPERSEDED 2026-08-12**: local `empdb` was later
+dropped and replaced by a Neon pull, so this backfill is no longer live
+anywhere (only in the pre-sync dump - see "Current state at a glance").
+**Also note**: between the two imports, a smaller,
 undocumented partial **FY2026-27** import (Apr-Jul 2026, 534 invoices/1,911
 payments, `TALLY-S-FY2026-27-<vchNo>`) had already been applied to *both*
 local and Neon before this session started - discovered while building the
@@ -54,10 +85,10 @@ was created alongside `empdb` (which remains completely untouched) and now
 holds a from-scratch, PDF-verified FY2026-27 (1-Apr-26 to 28-Jul-26) ledger
 for the same ShivShakti business - 252 parties, 755 invoices, 1,991
 payment_entries, containing *only* this ledger's data (none of `empdb`'s
-FY22-26 history was carried over). **The running local app is currently
-pointed at `empdb2`, not `empdb`** (`spring.datasource.url` was switched -
-see "Running it / connecting" below) - don't assume "local" means `empdb`
-without checking the datasource URL first. Full details - including the
+FY22-26 history was carried over). **[Historical: the app was pointed at
+`empdb2` at that time; as of 2026-08-12 it points back at `empdb`, and as of
+2026-08-30 `empdb2` is rebuilt by a repeatable current-FY sync from `empdb`.]**
+Always check the datasource URL before assuming which DB is active. Full details - including the
 party-outstanding data-entry error and the party-ledger Dr/Cr display bug
 found and fixed along the way - in the "FY2026-27 ledger + `empdb2`"
 section below.
@@ -70,35 +101,46 @@ section below.
   Password is a plaintext local-dev credential in
   `src/main/resources/application.properties` (`spring.datasource.password`)
   - read it from that file rather than assuming it's unchanged. Connect via:
-  `"C:\Program Files\PostgreSQL\13\bin\psql.exe" -h localhost -U postgres -d empdb`
+  `"C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U postgres -d empdb`
   or `-d empdb2` (no GUI psql/pgAdmin on this machine - always use this CLI path).
-  - `empdb` - the original, full-history database (FY22-23 through FY26-27,
-    everything described in "Current data snapshot" below). Untouched since
-    2026-07-30/31's `empdb2` work - always verify this assumption still holds
-    (`SELECT count(*) FROM invoices` etc.) rather than trusting it blindly.
-  - `empdb2` - created 2026-07-30/31, schema-cloned from `empdb` (`pg_dump`/
-    restore) but with `parties`/`invoices`/`payment_entries`/`transaction_logs`/
-    `audit_logs`/`notification_logs`/`admin_notifications`/`payment_receipts`
-    wiped and rebuilt from *only* the FY2026-27 ledger data (`users`/
-    `notification_settings`/`login_sessions` were left as cloned from `empdb`).
-    See the "FY2026-27 ledger + `empdb2`" section below for the full story.
-  - **`spring.datasource.url` currently points at `empdb2`** (switched
-    2026-07-31) - check this value before assuming which DB a running local
-    instance is actually using; it's easy to flip back to `empdb` by editing
-    that one line + restarting.
+  - `empdb` - **the active local dev DB; a straight mirror of live Neon
+    (`neondb`) as of 2026-08-12** (pulled via `pg_dump -Fc` -> `dropdb`/`createdb`
+    -> `pg_restore`, v18 tools). Its earlier full FY22-27 local history was
+    overwritten (backup dump path in "Current state at a glance"). It may
+    have been re-synced or edited since - check `SELECT min(invoice_date),
+    max(invoice_date), count(*) FROM invoices` rather than trusting old counts.
+    Also has ~22-24 orphaned `party_name`s (see "Changes since 2026-07-29").
+  - `empdb2` - schema-clone of `empdb`, holds **only the current financial
+    year** rebuilt by a Node script (`pg` connecting to both DBs) on request:
+    per-party opening balance as of 1-Apr = `parties.opening_balance` +
+    pre-FY invoices - pre-FY payments, real current-FY rows copied as-is,
+    tables TRUNCATEd first, synthetic `TALLY-S-FY<yr>-OPEN-<slug>` invoice
+    (Dr) or "Opening balance (Cr)" payment per party. `users`/
+    `notification_settings`/`login_sessions` untouched. `payment_entries.
+    employee_id` is remapped via normalized username (one known mismatch:
+    `Hryadav` vs `HR_Yadav`), falling back to admin. **Verification invariant
+    every run**: `empdb2` SUM(invoices)-SUM(payments) must equal `empdb`
+    SUM(opening_balance)+SUM(invoices)-SUM(payments). The script lived only in
+    a session scratchpad (~150 lines) - re-derive from this description. The
+    original 2026-07-30/31 PDF-based build is described further below (historical).
+  - `spring.datasource.url` is `jdbc:postgresql://localhost:5432/empdb`
+    (confirmed 2026-09-30) - still check it before assuming which DB a running
+    local instance uses.
 - `spring.jpa.hibernate.ddl-auto=update` - schema auto-migrates new
   tables/columns on boot, but **never** rewrites existing CHECK constraints,
   indexes, or drops columns. See the enum gotcha below.
-- **Two Postgres installs on this machine, roles now REVERSED from earlier
-  notes**: the local server itself is now **v18** (confirmed 2026-07-28 -
-  `pg_dump.exe` under `C:\Program Files\PostgreSQL\13` fails with `server
+- **Two Postgres installs on this machine; the local server is v18**
+  (confirmed 2026-07-28; `pg_dump.exe` from the `13` folder fails with `server
   version: 18.4 ... aborting because of server version mismatch`). Use
-  `C:\Program Files\PostgreSQL\18\bin\pg_dump.exe`/`pg_restore.exe` for any
-  local backup/restore. `psql.exe` under either the `13` or `18` folder still
-  connects fine for plain queries/DDL (psql is lenient about talking to a
-  newer server; pg_dump/pg_restore are not). Re-verify which version the
-  server is on before assuming either of these - it may have been upgraded
-  again since.
+  `C:\Program Files\PostgreSQL\18\bin\` for `psql`, `pg_dump`, `pg_restore`
+  (and it satisfies Neon's SNI/`sslmode=require` needs). `psql` from `13` still
+  works for plain queries but there's no reason to use it. Re-verify the server
+  version if a dump/restore ever complains.
+- **New `nullable=false` columns need a manual migration too**: Hibernate's
+  `ddl-auto=update` emits `ADD COLUMN ... NOT NULL` with no DEFAULT, which fails
+  on a populated table (`column contains null values`). Run `ALTER TABLE ...
+  ADD COLUMN ... NOT NULL DEFAULT <v>` by hand on both local and Neon first
+  (this bit `parties.opening_balance`). Separate from the enum CHECK gotcha.
 - To restart the app after a code change: find the PID on port 8080
   (`Get-NetTCPConnection -LocalPort 8080 -State Listen`), `Stop-Process -Force`
   it, then `nohup mvn -q spring-boot:run &` and poll
@@ -125,8 +167,9 @@ section below.
   `POST /admin/employees/{id}/reset-password` action on `/admin/employees`
   to set a new one - don't try to guess or derive the old one.
 - **Template-only edits need a rebuild, not just a restart.**
-  `spring.thymeleaf.cache=false` only disables Thymeleaf's own template
-  cache, not the underlying classpath resource copy - editing a `.html`
+  (`spring.thymeleaf.cache` is now `true` as of commit `5cf0089`, so a
+  template edit is never picked up live - always compile + restart.) The older
+  reasoning: the underlying classpath resource copy is stale - editing a `.html`
   under `src/main/resources/templates` and just restarting the already-
   running jar/process serves the **stale** copy from `target/classes`.
   Always run `mvn -q compile` (which re-triggers `process-resources`) before
@@ -163,7 +206,7 @@ thing to understand before touching invoices/payments/parties:
   `ExcelPartyService.ensureExists(combined)` / the existing controllers
   rather than hand-crafting the string.
 
-### Tables (11, schema `public`)
+### Tables (12+, schema `public`; `voucher_acknowledgements` added 2026-08-31, `parties` gained `opening_balance`/`opening_balance_date` 2026-08-17 - the table below predates both)
 
 | Table | Key columns | Notes |
 |---|---|---|
@@ -182,7 +225,8 @@ thing to understand before touching invoices/payments/parties:
 ### Entities/enums (`entity/` package)
 
 - `User.Role`: `ADMIN, EMPLOYEE, ACCOUNTANT, MANAGER`
-- `Invoice.DeliveryMode`: `TRUCK("Truck"), SELF_PICKUP("Self Pickup"), TROLLEY("Trolley")`
+- `Invoice.DeliveryMode`: `TRUCK("Truck"), SELF_PICKUP("Self Pickup"), TROLLEY("Trolley"), TRACTOR("Tractor"), YODHA_PICKUP("Yodha Pickup")` (last two added ~2026-08; the `invoices_delivery_mode_check` constraint needed the manual widening described in the enum gotcha)
+- `AdminNotification.NotificationType`: `COLLECTION_ADDED, INVOICE_ADDED, VOUCHER_DUPLICATE, VOUCHER_SUSPECT` (last two added 2026-08-31; `admin_notifications.type` CHECK was widened manually on local and Neon)
 - `PaymentEntry.ModeOfPayment`: `CASH, CHEQUE, BANK_TRANSFER, UPI, NEFT, RTGS, DD`
 - `NotificationLog.Status`: `SENT, FAILED, DRY_RUN`
 - `User` --1:N--> `PaymentEntry` (real JPA relationship, `employee_id` FK)
@@ -1013,9 +1057,9 @@ rather than re-deriving it:
   `zone = "Asia/Kolkata"`** - the container's default timezone is UTC, not
   IST, and nothing here sets `TZ` globally.
 
-## Current data snapshot (point-in-time, end of day 2026-07-28 - re-query live, don't trust these numbers as still current)
+## Current data snapshot (point-in-time, end of day 2026-07-28 - **STALE**: local `empdb` was replaced by a Neon mirror on 2026-08-12, see "Current state at a glance"; the numbers below are kept only as history of the old local DB)
 
-**Local `empdb` only** - see the ShivShakti historical import section below
+**Old local `empdb` only** - see the ShivShakti historical import section below
 for why local and Neon now diverge on more than just organic usage.
 
 - `parties`: 664 rows (241 as of 2026-07-12 + 385 from the 2026-07-28
@@ -1531,7 +1575,135 @@ one above.
   for anything this skill doesn't cover yet, rather than assuming the
   feature set is frozen at what's written above.
 
-## Still open / not yet done (updated 2026-07-29)
+## Changes since 2026-07-29 (added 2026-09-30, from git log + memory)
+
+Newest first is `git log`; below are the durable facts.
+
+### Party identity, orphans, and the merge tool
+- `party_name` on invoices/payments is still **free text** matched byte-for-byte
+  to `parties.combined`. Any edit to a party's Name/`combined` instantly
+  orphans its transactions (real incident: appending "448" to KAIF's Name).
+  To show a ledger code use the **Trailing Number** field, never the Name.
+  Reverting is the fix, never renaming the transactions.
+- Commit `bbeb559`: ledgers, reports and reminders **exclude names with no
+  live `parties` row**. Deleting a party (plain `deleteById`, no cascade) hides
+  its whole history from Full Ledger/Aging/Behavior/Executive - flag this
+  before deleting a party with real history.
+- **`/admin/parties/merge`** (`PartyMergeService`, `PartyMergeDTO`,
+  `admin/party-merge.html`, ADMIN-only, commit `8d5fff1`, trim fix `fa10490`):
+  lists orphaned `party_name`s biggest-money-first; "From" free text
+  (autocomplete via `/api/parties/ledger-names/suggest`) -> "To" must be an
+  existing `parties` row; live preview; re-points invoices+payments in one
+  transaction; one `audit_logs` row (`action=MERGE`); does NOT touch
+  `transaction_logs` and does NOT delete the source Party. Use it before manual
+  SQL. It only solves "wrong name entirely" - not typos with trailing space
+  (check `encode(x::bytea,'hex')`), missing transactions, or vouchers misfiled
+  under a legitimate second party.
+- **Party fix history** (all on live Neon; pattern = same split): PRASANG
+  (variants A/B still unresolved), SURAJ (fixed), USMANI (fully reconciled),
+  KAIF (fixed). Orphan count on Neon was 22 on 2026-08-16 and ~24 on
+  2026-08-30; re-run the anti-join
+  (`party_name` in invoices/payments with no `parties.combined`) or open the
+  merge page for the current list. HCL Ltd (test party) has payments with no
+  party row at all.
+- **Always finish a party fix with a closing-balance reconciliation** against
+  the Tally/Excel source - a voucher-number listing alone missed ₹13,000 on KAIF.
+- Editing prod: single audited edits via the app UI (claude-in-chrome); bulk /
+  investigative work via direct SQL when the user asks (they often paste the
+  Neon string). Ledger Add Payment/Invoice tabs: set the hidden `#partyName`
+  via JS after opening the tab; Add Invoice always computes `amount = rate x
+  bags` (bags >= 1), so bag-less opening rows need direct SQL.
+
+### Native opening balance (2026-08-17)
+- `parties.opening_balance NUMERIC(15,2) NOT NULL DEFAULT 0` (+ `opening_balance_date`),
+  positive = Dr, negative = Cr. Folded into `getPartyOutstandingSummary()`,
+  `getPartyLedger()`/`getAllPartyLedgers()` (renders a "🏁 Opening Balance" line
+  via `insertFiscalYearTotals`) and the aging FIFO walk. Editable on
+  Add/Edit Party.
+- **Not fully migrated**: ~230 old synthetic `TALLY-...-OPEN-<slug>` invoices /
+  "Opening balance%" payments still exist; only KAIF was moved to the real
+  column. Setting `opening_balance` on a party that still has a synthetic row
+  **double-counts** - remove the synthetic row first.
+
+### Voucher Audit (2026-08-30/31, commits `7aa34ed`, `897604a`)
+- `/admin/voucher-audit` (ADMIN-only, current FY only, no year picker):
+  models 100-voucher paper diary books; states USED / MISSING / NOT_YET_USED /
+  DUPLICATE / SUSPECT / AMBIGUOUS / UNPARSEABLE (`VoucherNumberParser`,
+  `VoucherAuditService`, `VoucherAuditDTO`). Clickable cells resolve via
+  `/admin/voucher-audit/lookup`. Acknowledge workflow (Voided/Spoiled/Transfer/
+  Explained + note) in `voucher_acknowledgements`.
+- `/admin/entries` and `/admin/invoices` Vch No. columns sort numerically
+  (`?sort=vch&dir=asc|desc`).
+- Silent admin bell alerts (`VOUCHER_DUPLICATE`/`VOUCHER_SUSPECT`) from
+  `AdminNotificationListener` on every save, **fires even when actor is ADMIN**,
+  wrapped in try/catch, and the entering user sees no warning (explicit
+  requirement - never add an entry-time warning). `897604a` made the per-save
+  check cheap instead of rebuilding the full report.
+- **Deploy status was never independently confirmed live** (as of 2026-08-31).
+  Check Render Events before assuming it's there.
+- New cache `VOUCHER_AUDIT` in `CacheConfig` (seven caches now).
+- **`@CacheEvict` gotcha**: evicting a no-arg `@Cacheable` method from a method
+  with different params silently no-ops unless `allEntries = true` (or an
+  explicit `key`). Verify writes invalidate reads live.
+
+### Errors, tracing, logging (2026-08-17, commit `be078c0`)
+- `RequestTraceFilter` puts an 8-char trace id in MDC; logs only 5xx and
+  requests over 3s. `CustomErrorController` renders `templates/error.html`
+  (friendly message + Reference ID = trace id + mailto, no stack/exception
+  text). `GlobalExceptionHandler` logs full context server-side and **re-throws
+  `AccessDeniedException`** (keeps `SecurityConfig`'s CSRF-expiry redirect
+  working - don't "simplify" that away). `logback-spring.xml`: async,
+  `neverBlock=true`, console-only, framework loggers at WARN.
+  To debug a user report, ask for the Reference ID and grep Render logs.
+
+### Render / runtime hardening
+- **OOM / 502 deploy incident 2026-08-16**: a push booted slowly (256s), died
+  ~10 min later silently (OOM), then 502-looped. Waiting or re-polling `/health`
+  did not help; the user's **Render dashboard -> Manual Deploy -> "Clear cache
+  and Deploy"** fixed it. If a deploy 502s past a normal 1-2 min boot, suggest
+  that instead of re-pushing.
+- Dockerfile JVM flags now: `-XX:MaxRAMPercentage=40 -XX:MaxMetaspaceSize=128m
+  -Xss512k -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError` (commit `54cedaf`).
+  `party.import.on-startup=false`, Hikari `maximum-pool-size=5`/`minimum-idle=2`,
+  Thymeleaf cache on, an index on `payment_entries` (`5cf0089`), dashboard uses
+  targeted aggregate queries instead of a full-table load (`6ddf610`).
+- All timestamps are pinned to IST (`util/IstClock.java`, commits `04cb3f3`,
+  `b37dd5d`); Login History now shows IST on Render.
+- Mobile flex/grid `min-width:0` rule and the iframe viewport-test workaround
+  from the older section still apply; `resize_window` does not work here.
+
+### Other features / fixes since 07-29
+- Admin **Invoices by Creator** page (`invoice-creators.html`, with a "View
+  Invoices" drill-down) and Manager/Accountant collections now included on
+  Employee Collections; Accountant/Manager dashboards have an overview.
+- Manager can add collections for any date; Manager collection edit / All My
+  Collections page; page-loading overlay on employee pages.
+- Truck-number suggestions use a JS dropdown (not `<datalist>`); new delivery
+  modes Tractor / Yodha Pickup.
+- Fixed: `th:field` on `type="date"` silently blocked edits in 5 forms
+  (`d55cf66`) - use the disabled display + hidden ISO input pattern, or
+  `th:value` with `#temporals.format(..., 'yyyy-MM-dd')`, everywhere a date
+  is pre-filled. Also fixed: payment mode not preserved on edit and
+  future-dated entries hidden from filtered views (`cfa1e6d`); sidebar nav
+  overflow hiding Sign Out on admin pages (`38042f3`).
+- **Audit-log date snapshot**: "live count != audit CREATE count" is expected -
+  the audit row is an immutable creation-date snapshot that diverges after an
+  entry's date is edited; not a bug.
+- Full Ledger is sorted by outstanding: a "missing" row may just have moved -
+  compute `ROW_NUMBER()` rank before suspecting cache/bug.
+- Admin template count is now 23 (`activity`, `party-merge`, `voucher-audit`,
+  `invoice-creators`, etc.); the "copy the nav/bell/manifest block to every
+  admin template" convention still applies.
+
+### Documentation state
+- `ARCHITECTURE.md` and `USER_GUIDE.md` (repo root) are still the old
+  H2 / two-role version (verified 2026-09-30) - untouched, still not to be trusted.
+
+## Still open / not yet done (**older list, updated 2026-07-29; some items now superseded - read "Changes since 2026-07-29" and "Current state at a glance" first**)
+
+- **Superseded items in this list**: the "Neon lacks the 2026-07-28 import"
+  bullet, the "local app points at `empdb2`" bullet, and the "`empdb2` exists
+  only locally / static" bullets no longer describe reality (see top of file).
 
 - **Verify `fbd9bf0` (the th:data-*/T(...) truncation fix) is actually live
   on Render** before assuming production is healthy - the deploy pipeline
