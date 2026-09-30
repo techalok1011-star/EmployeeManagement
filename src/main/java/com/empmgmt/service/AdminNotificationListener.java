@@ -6,6 +6,8 @@ import com.empmgmt.entity.User;
 import com.empmgmt.event.InvoiceCreatedEvent;
 import com.empmgmt.event.PaymentEntryCreatedEvent;
 import com.empmgmt.repository.AdminNotificationRepository;
+import com.empmgmt.repository.InvoiceRepository;
+import com.empmgmt.repository.PaymentEntryRepository;
 import com.empmgmt.repository.UserRepository;
 import com.empmgmt.util.VoucherNumberParser;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +45,8 @@ public class AdminNotificationListener {
     private final AdminNotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final VoucherAuditService voucherAuditService;
+    private final PaymentEntryRepository paymentEntryRepository;
+    private final InvoiceRepository invoiceRepository;
 
     private static final NumberFormat AMOUNT_FMT = NumberFormat.getNumberInstance(new Locale("en", "IN"));
 
@@ -142,7 +146,7 @@ public class AdminNotificationListener {
         // Targeted check, not the full cached dashboard report - see checkNewVoucher's own
         // Javadoc for why: that report builds book grids and every exception category, which
         // this doesn't need and can't afford to redo on every single save.
-        var anomaly = voucherAuditService.checkNewVoucher(series, vchNumber);
+        var anomaly = voucherAuditService.checkNewVoucher(series, vchNumber, sourceId);
         if (anomaly.isEmpty()) return;
 
         boolean isDuplicate = "DUPLICATE".equals(anomaly.get().type());
@@ -155,7 +159,9 @@ public class AdminNotificationListener {
             int otherOccurrences = anomaly.get().otherOccurrences();
             message = actorName + " used " + seriesLabel + " Vch No. " + vchNumber
                     + " for " + partyName + " - already recorded " + otherOccurrences
-                    + " other time" + (otherOccurrences == 1 ? "" : "s") + " this financial year.";
+                    + " other time" + (otherOccurrences == 1 ? "" : "s") + " this financial year"
+                    + describeMatches(series, anomaly.get().others()) + ".";
+            if (message.length() > 500) message = message.substring(0, 497) + "...";
         } else {
             type = AdminNotification.NotificationType.VOUCHER_SUSPECT;
             message = actorName + " used " + seriesLabel + " Vch No. " + vchNumber
@@ -175,5 +181,37 @@ public class AdminNotificationListener {
                 .build());
         log.info("🔔 Admin notification created for {} voucher {} ({}) on {} id={}",
                 anomaly.get().type(), seriesLabel, vchNumber, sourceType, sourceId);
+    }
+
+    /** " (matches: <party>, <date>, ₹<amt>, entered by <name>; ...)" for the earlier rows sharing the number. */
+    private String describeMatches(VoucherAuditDTO.Series series, java.util.List<VoucherAuditService.Match> others) {
+        if (others == null || others.isEmpty()) return "";
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("dd-MMM-yyyy");
+        StringBuilder sb = new StringBuilder(" (matches: ");
+        for (int i = 0; i < others.size(); i++) {
+            var m = others.get(i);
+            if (i > 0) sb.append("; ");
+            sb.append(m.partyName()).append(", ").append(m.date().format(fmt))
+              .append(", ₹").append(AMOUNT_FMT.format(m.amount()))
+              .append(", entered by ").append(enteredBy(series, m.id()));
+        }
+        return sb.append(")").toString();
+    }
+
+    private String enteredBy(VoucherAuditDTO.Series series, Long id) {
+        try {
+            if (series == VoucherAuditDTO.Series.RECEIPT) {
+                return paymentEntryRepository.findById(id)
+                        .map(p -> p.getEmployee() != null ? p.getEmployee().getFullName() : "unknown")
+                        .orElse("unknown");
+            }
+            return invoiceRepository.findById(id)
+                    .map(i -> i.getCreatedBy() == null ? "unknown (imported)"
+                            : userRepository.findByUsername(i.getCreatedBy())
+                                .map(User::getFullName).orElse(i.getCreatedBy()))
+                    .orElse("unknown");
+        } catch (Exception e) {
+            return "unknown";
+        }
     }
 }

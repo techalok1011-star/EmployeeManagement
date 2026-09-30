@@ -134,7 +134,7 @@ public class VoucherAuditService {
      * skips straight to the shared classify() step and stops there.
      */
     @Transactional(readOnly = true)
-    public Optional<Anomaly> checkNewVoucher(VoucherAuditDTO.Series series, long vchNumber) {
+    public Optional<Anomaly> checkNewVoucher(VoucherAuditDTO.Series series, long vchNumber, Long justSavedId) {
         LocalDate fyStart = currentFinancialYearStart();
         List<Row> rows = series == VoucherAuditDTO.Series.RECEIPT
                 ? loadRows(paymentEntryRepository.findVoucherRowsFrom(fyStart))
@@ -143,16 +143,24 @@ public class VoucherAuditService {
         Classification c = classify(rows);
         List<Row> occurrences = c.byValue().get(vchNumber);
         if (occurrences != null && occurrences.size() > 1) {
-            return Optional.of(new Anomaly("DUPLICATE", occurrences.size() - 1));
+            List<Match> others = occurrences.stream()
+                    .filter(r -> !r.id().equals(justSavedId))
+                    .sorted(java.util.Comparator.comparing(Row::date))
+                    .map(r -> new Match(r.id(), r.date(), r.amount(), r.partyName()))
+                    .toList();
+            return Optional.of(new Anomaly("DUPLICATE", occurrences.size() - 1, others));
         }
         if (c.suspectValues().contains(vchNumber)) {
-            return Optional.of(new Anomaly("SUSPECT", 0));
+            return Optional.of(new Anomaly("SUSPECT", 0, List.of()));
         }
         return Optional.empty();
     }
 
     /** type is "DUPLICATE" or "SUSPECT"; otherOccurrences only meaningful for DUPLICATE. */
-    public record Anomaly(String type, int otherOccurrences) {}
+    public record Anomaly(String type, int otherOccurrences, List<Match> others) {}
+
+    /** One earlier row that shares a duplicate voucher number (the just-saved row is excluded). */
+    public record Match(Long id, LocalDate date, BigDecimal amount, String partyName) {}
 
     // ── Acknowledging a gap ──────────────────────────────────────────────────
 
