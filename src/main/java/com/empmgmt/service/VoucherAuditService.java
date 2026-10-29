@@ -118,7 +118,8 @@ public class VoucherAuditService {
 
     private List<Row> loadRows(List<Object[]> raw) {
         return raw.stream()
-                .map(a -> new Row((Long) a[0], (String) a[1], (LocalDate) a[2], (BigDecimal) a[3], (String) a[4]))
+                .map(a -> new Row((Long) a[0], (String) a[1], (LocalDate) a[2], (BigDecimal) a[3], (String) a[4],
+                        a.length > 5 && a[5] != null ? ((Enum<?>) a[5]).name() : null))
                 .toList();
     }
 
@@ -142,11 +143,11 @@ public class VoucherAuditService {
 
         Classification c = classify(rows);
         List<Row> occurrences = c.byValue().get(vchNumber);
-        if (occurrences != null && occurrences.size() > 1) {
+        if (occurrences != null && occurrences.size() > 1 && !isSplitReceipt(occurrences)) {
             List<Match> others = occurrences.stream()
                     .filter(r -> !r.id().equals(justSavedId))
                     .sorted(java.util.Comparator.comparing(Row::date))
-                    .map(r -> new Match(r.id(), r.date(), r.amount(), r.partyName()))
+                    .map(r -> new Match(r.id(), r.date(), r.amount(), r.partyName(), r.mode()))
                     .toList();
             return Optional.of(new Anomaly("DUPLICATE", occurrences.size() - 1, others));
         }
@@ -165,6 +166,17 @@ public class VoucherAuditService {
      */
     @Transactional(readOnly = true)
     public Optional<Preview> previewNewVoucher(VoucherAuditDTO.Series series, long vchNumber, Long excludeId) {
+        return previewNewVoucher(series, vchNumber, excludeId, null, null, null);
+    }
+
+    /**
+     * Same as above, but when the caller also says which party/date/payment mode the new entry is for,
+     * a voucher already used for the SAME party on the SAME day in a DIFFERENT mode is reported as SPLIT
+     * (one paper receipt paid part cash, part net banking) instead of DUPLICATE.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Preview> previewNewVoucher(VoucherAuditDTO.Series series, long vchNumber, Long excludeId,
+                                               String party, LocalDate date, String mode) {
         LocalDate fyStart = currentFinancialYearStart();
         List<Row> rows = series == VoucherAuditDTO.Series.RECEIPT
                 ? loadRows(paymentEntryRepository.findVoucherRowsFrom(fyStart))
@@ -177,9 +189,10 @@ public class VoucherAuditService {
         if (same != null && !same.isEmpty()) {
             List<Match> others = same.stream()
                     .sorted(java.util.Comparator.comparing(Row::date))
-                    .map(r -> new Match(r.id(), r.date(), r.amount(), r.partyName()))
+                    .map(r -> new Match(r.id(), r.date(), r.amount(), r.partyName(), r.mode()))
                     .toList();
-            return Optional.of(new Preview("DUPLICATE", c.highWaterMark(), others));
+            boolean split = series == VoucherAuditDTO.Series.RECEIPT && isSplitWith(same, party, date, mode);
+            return Optional.of(new Preview(split ? "SPLIT" : "DUPLICATE", c.highWaterMark(), others));
         }
         if (vchNumber - c.highWaterMark() > SUSPECT_GAP) {
             return Optional.of(new Preview("SUSPECT", c.highWaterMark(), List.of()));
@@ -232,14 +245,14 @@ public class VoucherAuditService {
         return runs;
     }
 
-    /** type is "DUPLICATE" or "SUSPECT"; highestUsed is the highest legitimately used number so far. */
+    /** type is "DUPLICATE", "SPLIT" or "SUSPECT"; highestUsed is the highest legitimately used number so far. */
     public record Preview(String type, long highestUsed, List<Match> others) {}
 
     /** type is "DUPLICATE" or "SUSPECT"; otherOccurrences only meaningful for DUPLICATE. */
     public record Anomaly(String type, int otherOccurrences, List<Match> others) {}
 
     /** One earlier row that shares a duplicate voucher number (the just-saved row is excluded). */
-    public record Match(Long id, LocalDate date, BigDecimal amount, String partyName) {}
+    public record Match(Long id, LocalDate date, BigDecimal amount, String partyName, String mode) {}
 
     // ── Acknowledging a gap ──────────────────────────────────────────────────
 
@@ -300,7 +313,7 @@ public class VoucherAuditService {
 
     // ── Row shape used internally, before classification ────────────────────
 
-    private record Row(Long id, String rawVch, LocalDate date, BigDecimal amount, String partyName) {}
+    private record Row(Long id, String rawVch, LocalDate date, BigDecimal amount, String partyName, String mode) {}
 
     /** The shared, cheap part of classification: every NUMERIC row grouped by value, which of
      *  those values are suspect jumps, and the resulting high-water mark. Stops well short of
@@ -354,9 +367,11 @@ public class VoucherAuditService {
         long highWaterMark = c.highWaterMark();
 
         List<VoucherAuditDTO.ExceptionRow> duplicates = new ArrayList<>();
+        List<VoucherAuditDTO.ExceptionRow> splits = new ArrayList<>();
         for (var e : byValue.entrySet()) {
             if (e.getValue().size() > 1) {
-                duplicates.add(toException("DUPLICATE", e.getKey(), e.getValue()));
+                if (isSplitReceipt(e.getValue())) splits.add(toException("SPLIT", e.getKey(), e.getValue()));
+                else duplicates.add(toException("DUPLICATE", e.getKey(), e.getValue()));
             }
         }
         List<VoucherAuditDTO.ExceptionRow> suspects = suspectValues.stream()
@@ -448,6 +463,8 @@ public class VoucherAuditService {
                 .totalMissing(totalMissing)
                 .totalAcknowledged(totalAcknowledged)
                 .totalDuplicateValues(duplicates.size())
+                .totalSplit(splits.size())
+                .splits(splits)
                 .totalSuspect(suspects.size())
                 .totalAmbiguous(ambiguous.size())
                 .totalUnparseable(unparseable.size())
@@ -458,14 +475,41 @@ public class VoucherAuditService {
                 .build();
     }
 
+    /**
+     * One paper receipt can be paid part cash, part net banking and written as two entries under the same
+     * voucher number. That pattern - same party, same day, every entry in a different payment mode - is a
+     * SPLIT receipt, not a duplicate. Anything else (another party or day, or the same mode twice) stays a duplicate.
+     */
+    private static boolean isSplitReceipt(List<Row> group) {
+        if (group == null || group.size() < 2) return false;
+        Row first = group.get(0);
+        java.util.Set<String> modes = new java.util.HashSet<>();
+        for (Row r : group) {
+            if (r.mode() == null || r.partyName() == null || !r.partyName().equals(first.partyName())
+                    || !r.date().equals(first.date()) || !modes.add(r.mode())) return false;
+        }
+        return true;
+    }
+
+    /** Would adding one more entry (party/date/mode) to this voucher make it a valid split receipt? */
+    private static boolean isSplitWith(List<Row> existing, String party, LocalDate date, String mode) {
+        if (party == null || date == null || mode == null || existing == null || existing.isEmpty()) return false;
+        java.util.Set<String> modes = new java.util.HashSet<>();
+        for (Row r : existing) {
+            if (r.mode() == null || !party.equals(r.partyName()) || !date.equals(r.date()) || !modes.add(r.mode())) return false;
+        }
+        return !modes.contains(mode);
+    }
+
     private VoucherAuditDTO.ExceptionRow toException(String type, Long vchNumber, List<Row> occRows) {
         return VoucherAuditDTO.ExceptionRow.builder()
                 .type(type)
                 .vchNumber(vchNumber)
+                .total(occRows.stream().map(Row::amount).reduce(BigDecimal.ZERO, BigDecimal::add))
                 .occurrences(occRows.stream()
                         .map(r -> VoucherAuditDTO.Occurrence.builder()
                                 .id(r.id()).date(r.date()).amount(r.amount())
-                                .partyName(r.partyName()).rawValue(r.rawVch())
+                                .partyName(r.partyName()).rawValue(r.rawVch()).mode(r.mode())
                                 .build())
                         .collect(Collectors.toList()))
                 .build();

@@ -106,8 +106,8 @@ public interface PaymentEntryRepository extends JpaRepository<PaymentEntry, Long
 
     // ── Voucher audit ──────────────────────────────────────────────────────
 
-    /** Raw [id, receiptVchNo, entryDate, amount, partyName] rows for one financial year, for VoucherAuditService to parse. */
-    @Query("SELECT p.id, p.receiptVchNo, p.entryDate, p.amount, p.partyName FROM PaymentEntry p " +
+    /** Raw [id, receiptVchNo, entryDate, amount, partyName, modeOfPayment] rows for one financial year, for VoucherAuditService to parse. */
+    @Query("SELECT p.id, p.receiptVchNo, p.entryDate, p.amount, p.partyName, p.modeOfPayment FROM PaymentEntry p " +
            "WHERE p.entryDate >= :fyStart AND p.receiptVchNo IS NOT NULL")
     List<Object[]> findVoucherRowsFrom(@Param("fyStart") LocalDate fyStart);
 }

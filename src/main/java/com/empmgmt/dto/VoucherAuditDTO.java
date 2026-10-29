@@ -55,6 +55,8 @@ public class VoucherAuditDTO {
         private BigDecimal amount;
         private String partyName;
         private String rawValue;
+        /** Payment mode (CASH, BANK_TRANSFER, ...) for receipts; null for sales. */
+        private String mode;
     }
 
     /** Something needing a human look: a duplicate, an out-of-range jump, or unreadable text. */
@@ -68,6 +70,8 @@ public class VoucherAuditDTO {
         private String type;
         /** Null for AMBIGUOUS/UNPARSEABLE, where no number could be trusted. */
         private Long vchNumber;
+        /** Sum of all the entries behind this number - what a SPLIT receipt adds up to. */
+        private BigDecimal total;
         private List<Occurrence> occurrences;
     }
 
@@ -114,6 +118,8 @@ public class VoucherAuditDTO {
         private int totalMissing;
         private int totalAcknowledged;
         private int totalDuplicateValues;
+        /** Receipt numbers used for one party on one day in different modes (cash + bank): normal, listed for review only. */
+        private int totalSplit;
         private int totalSuspect;
         private int totalAmbiguous;
         private int totalUnparseable;
@@ -121,6 +127,8 @@ public class VoucherAuditDTO {
         /** Every currently-active missing run, flattened across books, for the acknowledge worklist. */
         private List<Run> activeMissingRuns;
         private List<ExceptionRow> exceptions;
+        /** Split receipts (one voucher, paid more than one way) - not exceptions, shown separately. */
+        private List<ExceptionRow> splits;
         private List<Acknowledgement> acknowledgements;
     }
 

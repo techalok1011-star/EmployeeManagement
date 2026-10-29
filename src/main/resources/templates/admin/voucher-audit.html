@@ -100,6 +100,7 @@
         .vch-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
         .vch-DUPLICATE{background:rgba(251,146,60,0.15);color:var(--orange)}
         .vch-SUSPECT{background:rgba(248,113,113,0.15);color:var(--red)}
+        .vch-SPLIT{background:rgba(99,102,241,0.15);color:var(--accent)}
         .vch-AMBIGUOUS{background:rgba(245,200,66,0.15);color:var(--gold)}
         .vch-UNPARSEABLE{background:var(--overlay-4);color:var(--muted)}
         .ack-details{display:inline-block}
@@ -195,6 +196,7 @@
                 <div class="chip-row">
                     <span class="chip" th:if="${report.totalDuplicateValues == 0 and report.totalSuspect == 0 and report.totalAmbiguous == 0 and report.totalUnparseable == 0}">✅ No exceptions</span>
                     <span class="chip bad" th:if="${report.totalDuplicateValues > 0}" th:text="${report.totalDuplicateValues} + ' duplicate'"></span>
+                    <span class="chip" th:if="${report.totalSplit > 0}" th:text="${report.totalSplit} + ' split receipt(s)'" title="One voucher paid more than one way (e.g. cash + net banking) - normal"></span>
                     <span class="chip bad" th:if="${report.totalSuspect > 0}" th:text="${report.totalSuspect} + ' suspect'"></span>
                     <span class="chip warn" th:if="${report.totalAmbiguous > 0}" th:text="${report.totalAmbiguous} + ' ambiguous'"></span>
                     <span class="chip" th:if="${report.totalUnparseable > 0}" th:text="${report.totalUnparseable} + ' unparseable'"></span>
@@ -358,6 +360,37 @@
                                         </div>
                                     </div>
                                 </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card" th:if="${!#lists.isEmpty(report.splits)}">
+                <div class="section-title">Split receipts <span class="text-muted" style="font-weight:400;font-size:12px">— one voucher paid more than one way (e.g. cash + net banking). Normal; listed so you can compare the total with Tally.</span></div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Voucher No.</th>
+                                <th>Party / date</th>
+                                <th>Entries</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="sp : ${report.splits}">
+                                <td><span class="vch-badge vch-SPLIT" th:text="${sp.vchNumber}"></span></td>
+                                <td>
+                                    <a class="party" th:href="@{/admin/ledger(partyName=${sp.occurrences[0].partyName})}" th:text="${sp.occurrences[0].partyName}"></a>
+                                    <div class="text-muted" th:text="${#temporals.format(sp.occurrences[0].date,'dd MMM yyyy')}"></div>
+                                </td>
+                                <td>
+                                    <div class="occ-row" th:each="occ : ${sp.occurrences}">
+                                        <span th:text="${#strings.capitalizeWords(#strings.toLowerCase(#strings.replace(occ.mode,'_',' ')))}"></span>
+                                        — ₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(occ.amount)}"></span>
+                                    </div>
+                                </td>
+                                <td>₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(sp.total)}"></span></td>
                             </tr>
                         </tbody>
                     </table>
@@ -371,6 +404,7 @@
                 <div class="chip-row">
                     <span class="chip" th:if="${report.totalDuplicateValues == 0 and report.totalSuspect == 0 and report.totalAmbiguous == 0 and report.totalUnparseable == 0}">✅ No exceptions</span>
                     <span class="chip bad" th:if="${report.totalDuplicateValues > 0}" th:text="${report.totalDuplicateValues} + ' duplicate'"></span>
+                    <span class="chip" th:if="${report.totalSplit > 0}" th:text="${report.totalSplit} + ' split receipt(s)'" title="One voucher paid more than one way (e.g. cash + net banking) - normal"></span>
                     <span class="chip bad" th:if="${report.totalSuspect > 0}" th:text="${report.totalSuspect} + ' suspect'"></span>
                     <span class="chip warn" th:if="${report.totalAmbiguous > 0}" th:text="${report.totalAmbiguous} + ' ambiguous'"></span>
                     <span class="chip" th:if="${report.totalUnparseable > 0}" th:text="${report.totalUnparseable} + ' unparseable'"></span>
@@ -534,6 +568,37 @@
                                         </div>
                                     </div>
                                 </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card" th:if="${!#lists.isEmpty(report.splits)}">
+                <div class="section-title">Split receipts <span class="text-muted" style="font-weight:400;font-size:12px">— one voucher paid more than one way (e.g. cash + net banking). Normal; listed so you can compare the total with Tally.</span></div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Voucher No.</th>
+                                <th>Party / date</th>
+                                <th>Entries</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="sp : ${report.splits}">
+                                <td><span class="vch-badge vch-SPLIT" th:text="${sp.vchNumber}"></span></td>
+                                <td>
+                                    <a class="party" th:href="@{/admin/ledger(partyName=${sp.occurrences[0].partyName})}" th:text="${sp.occurrences[0].partyName}"></a>
+                                    <div class="text-muted" th:text="${#temporals.format(sp.occurrences[0].date,'dd MMM yyyy')}"></div>
+                                </td>
+                                <td>
+                                    <div class="occ-row" th:each="occ : ${sp.occurrences}">
+                                        <span th:text="${#strings.capitalizeWords(#strings.toLowerCase(#strings.replace(occ.mode,'_',' ')))}"></span>
+                                        — ₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(occ.amount)}"></span>
+                                    </div>
+                                </td>
+                                <td>₹<span th:text="${T(com.empmgmt.util.AmountFormat).format(sp.total)}"></span></td>
                             </tr>
                         </tbody>
                     </table>
