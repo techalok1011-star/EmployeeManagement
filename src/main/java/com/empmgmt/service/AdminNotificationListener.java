@@ -4,6 +4,7 @@ import com.empmgmt.dto.VoucherAuditDTO;
 import com.empmgmt.entity.AdminNotification;
 import com.empmgmt.entity.User;
 import com.empmgmt.event.InvoiceCreatedEvent;
+import com.empmgmt.event.PartyCreatedEvent;
 import com.empmgmt.event.PaymentEntryCreatedEvent;
 import com.empmgmt.repository.AdminNotificationRepository;
 import com.empmgmt.repository.InvoiceRepository;
@@ -108,6 +109,39 @@ public class AdminNotificationListener {
 
         checkVoucherAnomaly(VoucherAuditDTO.Series.SALES, invoice.getSalesVchNo(), invoice.getPartyName(),
                 invoice.getAmount(), invoice.getId(), "INVOICE", actor);
+    }
+
+    /**
+     * Tells the admin a new party exists - every new party is a potential duplicate/typo of an
+     * existing one (the recurring PRASANG/SURAJ/USMANI problem), so the admin wants to see each.
+     * Skipped when the admin created it themselves. Wrapped so a failure here (e.g. the
+     * admin_notifications type CHECK not yet widened on a database) can never undo or fail the
+     * party creation that already committed.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void onPartyCreated(PartyCreatedEvent event) {
+        try {
+            User actor = userRepository.findByUsername(event.getActorUsername()).orElse(null);
+            if (actor == null || actor.getRole() == User.Role.ADMIN) return;
+            var party = event.getParty();
+            String message = actor.getFullName() + " (" + actor.getRole().name().toLowerCase()
+                    + ") added a new party: " + party.getCombined();
+            if (message.length() > 500) message = message.substring(0, 497) + "...";
+            notificationRepository.save(AdminNotification.builder()
+                    .type(AdminNotification.NotificationType.PARTY_ADDED)
+                    .message(message)
+                    .partyName(party.getCombined())
+                    .triggeredBy(actor.getUsername())
+                    .triggeredByRole(actor.getRole().name())
+                    .sourceType("PARTY")
+                    .sourceId(party.getId())
+                    .read(false)
+                    .build());
+            log.info("🔔 Admin notification created for new party id={}", party.getId());
+        } catch (Exception e) {
+            log.error("New-party notification failed (party itself was created fine)", e);
+        }
     }
 
     /**

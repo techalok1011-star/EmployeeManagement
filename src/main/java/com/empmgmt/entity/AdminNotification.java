@@ -70,6 +70,10 @@ public class AdminNotification {
         /** A newly-saved voucher number matches one already used this financial year. */
         VOUCHER_DUPLICATE,
         /** A newly-saved voucher number is far outside this year's normal range - likely a typo. */
-        VOUCHER_SUSPECT
+        VOUCHER_SUSPECT,
+        /** A new party was created by someone other than the admin. */
+        PARTY_ADDED,
+        /** Daily 10 PM summary of receipt voucher numbers still missing after the grace period. */
+        VOUCHER_GAP_DIGEST
     }
 }

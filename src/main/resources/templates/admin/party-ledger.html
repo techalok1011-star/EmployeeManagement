@@ -529,5 +529,7 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 }
 </script>
+<script th:src="@{/js/pt-modal.js}"></script>
+<script th:src="@{/js/voucher-dup.js}"></script>
 </body>
 </html>

@@ -156,6 +156,85 @@ public class VoucherAuditService {
         return Optional.empty();
     }
 
+    /**
+     * Pre-save version of {@link #checkNewVoucher}: would this number, if saved now, be a DUPLICATE
+     * of an existing one or a SUSPECT jump (more than {@value #SUSPECT_GAP} above the highest
+     * legitimately used number)? Uses exactly the same classification as the audit dashboard and
+     * the post-save admin alert, so the person entering the data sees what the admin would be told.
+     * {@code excludeId} removes the row being edited from the comparison.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Preview> previewNewVoucher(VoucherAuditDTO.Series series, long vchNumber, Long excludeId) {
+        LocalDate fyStart = currentFinancialYearStart();
+        List<Row> rows = series == VoucherAuditDTO.Series.RECEIPT
+                ? loadRows(paymentEntryRepository.findVoucherRowsFrom(fyStart))
+                : loadRows(invoiceRepository.findVoucherRowsFrom(fyStart));
+        if (excludeId != null) {
+            rows = rows.stream().filter(r -> !excludeId.equals(r.id())).toList();
+        }
+        Classification c = classify(rows);
+        List<Row> same = c.byValue().get(vchNumber);
+        if (same != null && !same.isEmpty()) {
+            List<Match> others = same.stream()
+                    .sorted(java.util.Comparator.comparing(Row::date))
+                    .map(r -> new Match(r.id(), r.date(), r.amount(), r.partyName()))
+                    .toList();
+            return Optional.of(new Preview("DUPLICATE", c.highWaterMark(), others));
+        }
+        if (vchNumber - c.highWaterMark() > SUSPECT_GAP) {
+            return Optional.of(new Preview("SUSPECT", c.highWaterMark(), List.of()));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Voucher numbers that are still missing and have been for at least {@code graceDays}: below the
+     * highest number that was entered on a date at least {@code graceDays} ago, unused, and not
+     * acknowledged (voided/spoiled/transfer/explained). Numbers skipped only recently are left out
+     * on purpose - paper books are often keyed out of order, so a fresh gap usually fills itself.
+     * Suspect (typo) jumps are ignored exactly as on the audit dashboard.
+     */
+    @Transactional(readOnly = true)
+    public List<VoucherAuditDTO.Run> findOverdueMissing(VoucherAuditDTO.Series series, int graceDays) {
+        LocalDate fyStart = currentFinancialYearStart();
+        String fyLabel = financialYearLabel(fyStart);
+        List<Row> rows = series == VoucherAuditDTO.Series.RECEIPT
+                ? loadRows(paymentEntryRepository.findVoucherRowsFrom(fyStart))
+                : loadRows(invoiceRepository.findVoucherRowsFrom(fyStart));
+        Classification c = classify(rows);
+
+        LocalDate cutoff = IstClock.today().minusDays(graceDays);
+        long settledHighest = 0;
+        for (var e : c.byValue().entrySet()) {
+            if (c.suspectValues().contains(e.getKey())) continue;
+            if (e.getValue().stream().anyMatch(r -> !r.date().isAfter(cutoff))) {
+                settledHighest = Math.max(settledHighest, e.getKey());
+            }
+        }
+
+        List<VoucherAcknowledgement> acks = voucherAcknowledgementRepository
+                .findBySeriesAndFinancialYearOrderByRangeStart(series.name(), fyLabel);
+
+        List<VoucherAuditDTO.Run> runs = new ArrayList<>();
+        Long runStart = null;
+        for (long n = 1; n <= settledHighest; n++) {
+            boolean used = c.byValue().containsKey(n) && !c.suspectValues().contains(n);
+            final long num = n;
+            boolean acked = !used && acks.stream().anyMatch(a -> num >= a.getRangeStart() && num <= a.getRangeEnd());
+            boolean missing = !used && !acked;
+            if (missing && runStart == null) runStart = n;
+            if (!missing && runStart != null) {
+                runs.add(new VoucherAuditDTO.Run(runStart, n - 1));
+                runStart = null;
+            }
+        }
+        if (runStart != null) runs.add(new VoucherAuditDTO.Run(runStart, settledHighest));
+        return runs;
+    }
+
+    /** type is "DUPLICATE" or "SUSPECT"; highestUsed is the highest legitimately used number so far. */
+    public record Preview(String type, long highestUsed, List<Match> others) {}
+
     /** type is "DUPLICATE" or "SUSPECT"; otherOccurrences only meaningful for DUPLICATE. */
     public record Anomaly(String type, int otherOccurrences, List<Match> others) {}
 

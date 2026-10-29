@@ -61,6 +61,7 @@ public class InvoiceService {
             throw new IllegalArgumentException(
                     "Invoice number '" + request.getInvoiceNumber() + "' already exists.");
         }
+        requirePartyExists(request.getPartyName());
         BigDecimal amount = request.getRatePerBag().multiply(BigDecimal.valueOf(request.getBags()));
         Invoice saved = invoiceRepository.save(Invoice.builder()
                 .invoiceNumber(request.getInvoiceNumber().trim())
@@ -84,6 +85,14 @@ public class InvoiceService {
         return toResponse(saved);
     }
 
+    private void requirePartyExists(String partyName) {
+        if (partyName == null || partyName.isBlank()) return;
+        if (!partyRepository.existsByCombined(partyName.trim())) {
+            throw new IllegalArgumentException("Party '" + partyName.trim()
+                    + "' does not exist. Please add the party first, then enter the data.");
+        }
+    }
+
     // ─────────────────────────────────────────────────────────
     // UPDATE
     // ─────────────────────────────────────────────────────────
@@ -98,6 +107,9 @@ public class InvoiceService {
             throw new IllegalArgumentException("Invoice number '" + newNumber + "' already exists.");
         }
 
+        if (!Objects.equals(invoice.getPartyName(), request.getPartyName())) {
+            requirePartyExists(request.getPartyName());
+        }
         BigDecimal amount = request.getRatePerBag().multiply(BigDecimal.valueOf(request.getBags()));
         String diff = "invoice_number: '" + invoice.getInvoiceNumber() + "' -> '" + newNumber
                 + "', party: '" + invoice.getPartyName() + "' -> '" + request.getPartyName()

@@ -68,6 +68,7 @@ public class AdminController {
     private final LoginSessionService loginSessionService;
     private final SessionRegistry sessionRegistry;
     private final PartyMergeService partyMergeService;
+    private final com.empmgmt.service.PartyCreationService partyCreationService;
     private final VoucherAuditService voucherAuditService;
 
     // ─── Dashboard ────────────────────────────────────────────
@@ -210,7 +211,14 @@ public class AdminController {
             redirectAttributes.addFlashAttribute("editRequest", request);
             return "redirect:/admin/entries/" + id + "/edit";
         }
-        paymentEntryService.updateEntry(id, request, auth.getName());
+        try {
+            paymentEntryService.updateEntry(id, request, auth.getName());
+        } catch (IllegalArgumentException e) {
+            // e.g. the party typed does not exist - show why and keep the admin's edits on screen
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+            redirectAttributes.addFlashAttribute("editRequest", request);
+            return "redirect:/admin/entries/" + id + "/edit";
+        }
         redirectAttributes.addFlashAttribute("successMsg", "Entry updated successfully!");
         return "redirect:/admin/entries";
     }
@@ -693,28 +701,8 @@ public class AdminController {
             return "redirect:/admin/parties";
         }
         try {
-            String gstin    = request.getGstin() != null ? request.getGstin().trim() : "";
-            String combined = gstin.isEmpty() ? request.getName().trim()
-                                              : request.getName().trim() + "_" + gstin;
-            if (partyRepository.existsByCombined(combined)) {
-                redirectAttributes.addFlashAttribute("errorMsg",
-                        "Party '" + combined + "' already exists.");
-                return "redirect:/admin/parties";
-            }
-            Party saved = partyRepository.save(Party.builder()
-                    .name(request.getName().trim())
-                    .gst(gstin)
-                    .combined(combined)
-                    .trailingNumber(request.getTrailingNumber() != null && !request.getTrailingNumber().isBlank()
-                            ? request.getTrailingNumber().trim() : null)
-                    .phone(request.getPhone() != null && !request.getPhone().isBlank()
-                            ? request.getPhone().trim() : null)
-                    .whatsappOptIn(request.isWhatsappOptIn())
-                    .openingBalance(request.getOpeningBalance() != null ? request.getOpeningBalance() : java.math.BigDecimal.ZERO)
-                    .openingBalanceDate(request.getOpeningBalanceDate())
-                    .build());
-            logPartyAudit("CREATE", saved, auth.getName(), "Party '" + combined + "' created");
-            invoiceService.evictPartyDerivedCaches();
+            // PartyCreationService audits, evicts caches and notifies the admin (if not the admin).
+            partyCreationService.create(request, auth.getName());
             redirectAttributes.addFlashAttribute("successMsg", "Party added successfully!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());

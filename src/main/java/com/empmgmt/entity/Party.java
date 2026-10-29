@@ -53,6 +53,10 @@ public class Party {
      * existing synthetic rows have NOT yet been migrated/removed as of when this was added,
      * so don't assume every party's opening balance is captured here yet.
      */
+    // @Builder.Default is required: without it Lombok's builder ignores this initializer and
+    // Party.builder()...build() (e.g. ExcelPartyService.ensureExists) inserts NULL, which violates
+    // the NOT NULL column and fails the whole entry save.
+    @Builder.Default
     @Column(name = "opening_balance", nullable = false, precision = 15, scale = 2)
     private BigDecimal openingBalance = BigDecimal.ZERO;
 

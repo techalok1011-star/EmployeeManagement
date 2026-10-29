@@ -64,7 +64,15 @@ public class EmployeeController {
         }
         // Always force today's date — employees cannot add past/future entries
         request.setEntryDate(IstClock.today());
-        PaymentEntryDTO.Response saved = paymentEntryService.createEntry(request, auth.getName());
+        PaymentEntryDTO.Response saved;
+        try {
+            saved = paymentEntryService.createEntry(request, auth.getName());
+        } catch (IllegalArgumentException e) {
+            // e.g. party does not exist - show the message and keep what the employee typed
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+            redirectAttributes.addFlashAttribute("newEntry", request);
+            return "redirect:/employee/dashboard";
+        }
 
         // Receipt photo is optional — a problem attaching it should never block the entry itself.
         if (receiptPhoto != null && !receiptPhoto.isEmpty()) {

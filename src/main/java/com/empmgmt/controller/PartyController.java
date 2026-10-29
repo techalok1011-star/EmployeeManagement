@@ -37,6 +37,12 @@ public class PartyController {
 		return partyRepository.findLedgerPartyNamesMatching(q.trim(), limit);
 	}
 
+	/** Used by entry forms to decide whether to show the "this party does not exist" popup. */
+	@GetMapping("/exists")
+	public Map<String, Object> exists(@RequestParam(name = "name") String name) {
+		return Map.of("exists", excelPartyService.exists(name));
+	}
+
 	@GetMapping("/suggest")
 	public List<PartySuggestionDTO> suggest(@RequestParam(name = "q", required = false) String q,
 											@RequestParam(name = "limit", required = false, defaultValue = "20") int limit) {

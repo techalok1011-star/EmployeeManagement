@@ -66,8 +66,8 @@ public class PaymentEntryService {
         request.setEntryDate(IstClock.today());
         User employee = findUserByUsername(username);
 
-        // ensure party exists in parties table (accepts "Name" or "Name_GSTIN")
-        excelPartyService.ensureExists(request.getPartyName());
+        // party must already exist in parties table (UI offers to create it first)
+        excelPartyService.requireExists(request.getPartyName());
 
         PaymentEntry entry = PaymentEntry.builder()
                 .partyName(request.getPartyName())
@@ -100,7 +100,7 @@ public class PaymentEntryService {
     public PaymentEntryDTO.Response createEntryForManager(PaymentEntryDTO.Request request, String username) {
         User manager = findUserByUsername(username);
 
-        excelPartyService.ensureExists(request.getPartyName());
+        excelPartyService.requireExists(request.getPartyName());
 
         PaymentEntry entry = PaymentEntry.builder()
                 .partyName(request.getPartyName())
@@ -155,7 +155,7 @@ public class PaymentEntryService {
         }
         User staff = findUserByUsername(username);
 
-        excelPartyService.ensureExists(request.getPartyName());
+        excelPartyService.requireExists(request.getPartyName());
 
         PaymentEntry entry = PaymentEntry.builder()
                 .partyName(request.getPartyName())
@@ -469,8 +469,11 @@ public class PaymentEntryService {
         PaymentEntry entry = findEntryById(id);
         String diff = computeDiff(entry, request);
 
-        // ensure party exists for updated value
-        excelPartyService.ensureExists(request.getPartyName());
+        // A changed party must already exist (never auto-created). An unchanged one is left alone
+        // so entries on a legacy orphaned party name can still be edited for other fields.
+        if (!java.util.Objects.equals(entry.getPartyName(), request.getPartyName())) {
+            excelPartyService.requireExists(request.getPartyName());
+        }
         entry.setPartyName(request.getPartyName());
         entry.setAmount(request.getAmount());
         entry.setModeOfPayment(request.getModeOfPayment());
@@ -493,6 +496,21 @@ public class PaymentEntryService {
      */
     @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
     public PaymentEntryDTO.Response updateEntryByEmployee(Long id, PaymentEntryDTO.Request request, String username) {
+        return updateOwnEntry(id, request, username, true);
+    }
+
+    /**
+     * Manager variant of {@link #updateEntryByEmployee}: still limited to the manager's own
+     * entries and still needs remarks, but not restricted to today's date - managers can log
+     * collections for any date, so they must be able to correct those too.
+     */
+    @CacheEvict(cacheNames = {PARTY_OUTSTANDING, ALL_PARTY_LEDGERS, PARTY_LEDGER, AGING_REPORT, PAYMENT_BEHAVIOR, INVOICE_STATS, VOUCHER_AUDIT}, allEntries = true)
+    public PaymentEntryDTO.Response updateEntryByManager(Long id, PaymentEntryDTO.Request request, String username) {
+        return updateOwnEntry(id, request, username, false);
+    }
+
+    private PaymentEntryDTO.Response updateOwnEntry(Long id, PaymentEntryDTO.Request request, String username,
+                                                    boolean todayOnly) {
         if (request.getRemarks() == null || request.getRemarks().isBlank()) {
             throw new RuntimeException("Remarks are mandatory when editing an entry");
         }
@@ -500,14 +518,17 @@ public class PaymentEntryService {
         if (!entry.getEmployee().getUsername().equals(username)) {
             throw new AccessDeniedException("You can only edit your own entries");
         }
-        if (!entry.getEntryDate().equals(IstClock.today())) {
+        if (todayOnly && !entry.getEntryDate().equals(IstClock.today())) {
             throw new RuntimeException("You can only edit today's entries. Past entries cannot be modified.");
         }
 
         String diff = computeDiff(entry, request);
 
-        // ensure party exists for updated value
-        excelPartyService.ensureExists(request.getPartyName());
+        // A changed party must already exist (never auto-created). An unchanged one is left alone
+        // so entries on a legacy orphaned party name can still be edited for other fields.
+        if (!java.util.Objects.equals(entry.getPartyName(), request.getPartyName())) {
+            excelPartyService.requireExists(request.getPartyName());
+        }
         entry.setPartyName(request.getPartyName());
         entry.setAmount(request.getAmount());
         entry.setModeOfPayment(request.getModeOfPayment());

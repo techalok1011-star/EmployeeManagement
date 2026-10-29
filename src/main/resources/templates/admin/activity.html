@@ -130,6 +130,8 @@
                 <div class="feed-icon invoice" th:if="${n.type == 'INVOICE_ADDED'}">🧾</div>
                 <div class="feed-icon voucher-anomaly" th:if="${n.type == 'VOUCHER_DUPLICATE'}">🔁</div>
                 <div class="feed-icon voucher-anomaly" th:if="${n.type == 'VOUCHER_SUSPECT'}">⚠️</div>
+                <div class="feed-icon invoice" th:if="${n.type == 'PARTY_ADDED'}">🏢</div>
+                <div class="feed-icon voucher-anomaly" th:if="${n.type == 'VOUCHER_GAP_DIGEST'}">📋</div>
                 <div>
                     <div class="feed-message" th:text="${n.message}"></div>
                     <div class="feed-meta" th:text="${n.createdAt}"></div>

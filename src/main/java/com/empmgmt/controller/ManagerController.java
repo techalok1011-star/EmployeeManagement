@@ -82,11 +82,11 @@ public class ManagerController {
     }
 
     private YearMonth parseMonthOrCurrent(String month) {
-        if (month == null || month.isBlank()) return YearMonth.now();
+        if (month == null || month.isBlank()) return YearMonth.from(IstClock.today());
         try {
             return YearMonth.parse(month);
         } catch (Exception e) {
-            return YearMonth.now();
+            return YearMonth.from(IstClock.today());
         }
     }
 
@@ -142,10 +142,20 @@ public class ManagerController {
         try {
             invoiceService.createInvoice(request, username);
             redirectAttributes.addFlashAttribute("successMsg", "Invoice added successfully!");
+            return dashboardRedirectFor(request.getInvoiceDate());
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
         }
         return "redirect:/manager/dashboard";
+    }
+
+    /**
+     * Dashboard lists only show the selected day/month (default: today). After saving an entry
+     * dated on another day, land on that day/month so it's visible instead of seeming to vanish.
+     */
+    private String dashboardRedirectFor(LocalDate entryDate) {
+        if (entryDate == null || entryDate.equals(IstClock.today())) return "redirect:/manager/dashboard";
+        return "redirect:/manager/dashboard?date=" + entryDate + "&month=" + YearMonth.from(entryDate);
     }
 
     // ─── View All My Invoices ───────────────────────────────────
@@ -267,7 +277,16 @@ public class ManagerController {
             redirectAttributes.addFlashAttribute("activeTab", "collections");
             return "redirect:/manager/dashboard";
         }
-        PaymentEntryDTO.Response saved = paymentEntryService.createEntryForManager(request, username);
+        PaymentEntryDTO.Response saved;
+        try {
+            saved = paymentEntryService.createEntryForManager(request, username);
+        } catch (IllegalArgumentException e) {
+            // e.g. party does not exist - show the message and keep what the manager typed
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+            redirectAttributes.addFlashAttribute("newEntry", request);
+            redirectAttributes.addFlashAttribute("activeTab", "collections");
+            return "redirect:/manager/dashboard";
+        }
 
         // Receipt photo is optional - a problem attaching it should never block the entry itself.
         if (receiptPhoto != null && !receiptPhoto.isEmpty()) {
@@ -280,7 +299,8 @@ public class ManagerController {
         }
 
         redirectAttributes.addFlashAttribute("successMsg", "Collection added successfully!");
-        return "redirect:/manager/dashboard";
+        redirectAttributes.addFlashAttribute("activeTab", "collections");
+        return dashboardRedirectFor(request.getEntryDate());
     }
 
     // ─── View All My Collections (day-wise, filterable) ────────
@@ -303,7 +323,7 @@ public class ManagerController {
         return "manager/entries";
     }
 
-    // ─── Edit Collection (today's entries only) ────────────────
+    // ─── Edit Collection (own entries, any date) ───────────────
 
     @GetMapping("/entries/{id}/edit")
     public String editEntryForm(@PathVariable Long id, Authentication auth, Model model,
@@ -312,11 +332,6 @@ public class ManagerController {
             PaymentEntryDTO.Response entry = paymentEntryService.getEntryById(id);
             if (!entry.getEmployeeUsername().equals(auth.getName())) {
                 redirectAttributes.addFlashAttribute("errorMsg", "You can only edit your own collections.");
-                return "redirect:/manager/entries";
-            }
-            if (!entry.getEntryDate().equals(IstClock.today())) {
-                redirectAttributes.addFlashAttribute("errorMsg",
-                        "You can only edit today's collections. Past entries are locked.");
                 return "redirect:/manager/entries";
             }
             PaymentEntryDTO.Request req = new PaymentEntryDTO.Request();
@@ -351,7 +366,7 @@ public class ManagerController {
             return "redirect:/manager/entries/" + id + "/edit";
         }
         try {
-            paymentEntryService.updateEntryByEmployee(id, request, auth.getName());
+            paymentEntryService.updateEntryByManager(id, request, auth.getName());
             redirectAttributes.addFlashAttribute("successMsg", "Collection updated successfully!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());

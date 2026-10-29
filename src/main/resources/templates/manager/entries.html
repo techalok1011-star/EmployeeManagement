@@ -282,11 +282,8 @@
                             <td class="text-muted" th:text="${entry.createdAt}"></td>
                             <td>
                                 <div style="display:flex;gap:6px;align-items:center">
-                                    <!-- Edit only allowed for today's entries -->
-                                    <a th:if="${entry.entryDate == T(java.time.LocalDate).now()}"
-                                       th:href="@{/manager/entries/{id}/edit(id=${entry.id})}" class="btn btn-ghost">✏️ Edit</a>
-                                    <span th:if="${entry.entryDate != T(java.time.LocalDate).now()}"
-                                          class="btn btn-ghost" style="opacity:0.4;cursor:not-allowed" title="Only today's entries can be edited">🔒</span>
+                                    <!-- Managers can edit their own entries of any date -->
+                                    <a th:href="@{/manager/entries/{id}/edit(id=${entry.id})}" class="btn btn-ghost">✏️ Edit</a>
                                     <form class="delete-entry-form" th:action="@{/manager/entries/{id}/delete(id=${entry.id})}" method="post">
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                         <button type="submit" class="btn btn-danger">🗑</button>

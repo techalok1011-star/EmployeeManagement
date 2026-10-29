@@ -228,6 +228,22 @@ public class ExcelPartyService {
                 .collect(Collectors.toList());
     }
 
+    public boolean exists(String combined) {
+        return combined != null && !combined.isBlank() && partyRepository.existsByCombined(combined.trim());
+    }
+
+    /**
+     * Entry/invoice forms must not silently invent parties (that is how free-text duplicates and
+     * typo'd names pile up). The UI offers to create the party first; this is the server-side backstop.
+     */
+    public void requireExists(String combined) {
+        if (combined == null || combined.isBlank()) return;
+        if (!exists(combined)) {
+            throw new IllegalArgumentException("Party '" + combined.trim()
+                    + "' does not exist. Please add the party first, then enter the data.");
+        }
+    }
+
     /** Ensure a party record exists for the given combined string (name or name_gstin). */
     public void ensureExists(String combined) {
         if (combined == null || combined.isBlank()) return;
