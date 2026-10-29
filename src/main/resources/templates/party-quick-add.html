@@ -3,62 +3,79 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Add New Party – PayTrack</title>
+    <meta name="theme-color" content="#161a24"/>
+    <title>Add new party – PayTrack</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&amp;family=DM+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
     <link rel="stylesheet" th:href="@{/css/theme.css}"/>
     <script th:src="@{/js/theme.js}"></script>
     <style>
         *{box-sizing:border-box}
-        body{margin:0;font-family:'DM Sans',system-ui,sans-serif;background:var(--bg,#0f1218);color:var(--text,#e8eaf0);min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px}
-        .card{background:var(--card,#1b2030);border:1px solid var(--border,#2c3347);border-radius:16px;padding:24px;width:100%;max-width:460px}
-        h1{font-size:20px;margin:0 0 4px}
-        .sub{font-size:13px;color:var(--muted,#8b93a7);margin:0 0 18px;line-height:1.5}
-        label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted,#8b93a7);margin:0 0 7px;font-weight:600}
-        .opt{text-transform:none;letter-spacing:0;font-weight:400;font-size:11px}
-        input[type=text],input[type=tel]{width:100%;padding:12px 14px;background:var(--surface,#141824);border:1.5px solid var(--border,#2c3347);border-radius:9px;color:var(--text,#e8eaf0);font-size:15px;margin-bottom:14px;outline:none;font-family:inherit}
-        input:focus{border-color:var(--accent,#6c8eff)}
-        .err{font-size:12px;color:var(--red,#f87171);margin:-10px 0 10px}
-        .alert{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.4);color:var(--red,#f87171);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:14px}
-        .note{background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.35);border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.5;margin-bottom:16px}
-        .row{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap}
-        .btn{flex:1;min-width:130px;padding:12px 14px;border-radius:10px;border:none;font-weight:600;font-size:14px;cursor:pointer;text-align:center;text-decoration:none;font-family:inherit}
-        .btn-primary{background:linear-gradient(135deg,var(--accent,#6c8eff),var(--accent2,#8b5cf6));color:#fff}
-        .btn-ghost{background:transparent;color:inherit;border:1px solid var(--border,#2c3347)}
+        body{margin:0;font-family:'DM Sans',sans-serif;background:var(--ink);color:var(--text);min-height:100vh;
+             display:flex;align-items:flex-start;justify-content:center;padding:20px 16px calc(24px + env(safe-area-inset-bottom,0px))}
+        .wrap{width:100%;max-width:460px}
+        .brand{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:var(--muted);letter-spacing:.3px;margin:4px 2px 14px}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px 20px}
+        h1{font-family:'Syne',sans-serif;font-size:21px;font-weight:700;margin:0 0 6px;line-height:1.25}
+        .sub{font-size:14px;color:var(--muted);margin:0 0 16px;line-height:1.55}
+        .sub b{color:var(--text);font-weight:600;word-break:break-word}
+        .note{display:flex;gap:10px;background:var(--overlay-2);border:1px solid var(--border);border-left:3px solid var(--orange);
+              border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;margin-bottom:18px}
+        .alert{background:var(--overlay-2);border:1px solid var(--red);color:var(--red);border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:14px;line-height:1.45}
+        label{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0 0 7px;font-weight:600}
+        .opt{text-transform:none;letter-spacing:0;font-weight:400;font-size:12px;color:var(--muted2)}
+        input[type=text],input[type=tel]{width:100%;padding:12px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;
+              color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;margin-bottom:16px;outline:none;transition:border-color .2s,box-shadow .2s}
+        input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--overlay-5)}
+        .err{font-size:12.5px;color:var(--red);margin:-10px 0 14px}
+        .row{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+        .btn{width:100%;min-height:52px;padding:13px 16px;border-radius:12px;border:1px solid transparent;font-weight:600;font-size:16px;cursor:pointer;
+             text-align:center;text-decoration:none;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center}
+        .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+        .btn-primary:hover{opacity:.9}
+        .btn-ghost{background:var(--overlay-3);color:var(--text);border-color:var(--border)}
+        .btn:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+        @media (min-width:600px){.row{flex-direction:row-reverse}.btn{flex:1}body{padding-top:40px}}
     </style>
 </head>
 <body>
-<div class="card">
-    <h1>🏢 Add New Party</h1>
-    <p class="sub">This party doesn't exist yet. Add it here and you'll be taken straight back to your entry, with everything you typed still in place.</p>
+<div class="wrap">
+    <div class="brand">PayTrack</div>
+    <div class="card">
+        <h1>Add new party</h1>
+        <p class="sub"><b th:text="${newParty.name != null && !newParty.name.isBlank() ? '“' + newParty.name + '”' : 'This party'}">This party</b>
+            isn't in your party list yet. Add it here and you'll go straight back to your entry. Nothing you typed is lost.</p>
 
-    <div class="alert" th:if="${errorMsg}" th:text="${errorMsg}"></div>
+        <div class="alert" th:if="${errorMsg}" th:text="${errorMsg}"></div>
 
-    <div class="note">⚠️ Check the spelling first. If the party may already exist under a slightly different name, go back and pick it from the suggestions instead of creating a duplicate.</div>
+        <div class="note"><span>⚠️</span><span>Check the spelling first. If this party may already be saved under a slightly different name, go back and pick it from the suggestions instead of adding a duplicate.</span></div>
 
-    <form method="post" th:action="@{/parties/new}" th:object="${newParty}">
-        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-        <input type="hidden" name="returnTo" th:value="${returnTo}"/>
+        <form method="post" th:action="@{/parties/new}" th:object="${newParty}">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <input type="hidden" name="returnTo" th:value="${returnTo}"/>
 
-        <label>Party Name</label>
-        <input type="text" th:field="*{name}" maxlength="500" required autocomplete="off"/>
-        <div class="err" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></div>
+            <label for="name">Party name</label>
+            <input id="name" type="text" th:field="*{name}" maxlength="500" required autocomplete="off"/>
+            <div class="err" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></div>
 
-        <label>Trailing No. / Ledger Code <span class="opt">(optional)</span></label>
-        <input type="text" th:field="*{trailingNumber}" maxlength="20" autocomplete="off"/>
-        <div class="err" th:if="${#fields.hasErrors('trailingNumber')}" th:errors="*{trailingNumber}"></div>
+            <label for="trailingNumber">Ledger code <span class="opt">(optional)</span></label>
+            <input id="trailingNumber" type="text" th:field="*{trailingNumber}" maxlength="20" autocomplete="off" inputmode="numeric"/>
+            <div class="err" th:if="${#fields.hasErrors('trailingNumber')}" th:errors="*{trailingNumber}"></div>
 
-        <label>GSTIN <span class="opt">(optional)</span></label>
-        <input type="text" th:field="*{gstin}" maxlength="128" autocomplete="off"/>
-        <div class="err" th:if="${#fields.hasErrors('gstin')}" th:errors="*{gstin}"></div>
+            <label for="gstin">GSTIN <span class="opt">(optional)</span></label>
+            <input id="gstin" type="text" th:field="*{gstin}" maxlength="128" autocomplete="off" autocapitalize="characters"/>
+            <div class="err" th:if="${#fields.hasErrors('gstin')}" th:errors="*{gstin}"></div>
 
-        <label>Phone <span class="opt">(optional)</span></label>
-        <input type="tel" th:field="*{phone}" maxlength="20" autocomplete="off"/>
-        <div class="err" th:if="${#fields.hasErrors('phone')}" th:errors="*{phone}"></div>
+            <label for="phone">Phone <span class="opt">(optional)</span></label>
+            <input id="phone" type="tel" th:field="*{phone}" maxlength="20" autocomplete="off"/>
+            <div class="err" th:if="${#fields.hasErrors('phone')}" th:errors="*{phone}"></div>
 
-        <div class="row">
-            <button type="submit" class="btn btn-primary">✅ Add Party &amp; Continue</button>
-            <a class="btn btn-ghost" th:href="${returnTo}">Cancel</a>
-        </div>
-    </form>
+            <div class="row">
+                <button type="submit" class="btn btn-primary">Add party and continue</button>
+                <a class="btn btn-ghost" th:href="${returnTo}">Cancel</a>
+            </div>
+        </form>
+    </div>
 </div>
 </body>
 </html>

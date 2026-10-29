@@ -72,17 +72,53 @@
         } catch (e) { /* storage unavailable - user just re-types */ }
     }
 
+    // Words that appear in most party names and say nothing about which party it is.
+    var NOISE = ['BUILDING', 'MATERIAL', 'MATERIALS', 'TRADERS', 'TRADER', 'STORE', 'STORES', 'AGENCY', 'ENTERPRISE', 'ENTERPRISES', 'SUPPLY', 'CEMENT', 'AND', 'THE'];
+
+    function tokensOf(text) {
+        return (text.toUpperCase().match(/[A-Z0-9]+/g) || []).filter(function (w) {
+            return w.length >= 3 && NOISE.indexOf(w) === -1;
+        });
+    }
+
+    // A typed word matches a party name if the name contains it, or (to forgive a typo near the end
+    // of a long word, e.g. CHAUHN for CHAUHAN) contains the word minus its last two letters.
+    function wordMatches(word, nameUpper) {
+        if (nameUpper.indexOf(word) !== -1) return true;
+        return word.length >= 5 && nameUpper.indexOf(word.slice(0, word.length - 2)) !== -1;
+    }
+
+    // Only suggest parties that share most of the distinctive words typed. A single shared word
+    // (e.g. SHREE) is not enough when several were typed - that is how wrong suggestions appear.
+    function rankSuggestions(typed, candidates) {
+        var words = tokensOf(typed);
+        if (!words.length) return [];
+        var need = words.length === 1 ? 1 : Math.max(2, Math.ceil(words.length * 0.6));
+        return candidates.map(function (c) {
+            var upper = (c.combined || '').toUpperCase();
+            var score = words.filter(function (w) { return wordMatches(w, upper); }).length;
+            return {p: c, score: score};
+        }).filter(function (x) { return x.score >= need; })
+          .sort(function (x, y) { return y.score - x.score; })
+          .slice(0, 5)
+          .map(function (x) { return x.p; });
+    }
+
     function suggestions(q) {
-        function get(term) {
-            return fetch('/api/parties/suggest?limit=5&q=' + encodeURIComponent(term),
+        var words = tokensOf(q);
+        if (!words.length) return Promise.resolve([]);
+        return Promise.all(words.map(function (word) {
+            return fetch('/api/parties/suggest?limit=50&q=' + encodeURIComponent(word),
                 {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
-                .then(function (r) { return r.ok ? r.json() : []; });
-        }
-        return get(q).then(function (list) {
-            if (list.length) return list;
-            var first = q.split(/[\s,_]+/).filter(function (w) { return w.length >= 3; })[0];
-            return first ? get(first) : [];
-        }).catch(function () { return []; });
+                .then(function (r) { return r.ok ? r.json() : []; })
+                .catch(function () { return []; });
+        })).then(function (lists) {
+            var seen = {}, all = [];
+            lists.forEach(function (list) {
+                list.forEach(function (c) { if (!seen[c.combined]) { seen[c.combined] = 1; all.push(c); } });
+            });
+            return rankSuggestions(q, all);
+        });
     }
 
     function showPopup(form, formIndex, input, value) {
@@ -90,9 +126,9 @@
             icon: '⚠️',
             title: 'Party does not exist',
             message: '“' + value + '” is not in the party list.',
-            message2: 'Do you want to create a new party?',
+            message2: 'Do you want to add it as a new party?',
             actions: [
-                {label: '➕ Create new party', kind: 'primary', onClick: function () {
+                {label: 'Add new party', kind: 'primary', onClick: function () {
                     saveDraft(form, formIndex);
                     var back = location.pathname + location.search;
                     location.href = '/parties/new?name=' + encodeURIComponent(value) + '&returnTo=' + encodeURIComponent(back);
@@ -101,7 +137,7 @@
             ]
         });
         suggestions(value).then(function (list) {
-            modal.setItems('Or did you mean one of these existing parties?', list.map(function (p) {
+            modal.setItems('Did you mean one of these saved parties?', list.map(function (p) {
                 return {text: p.combined + (p.trailingNumber ? '   [' + p.trailingNumber + ']' : ''),
                         onClick: function () { input.value = p.combined; input.focus(); }};
             }));
