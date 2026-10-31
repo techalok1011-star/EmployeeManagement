@@ -145,7 +145,7 @@
                         </tr>
                     </thead>
                     <tbody id="invoicesTable">
-                        <tr th:each="inv : ${invoices}">
+                        <tr th:each="inv : ${invoices}" th:id="'invoice-' + ${inv.id}">
                             <td th:text="${inv.invoiceNumber}"></td>
                             <td class="text-muted" th:text="${#temporals.format(inv.invoiceDate,'dd MMM yyyy')}"></td>
                             <td th:text="${inv.partyName}"></td>
@@ -224,5 +224,6 @@
         });
     })();
 </script>
+<script th:src="@{/js/pt-loading.js}"></script>
 </body>
 </html>

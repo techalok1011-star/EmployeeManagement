@@ -111,8 +111,13 @@
         e.preventDefault();
         e.stopImmediatePropagation();
         function proceed() { confirmedKey = keyOf(v, c); form.requestSubmit ? form.requestSubmit() : form.submit(); }
+        // the check is a network call: show a spinner so a slow connection doesn't look like a dead Save button
+        if (window.PayTrackLoading) window.PayTrackLoading.show('Checking voucher number…');
         check(v, c).then(function (res) {
-            if (needsAsking(res)) warn(v, res, 'Save anyway', proceed); else proceed();
+            if (needsAsking(res)) {
+                if (window.PayTrackLoading) window.PayTrackLoading.hide();
+                warn(v, res, 'Save anyway', proceed);
+            } else proceed();
         }).catch(proceed);
     }, true);
 })();

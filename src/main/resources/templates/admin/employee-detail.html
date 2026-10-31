@@ -289,5 +289,6 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 }
 </script>
+<script th:src="@{/js/pt-loading.js}"></script>
 </body>
 </html>

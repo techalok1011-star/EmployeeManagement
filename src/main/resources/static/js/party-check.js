@@ -161,11 +161,17 @@
             if (isEditPage && input.value === initial) return;
             e.preventDefault();
             e.stopImmediatePropagation();
+            // the check is a network call: show a spinner so a slow connection doesn't look like a dead Save button
+            if (window.PayTrackLoading) window.PayTrackLoading.show('Checking party…');
             fetch('/api/parties/exists?name=' + encodeURIComponent(v),
                 {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
                 .then(function (r) { if (!r.ok) throw new Error('check failed'); return r.json(); })
                 .then(function (res) {
-                    if (res.exists) resubmit(v); else showPopup(form, formIndex, input, v);
+                    if (res.exists) resubmit(v);
+                    else {
+                        if (window.PayTrackLoading) window.PayTrackLoading.hide();
+                        showPopup(form, formIndex, input, v);
+                    }
                 })
                 .catch(function () { resubmit(v); });
         }, true);

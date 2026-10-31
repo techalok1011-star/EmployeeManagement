@@ -236,6 +236,7 @@ public class ManagerController {
         try {
             invoiceService.updateInvoice(id, request, auth.getName());
             redirectAttributes.addFlashAttribute("successMsg", "Invoice updated successfully!");
+            return "redirect:/manager/invoices#invoice-" + id;
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
         }
@@ -368,6 +369,8 @@ public class ManagerController {
         try {
             paymentEntryService.updateEntryByManager(id, request, auth.getName());
             redirectAttributes.addFlashAttribute("successMsg", "Collection updated successfully!");
+            // land on the row that was just edited (the list spans every day, so the top of the page loses the place)
+            return "redirect:/manager/entries#entry-" + id;
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
         }

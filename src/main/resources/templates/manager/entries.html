@@ -259,7 +259,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="entry : ${group.entries}" class="entry-row"
+                        <tr th:each="entry : ${group.entries}" class="entry-row" th:id="'entry-' + ${entry.id}"
                             th:classappend="${entry.editedBy == 'ADMIN'} ? 'was-edited-admin' : (${entry.edited} ? 'was-edited' : '')">
                             <td>
                                 <div style="font-weight:500" th:text="${entry.partyName}"></div>
@@ -374,5 +374,6 @@
         });
     })();
 </script>
+<script th:src="@{/js/pt-loading.js}"></script>
 </body>
 </html>
