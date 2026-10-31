@@ -68,6 +68,7 @@ public class AdminController {
     private final LoginSessionService loginSessionService;
     private final SessionRegistry sessionRegistry;
     private final PartyMergeService partyMergeService;
+    private final com.empmgmt.service.PartyRenameService partyRenameService;
     private final com.empmgmt.service.PartyCreationService partyCreationService;
     private final VoucherAuditService voucherAuditService;
 
@@ -744,30 +745,18 @@ public class AdminController {
             redirectAttributes.addFlashAttribute("editRequest", request);
             return "redirect:/admin/parties/" + id + "/edit";
         }
-        partyRepository.findById(id).ifPresent(party -> {
-            String before = party.getCombined();
-            String gstin    = request.getGstin() != null ? request.getGstin().trim() : "";
-            String combined = gstin.isEmpty() ? request.getName().trim()
-                                              : request.getName().trim() + "_" + gstin;
-            // Check uniqueness only if combined changed
-            if (!combined.equals(party.getCombined()) && partyRepository.existsByCombined(combined)) {
-                throw new RuntimeException("Party '" + combined + "' already exists.");
-            }
-            party.setName(request.getName().trim());
-            party.setGst(gstin);
-            party.setCombined(combined);
-            party.setTrailingNumber(request.getTrailingNumber() != null && !request.getTrailingNumber().isBlank()
-                    ? request.getTrailingNumber().trim() : null);
-            party.setPhone(request.getPhone() != null && !request.getPhone().isBlank()
-                    ? request.getPhone().trim() : null);
-            party.setWhatsappOptIn(request.isWhatsappOptIn());
-            party.setOpeningBalance(request.getOpeningBalance() != null ? request.getOpeningBalance() : java.math.BigDecimal.ZERO);
-            party.setOpeningBalanceDate(request.getOpeningBalanceDate());
-            partyRepository.save(party);
-            logPartyAudit("UPDATE", party, auth.getName(), "Party '" + before + "' updated to '" + combined + "'");
-        });
+        try {
+            // One transaction: the party row AND its invoices/payments move together if the name changes.
+            var r = partyRenameService.updateParty(id, request, auth.getName());
+            redirectAttributes.addFlashAttribute("successMsg", r.oldCombined().equals(r.newCombined())
+                    ? "Party updated successfully!"
+                    : "Party updated. " + r.invoices() + " invoice(s) and " + r.payments() + " payment(s) were renamed too.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+            redirectAttributes.addFlashAttribute("editRequest", request);
+            return "redirect:/admin/parties/" + id + "/edit";
+        }
         invoiceService.evictPartyDerivedCaches();
-        redirectAttributes.addFlashAttribute("successMsg", "Party updated successfully!");
         return "redirect:/admin/parties";
     }
 

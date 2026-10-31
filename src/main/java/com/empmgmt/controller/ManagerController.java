@@ -3,8 +3,11 @@ package com.empmgmt.controller;
 import com.empmgmt.dto.InvoiceDTO;
 import com.empmgmt.dto.PaymentEntryDTO;
 import com.empmgmt.entity.Invoice;
+import com.empmgmt.entity.Party;
 import com.empmgmt.entity.PaymentEntry;
+import com.empmgmt.repository.PartyRepository;
 import com.empmgmt.service.InvoiceService;
+import com.empmgmt.service.PartyRenameService;
 import com.empmgmt.service.PaymentEntryService;
 import com.empmgmt.service.UserService;
 import com.empmgmt.util.IstClock;
@@ -30,9 +33,10 @@ import java.util.List;
 /**
  * Mobile-first area for the MANAGER role: add + view invoices AND payment
  * entries (collections), mirroring the EMPLOYEE dashboard's "add today's
- * stuff from your phone" pattern for both. Managers still cannot see
- * parties or anything under /admin/** - this controller is the entirety of
- * their access.
+ * stuff from your phone" pattern for both. Managers can also rename a party
+ * (see PartyRenameService - the rename re-points the party's invoices and
+ * payments too). They still cannot reach anything under /admin/** - this
+ * controller is the entirety of their access.
  */
 @Controller
 @RequestMapping("/manager")
@@ -44,6 +48,8 @@ public class ManagerController {
     private final InvoiceService invoiceService;
     private final PaymentEntryService paymentEntryService;
     private final UserService userService;
+    private final PartyRepository partyRepository;
+    private final PartyRenameService partyRenameService;
 
     // ─── Dashboard ────────────────────────────────────────────
 
@@ -289,6 +295,9 @@ public class ManagerController {
             return "redirect:/manager/dashboard";
         }
 
+        // Where the collection was made, for the admin Collection Map (optional, never blocks the save).
+        paymentEntryService.tagLocation(saved.getId(), latitude, longitude);
+
         // Receipt photo is optional - a problem attaching it should never block the entry itself.
         if (receiptPhoto != null && !receiptPhoto.isEmpty()) {
             try {
@@ -390,5 +399,43 @@ public class ManagerController {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
         }
         return "redirect:/manager/entries";
+    }
+
+    // ─── Parties (rename only) ───────────────────────────────────
+
+    @GetMapping("/parties")
+    public String parties(Model model, Authentication auth) {
+        model.addAttribute("user", userService.getUserByUsername(auth.getName()));
+        model.addAttribute("parties", partyRepository.findAll(org.springframework.data.domain.Sort.by("name")));
+        return "manager/parties";
+    }
+
+    @GetMapping("/parties/{id}/edit")
+    public String editPartyForm(@PathVariable Long id, Model model, Authentication auth,
+                                RedirectAttributes redirectAttributes) {
+        Party party = partyRepository.findById(id).orElse(null);
+        if (party == null) {
+            redirectAttributes.addFlashAttribute("errorMsg", "Party not found.");
+            return "redirect:/manager/parties";
+        }
+        model.addAttribute("user", userService.getUserByUsername(auth.getName()));
+        model.addAttribute("party", party);
+        model.addAttribute("invoiceCount", partyRenameService.invoiceCount(party));
+        model.addAttribute("paymentCount", partyRenameService.paymentCount(party));
+        return "manager/edit-party";
+    }
+
+    @PostMapping("/parties/{id}/edit")
+    public String renameParty(@PathVariable Long id, @RequestParam String name,
+                              Authentication auth, RedirectAttributes redirectAttributes) {
+        try {
+            PartyRenameService.Result r = partyRenameService.rename(id, name, auth.getName());
+            redirectAttributes.addFlashAttribute("successMsg", "Party renamed. " + r.invoices()
+                    + " invoice(s) and " + r.payments() + " payment(s) were updated too.");
+            return "redirect:/manager/parties#party-" + id;
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
+            return "redirect:/manager/parties/" + id + "/edit";
+        }
     }
 }

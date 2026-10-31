@@ -176,6 +176,7 @@
         <a href="/manager/dashboard" class="nav-link active"><span>📊</span> Dashboard</a>
         <a href="/manager/invoices" class="nav-link"><span>🧾</span> All My Invoices</a>
         <a href="/manager/entries" class="nav-link"><span>💰</span> All My Collections</a>
+        <a href="/manager/parties" class="nav-link"><span>🏢</span> Parties</a>
     </nav>
     <div class="sidebar-footer">
         <form th:action="@{/logout}" method="post" id="logoutForm">
@@ -884,6 +885,7 @@ function closeInvoiceView() {
 <script th:src="@{/js/pt-modal.js}"></script>
 <script th:src="@{/js/voucher-dup.js}"></script>
 <script th:src="@{/js/party-check.js}"></script>
+<script th:src="@{/js/geo-refresh.js}"></script>
 <script th:src="@{/js/pt-loading.js}"></script>
 </body>
 </html>

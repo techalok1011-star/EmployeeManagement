@@ -74,6 +74,9 @@ public class EmployeeController {
             return "redirect:/employee/dashboard";
         }
 
+        // Where the collection was made, for the admin Collection Map (optional, never blocks the save).
+        paymentEntryService.tagLocation(saved.getId(), latitude, longitude);
+
         // Receipt photo is optional — a problem attaching it should never block the entry itself.
         if (receiptPhoto != null && !receiptPhoto.isEmpty()) {
             try {
@@ -162,6 +165,7 @@ public class EmployeeController {
             request.setEntryDate(IstClock.today());
             paymentEntryService.updateEntryByEmployee(id, request, auth.getName());
             redirectAttributes.addFlashAttribute("successMsg", "Entry updated successfully!");
+            return "redirect:/employee/entries#entry-" + id;
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
         }

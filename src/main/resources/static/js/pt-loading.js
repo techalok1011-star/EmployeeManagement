@@ -7,7 +7,6 @@
  *   - any form submit (Save Changes, Delete, Filter, ...) with "Saving..." / "Deleting..." text
  *   - form.submit() calls from inline onchange handlers (date / month pickers)
  *   - browser Back / Forward restoring a cached page (theme.js reloads it to get a fresh CSRF token)
- *   - any other navigation (beforeunload), hidden again after a few seconds in case it was a download
  * After 7s the text changes to a "slow connection" note; after 45s it gives up, hides itself and says so,
  * so the page is never locked behind a spinner forever.
  * It also turns the server's success / error flash messages into a toast pinned to the top of the
@@ -171,9 +170,9 @@
         }
     });
 
-    window.addEventListener('beforeunload', function () {
-        if (!visible) show('Loading…', {autoHide: UNLOAD_HIDE_MS});
-    });
+    // Deliberately NO beforeunload hook: it also fires for file downloads (Export PDF/CSV/Excel), where the
+    // page never unloads, and would leave a spinner over the page. Script-driven navigations that really
+    // leave the page call PayTrackLoading.show() themselves (e.g. the voucher-audit lookup).
 
     // ── jump to + highlight the row that was just saved (#entry-12 / #invoice-7) ──
     function highlightHashRow() {
