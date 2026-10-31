@@ -166,6 +166,7 @@
         <a href="/admin/notifications" class="nav-link"><span>📲</span> Notifications</a>
         <a href="/admin/history" class="nav-link"><span>📜</span> Audit Log</a>
         <a href="/admin/login-history" class="nav-link"><span>🕐</span> Login History</a>
+        <a href="/admin/collection-map" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>🗺️</span> Collection Map</a>
     </nav>
     <div class="sidebar-footer">
         <form th:action="@{/logout}" method="post">
@@ -683,6 +684,7 @@ function openVoucherLookup(series, vchNumber){
                 return;
             }
             if (rows.length === 1) {
+                if (window.PayTrackLoading) window.PayTrackLoading.show('Loading…');
                 window.location.href = rows[0].editUrl;
                 return;
             }

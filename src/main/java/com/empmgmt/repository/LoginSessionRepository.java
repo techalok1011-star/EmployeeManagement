@@ -11,6 +11,13 @@ import java.util.Optional;
 
 public interface LoginSessionRepository extends JpaRepository<LoginSession, Long> {
     List<LoginSession> findTop200ByOrderByLoginAtDesc();
+
+    /** Logins that carry a location (the browser's geolocation at sign-in), newest first, for the Collection Map. */
+    @Query("SELECT l FROM LoginSession l WHERE l.latitude IS NOT NULL AND l.longitude IS NOT NULL " +
+           "AND l.loginAt >= :from AND l.loginAt < :to ORDER BY l.loginAt DESC")
+    List<LoginSession> findWithLocation(@org.springframework.data.repository.query.Param("from") LocalDateTime from,
+                                        @org.springframework.data.repository.query.Param("to") LocalDateTime to,
+                                        org.springframework.data.domain.Pageable pageable);
     Optional<LoginSession> findTopByUsernameAndLogoutAtIsNullOrderByLoginAtDesc(String username);
 
     /**

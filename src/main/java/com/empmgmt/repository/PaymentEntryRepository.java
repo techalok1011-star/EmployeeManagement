@@ -17,6 +17,23 @@ import java.util.Map;
 @Repository
 public interface PaymentEntryRepository extends JpaRepository<PaymentEntry, Long> {
 
+    /**
+     * Collections that have a location, for the admin Collection Map. The location is the entry's own
+     * (saved from the phone at entry time), falling back to the receipt photo's geo-tag for older rows.
+     * Columns: id, partyName, amount, mode, entryDate, receiptVchNo, employeeFullName, employeeUsername,
+     * latitude, longitude, receiptId (null when there is no photo).
+     */
+    @Query("SELECT p.id, p.partyName, p.amount, p.modeOfPayment, p.entryDate, p.receiptVchNo, e.fullName, e.username, " +
+           "COALESCE(p.latitude, r.latitude), COALESCE(p.longitude, r.longitude), r.id " +
+           "FROM PaymentEntry p JOIN p.employee e LEFT JOIN PaymentReceipt r ON r.paymentEntry = p " +
+           "WHERE COALESCE(p.latitude, r.latitude) IS NOT NULL AND COALESCE(p.longitude, r.longitude) IS NOT NULL " +
+           "AND p.entryDate >= :from AND p.entryDate <= :to " +
+           "ORDER BY p.entryDate DESC, p.id DESC")
+    List<Object[]> findMapPoints(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("SELECT COUNT(p) FROM PaymentEntry p WHERE p.entryDate >= :from AND p.entryDate <= :to")
+    long countInRange(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
     List<PaymentEntry> findByEmployeeOrderByCreatedAtDesc(User employee);
 
     List<PaymentEntry> findByEmployeeAndEntryDateOrderByCreatedAtDesc(User employee, LocalDate date);

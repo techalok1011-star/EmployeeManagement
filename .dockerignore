@@ -5,3 +5,5 @@ target/
 .claude/
 src/main/resources/application-local.properties
 *.log
+frontend/node_modules/
+frontend/dist/

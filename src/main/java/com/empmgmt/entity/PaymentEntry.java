@@ -66,6 +66,17 @@ public class PaymentEntry {
 
     private LocalDateTime editedAt;
 
+    /**
+     * Where the phone was when a field employee/manager saved this collection (the party's place).
+     * Optional: null for imported/office-entered rows and whenever location permission was denied.
+     * Plain nullable columns, so ddl-auto=update adds them with no manual migration.
+     */
+    @Column(precision = 10, scale = 7)
+    private BigDecimal latitude;
+
+    @Column(precision = 10, scale = 7)
+    private BigDecimal longitude;
+
     @PrePersist
     protected void onCreate() {
         createdAt = IstClock.now();

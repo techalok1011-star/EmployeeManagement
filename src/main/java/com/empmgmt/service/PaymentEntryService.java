@@ -122,6 +122,25 @@ public class PaymentEntryService {
     }
 
     /**
+     * Stores where a collection was made (the phone's location at save time) on the entry itself, so
+     * the admin Collection Map can plot it whether or not a receipt photo was attached. Never throws:
+     * a missing, out-of-range or 0,0 location is simply ignored - the entry is already saved.
+     */
+    public void tagLocation(Long paymentEntryId, java.math.BigDecimal latitude, java.math.BigDecimal longitude) {
+        if (latitude == null || longitude == null) return;
+        double lat = latitude.doubleValue(), lng = longitude.doubleValue();
+        if (lat < -90 || lat > 90 || lng < -180 || lng > 180 || (lat == 0 && lng == 0)) return;
+        try {
+            PaymentEntry entry = findEntryById(paymentEntryId);
+            entry.setLatitude(latitude.setScale(7, java.math.RoundingMode.HALF_UP));
+            entry.setLongitude(longitude.setScale(7, java.math.RoundingMode.HALF_UP));
+            paymentEntryRepository.save(entry);
+        } catch (Exception e) {
+            log.warn("Could not store location for entry id={}: {}", paymentEntryId, e.getMessage());
+        }
+    }
+
+    /**
      * Attaches a photographed receipt (with optional geo-tag) to an already-created
      * entry. Called right after {@link #createEntry} when the employee submitted a
      * photo - kept separate so entry creation never fails because of a photo problem.

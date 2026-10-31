@@ -22,3 +22,8 @@ logs/
 
 # Local secrets (never commit — real WhatsApp token, etc.)
 application-local.properties
+
+# Frontend (React map) - only the compiled output under src/main/resources/static/js/map-app is committed
+frontend/node_modules/
+frontend/dist/
+frontend/node_modules/.tmp/
