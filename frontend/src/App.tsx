@@ -27,7 +27,8 @@ export default function App() {
   const [stage, setStage] = useState<Stage>(() => (new URLSearchParams(location.search).get("intro") === "0" ? "map" : "globe"));
   const [sheet, setSheet] = useState<SheetState>("peek");
   const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const [showLogins, setShowLogins] = useState(false);
+  // sign-in locations are on by default: until collections start carrying a location they are the data
+  const [showLogins, setShowLogins] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
 
@@ -39,6 +40,11 @@ export default function App() {
     [data.collections, hidden, colorOf],
   );
   const near = useMemo(() => points.filter(inView), [points]);
+  // what the map frames: the collections, plus the sign-ins around Azamgarh while that layer is on
+  const framed = useMemo(
+    () => (showLogins ? [...near, ...data.logins.filter(inView)] : near),
+    [near, showLogins, data.logins],
+  );
   const counts = useMemo(() => {
     const b = bucketBySector(near);
     return Object.fromEntries(Object.entries(b).map(([k, v]) => [k, v.length])) as Record<Sector, number>;
@@ -105,7 +111,7 @@ export default function App() {
 
   // once we have landed on the district (and the data is in), frame the pins
   useEffect(() => {
-    if (stage === "map" && !loading) fitTo(near, true);
+    if (stage === "map" && !loading) fitTo(framed, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, loading, data.collections]);
 
