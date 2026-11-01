@@ -9,6 +9,7 @@ import { useMapData } from "@/hooks/useMapData";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useTheme } from "@/hooks/useTheme";
 import type { Period } from "@/lib/api";
+import { OSM_STYLE, mapThemeFor, readChosen, saveChosen, type Basemap } from "@/lib/basemap";
 import { AZAMGARH, boundsOf, inView, type Sector } from "@/lib/geo";
 import { PALETTE, bucketBySector, collectorsOf, groupParties, type PartyRow, type Pt } from "@/lib/points";
 
@@ -19,6 +20,16 @@ export default function App() {
   const { theme, toggle: toggleTheme } = useTheme();
   const desktop = useMediaQuery("(min-width: 900px)");
   const reduced = useMemo(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches, []);
+
+  // Map style: what the person picked (remembered), otherwise it follows the page theme
+  const [chosen, setChosen] = useState<Basemap | null>(readChosen);
+  const basemap: Basemap = chosen ?? theme;
+  const mapTheme = mapThemeFor(basemap, theme);
+  const mapStyles = useMemo(() => (basemap === "streets" ? { light: OSM_STYLE, dark: OSM_STYLE } : undefined), [basemap]);
+  const pickBasemap = useCallback((b: Basemap) => {
+    setChosen(b);
+    saveChosen(b);
+  }, []);
 
   const [period, setPeriod] = useState<Period>("fy");
   const { data, loading, error, reload } = useMapData(period);
@@ -171,8 +182,8 @@ export default function App() {
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
       <div className="absolute inset-0">
-        <MapView ref={mapRef} theme={theme} center={AZAMGARH} zoom={1.5} maxPitch={60}>
-          <GlobeProjection theme={theme} />
+        <MapView ref={mapRef} theme={mapTheme} styles={mapStyles} center={AZAMGARH} zoom={1.5} maxPitch={60}>
+          <GlobeProjection theme={mapTheme} />
           <MapControls />
           <HubMarker />
           <CollectionLayer points={points} selectedId={selectedId} onSelect={select} />
@@ -180,7 +191,7 @@ export default function App() {
         </MapView>
       </div>
 
-      <TopBar theme={theme} onToggleTheme={toggleTheme} period={period} onPeriod={setPeriod} onReplay={replay} />
+      <TopBar theme={theme} onToggleTheme={toggleTheme} period={period} onPeriod={setPeriod} onReplay={replay} basemap={basemap} onBasemap={pickBasemap} />
 
       <Panel
         desktop={desktop}

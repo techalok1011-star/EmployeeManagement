@@ -167,7 +167,8 @@ export function LoginLayer({ logins }: { logins: Login[] }) {
           <MapMarker key={`l${props.i}`} longitude={l.lng} latitude={l.lat}>
             <MarkerContent>
               <span className="grid size-8 place-items-center">
-                <span className="block size-3 rounded-full border-2 border-foreground/70 bg-background/40" />
+                {/* fixed colours (not theme tokens) so the ring stays visible on dark, light AND street basemaps */}
+                <span className="block size-3.5 rounded-full border-2 border-slate-700 bg-white/80 shadow-[0_0_0_1.5px_rgba(255,255,255,0.7)]" />
               </span>
             </MarkerContent>
             <MarkerTooltip offset={12}>

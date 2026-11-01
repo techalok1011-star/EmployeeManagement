@@ -1,6 +1,8 @@
 import { ArrowLeft, Globe2, Moon, Sun } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
+import { StyleMenu } from "@/components/map/StyleMenu";
+import type { Basemap } from "@/lib/basemap";
 import { PERIODS, type Period } from "@/lib/api";
 import type { ThemeName } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
@@ -11,7 +13,11 @@ export function TopBar({
   period,
   onPeriod,
   onReplay,
+  basemap,
+  onBasemap,
 }: {
+  basemap: Basemap;
+  onBasemap: (b: Basemap) => void;
   theme: ThemeName;
   onToggleTheme: () => void;
   period: Period;
@@ -35,6 +41,7 @@ export function TopBar({
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        <StyleMenu value={basemap} onChange={onBasemap} />
         <Button variant="glass" size="icon" className="pointer-events-auto" onClick={onReplay} aria-label="Replay the globe intro" title="Replay intro">
           <Globe2 />
         </Button>
