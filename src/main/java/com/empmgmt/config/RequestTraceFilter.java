@@ -1,6 +1,10 @@
 package com.empmgmt.config;
 
+import com.empmgmt.monitoring.RequestMetrics;
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.RequestDispatcher;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.servlet.HandlerMapping;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,7 +38,11 @@ import java.util.concurrent.ThreadLocalRandom;
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 @Slf4j
+@RequiredArgsConstructor
 public class RequestTraceFilter extends OncePerRequestFilter {
+
+    /** Per-endpoint timing / error counts for the admin Performance page and the 5xx spike alert. */
+    private final RequestMetrics metrics;
 
     public static final String TRACE_ID_MDC_KEY = "traceId";
     public static final String TRACE_ID_ATTRIBUTE = "com.empmgmt.traceId";
@@ -70,7 +78,24 @@ public class RequestTraceFilter extends OncePerRequestFilter {
             } else if (tookMs > SLOW_REQUEST_MS) {
                 log.info("SLOW {} {} -> {} in {}ms", request.getMethod(), pathWithQuery(request), status, tookMs);
             }
+            recordMetrics(request, status, tookMs, traceId);
             MDC.remove(TRACE_ID_MDC_KEY);
+        }
+    }
+
+    /** Never allowed to break a request: statistics are best-effort. */
+    private void recordMetrics(HttpServletRequest request, int status, long tookMs, String traceId) {
+        try {
+            String uri = request.getRequestURI();
+            if ("/health".equals(uri)) return; // the keep-alive ping would drown every real number
+            String pattern = (String) request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+            String errorUri = (String) request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI);
+            String route = request.getMethod() + " " + ((pattern != null && !pattern.equals("/error") && !pattern.equals("/**"))
+                    ? pattern
+                    : RequestMetrics.normalisePath(errorUri != null ? errorUri : uri));
+            metrics.record(route, status, tookMs, errorUri != null ? errorUri : uri, traceId);
+        } catch (RuntimeException e) {
+            log.debug("metrics skipped: {}", e.toString());
         }
     }
 

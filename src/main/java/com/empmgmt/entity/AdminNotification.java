@@ -74,6 +74,8 @@ public class AdminNotification {
         /** A new party was created by someone other than the admin. */
         PARTY_ADDED,
         /** Daily 10 PM summary of receipt voucher numbers still missing after the grace period. */
-        VOUCHER_GAP_DIGEST
+        VOUCHER_GAP_DIGEST,
+        /** Server errors (5xx) spiked - raised by monitoring.ErrorSpikeAlert. */
+        SERVER_ALERT
     }
 }

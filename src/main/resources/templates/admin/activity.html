@@ -103,6 +103,7 @@
         <a href="/admin/history" class="nav-link"><span>📜</span> Audit Log</a>
         <a href="/admin/login-history" class="nav-link"><span>🕐</span> Login History</a>
         <a href="/admin/collection-map" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>🗺️</span> Collection Map</a>
+        <a href="/admin/performance" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>⚡</span> Performance</a>
     </nav>
     <div class="sidebar-footer">
         <form th:action="@{/logout}" method="post">
@@ -133,6 +134,7 @@
                 <div class="feed-icon voucher-anomaly" th:if="${n.type == 'VOUCHER_SUSPECT'}">⚠️</div>
                 <div class="feed-icon invoice" th:if="${n.type == 'PARTY_ADDED'}">🏢</div>
                 <div class="feed-icon voucher-anomaly" th:if="${n.type == 'VOUCHER_GAP_DIGEST'}">📋</div>
+                <div class="feed-icon voucher-anomaly" th:if="${n.type == 'SERVER_ALERT'}">🚨</div>
                 <div>
                     <div class="feed-message" th:text="${n.message}"></div>
                     <div class="feed-meta" th:text="${n.createdAt}"></div>

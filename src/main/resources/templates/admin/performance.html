@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="manifest" th:href="@{/admin-manifest.json}" sec:authorize="hasRole('ADMIN')"/>
+    <link rel="manifest" th:href="@{/accountant-manifest.json}" sec:authorize="hasRole('ACCOUNTANT')"/>
+    <meta name="theme-color" content="#161a24"/>
+    <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+    <title>Performance — PayTrack</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&amp;family=DM+Sans:wght@300;400;500&amp;display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" th:href="@{/css/theme.css}"/>
+    <script th:src="@{/js/theme.js}"></script>
+    <style>
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'DM Sans',sans-serif;background:var(--ink);color:var(--text);min-height:100vh;display:flex}
+        .sidebar{width:240px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100}
+        .sidebar-brand{padding:24px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+        .sidebar-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px}
+        .sidebar-title{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:var(--text)}
+        .sidebar-title span{color:var(--accent)}
+        .sidebar-user{padding:16px 20px;border-bottom:1px solid var(--border)}
+        .sidebar-user-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);margin-bottom:4px}
+        .sidebar-user-name{font-size:14px;font-weight:500;color:var(--text)}
+        .sidebar-user-role{font-size:11px;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px;background:rgba(245,200,66,0.15);color:var(--gold)}
+        .sidebar-nav{padding:16px 12px;flex:1;overflow-y:auto}
+        .nav-section-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);padding:0 8px;margin-bottom:6px;display:block;margin-top:12px}
+        .nav-link{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;text-decoration:none;color:var(--muted);font-size:14px;font-weight:500;transition:all 0.15s;margin-bottom:2px}
+        .nav-link:hover{background:var(--overlay-3);color:var(--text)}
+        .nav-link.active{background:rgba(108,142,255,0.12);color:var(--accent)}
+        .sidebar-footer{padding:16px 12px;border-top:1px solid var(--border)}
+        .logout-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:var(--muted);font-size:14px;font-weight:500;transition:all 0.15s;width:100%;cursor:pointer;background:transparent;border:none;font-family:'DM Sans',sans-serif}
+        .logout-btn:hover{background:rgba(248,113,113,0.1);color:var(--red)}
+        .main{margin-left:240px;flex:1}
+        .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
+        .topbar-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700}
+        .content{padding:28px 32px}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px}
+        .search-input{width:100%;padding:10px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color 0.2s;margin-bottom:14px}
+        .alert{padding:12px 16px;border-radius:10px;font-size:13.5px;margin-bottom:20px}
+        .alert-success{background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#6ee7b7}
+        .alert-danger{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);color:#fca5a5}
+        .btn{padding:5px 10px;border-radius:20px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s}
+        .btn-force-logout{background:rgba(248,113,113,0.15);color:var(--red)}
+        .btn-force-logout:hover{background:rgba(248,113,113,0.28)}
+        .search-input:focus{border-color:var(--accent)}
+        .search-input::placeholder{color:var(--muted2)}
+        .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;border:1px solid var(--border)}
+        table{width:100%;border-collapse:collapse}
+        thead{background:var(--surface)}
+        th{padding:10px 14px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+        td{padding:11px 14px;font-size:13px;border-bottom:1px solid var(--overlay-2);vertical-align:middle}
+        tr:last-child td{border-bottom:none}
+        tr:hover td{background:var(--overlay-1)}
+        .badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block;letter-spacing:0.5px}
+        .badge-active{background:rgba(52,211,153,0.15);color:var(--green)}
+        .badge-ended{background:rgba(108,142,255,0.15);color:var(--accent)}
+        .role-pill{background:rgba(167,139,250,0.12);color:var(--accent2);padding:2px 8px;border-radius:6px;font-size:11.5px;font-weight:500}
+        .text-muted{color:var(--muted);font-size:12px}
+        .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+        .empty-icon{font-size:44px;margin-bottom:12px}
+        .notif-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;background:var(--overlay-3);border:1px solid var(--border);color:var(--text);text-decoration:none;font-size:16px;cursor:pointer;transition:background 0.15s;flex-shrink:0}
+        .notif-bell:hover{background:var(--overlay-5)}
+        .notif-badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:white;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1}
+        .menu-toggle{display:none;background:var(--overlay-3);border:1px solid var(--border);color:var(--text);width:38px;height:38px;border-radius:8px;font-size:18px;cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
+        .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:150}
+        @media(max-width:768px){
+            .sidebar{transform:translateX(-100%);transition:transform 0.25s ease;z-index:200}
+            .sidebar.open{transform:translateX(0)}
+            .main{margin-left:0}
+            .menu-toggle{display:flex}
+            .sidebar-overlay.open{display:block}
+            .content{padding:16px}
+            .card{padding:16px}
+            .topbar{padding:12px 16px;flex-wrap:wrap;row-gap:8px}
+            .topbar-title{font-size:16px}
+            th,td{padding:9px 10px;font-size:12px}
+        }
+        .pf-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+        .pf-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:0}
+        .pf-card .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
+        .pf-card .v{font-family:'Syne',sans-serif;font-size:26px;font-weight:700;margin-top:4px}
+        .pf-card .v.bad{color:var(--red)} .pf-card .v.good{color:var(--green)}
+        .pf-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+        .pf-tabs a{padding:8px 14px;border-radius:20px;border:1px solid var(--border);color:var(--muted);text-decoration:none;font-size:13px;font-weight:600}
+        .pf-tabs a.on{background:rgba(108,142,255,.15);color:var(--accent);border-color:var(--accent)}
+        .pf-banner{padding:14px 16px;border-radius:12px;margin-bottom:16px;font-size:14px;line-height:1.45}
+        .pf-banner.bad{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.4);color:var(--red)}
+        .pf-banner.ok{background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.25);color:var(--text)}
+        .pf-note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:12px}
+        h2.pf-h{font-family:'Syne',sans-serif;font-size:15px;margin:22px 0 10px}
+        tr.r-slow td:nth-child(4){color:var(--red);font-weight:700}
+        tr.r-warn td:nth-child(4){color:var(--gold);font-weight:700}
+        tr.r-err td:nth-child(7){color:var(--red);font-weight:700}
+        td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+        td.route{word-break:break-all;font-family:'DM Sans',monospace;font-size:12.5px}    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div class="sidebar-brand">
+        <div class="sidebar-icon">💳</div>
+        <div class="sidebar-title">Pay<span>Track</span></div>
+    </div>
+    <div class="sidebar-user">
+        <div class="sidebar-user-label">Signed in as</div>
+        <div class="sidebar-user-name" th:text="${adminName}">Admin</div>
+        <span class="sidebar-user-role">👑 Admin</span>
+    </div>
+    <nav class="sidebar-nav">
+        <span class="nav-section-label">Administration</span>
+        <a href="/admin/dashboard" class="nav-link"><span>📊</span> Dashboard</a>
+        <a href="/admin/executive" class="nav-link"><span>💼</span> Executive</a>
+        <a href="/admin/employees" class="nav-link"><span>👥</span> Employees</a>
+        <a href="/admin/entries" class="nav-link"><span>📋</span> All Entries</a>
+        <a href="/admin/parties" class="nav-link"><span>🏢</span> Parties</a>
+        <a href="/admin/parties/merge" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>🔗</span> Merge Parties</a>
+        <a href="/admin/employee-collections" class="nav-link"><span>💰</span> Employee Collections</a>
+        <a href="/admin/invoice-creators" class="nav-link"><span>🧾</span> Invoices by Creator</a>
+        <a href="/admin/invoices" class="nav-link"><span>🧾</span> Invoices</a>
+        <a href="/admin/full-ledger" class="nav-link"><span>📚</span> Full Ledger</a>
+        <a href="/admin/aging" class="nav-link"><span>⏳</span> Aging Report</a>
+        <a href="/admin/voucher-audit" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>🔢</span> Voucher Audit</a>
+        <a href="/admin/payment-behavior" class="nav-link"><span>🏅</span> Payment Behavior</a>
+        <a href="/admin/collections" class="nav-link"><span>🎯</span> Collections</a>
+        <a href="/admin/notifications" class="nav-link"><span>📲</span> Notifications</a>
+        <a href="/admin/history" class="nav-link"><span>📜</span> Audit Log</a>
+        <a href="/admin/login-history" class="nav-link"><span>🕐</span> Login History</a>
+        <a href="/admin/collection-map" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>🗺️</span> Collection Map</a>
+        <a href="/admin/performance" class="nav-link active" sec:authorize="hasRole('ADMIN')"><span>⚡</span> Performance</a>
+        <a href="/admin/collection-map" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>🗺️</span> Collection Map</a>
+    </nav>
+    <div class="sidebar-footer">
+        <form th:action="@{/logout}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="logout-btn"><span>🚪</span> Sign Out</button>
+        </form>
+    </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<div class="main">
+    <div class="topbar">
+        <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+        <span class="topbar-title">⚡ Performance</span>
+        <div style="display:flex;align-items:center;gap:12px">
+            <span class="text-muted" th:text="'Since restart: ' + ${startedAt}"></span>
+            <div style="display:flex;align-items:center;gap:10px"><button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle light/dark theme">☀️</button><a href="/admin/activity" class="notif-bell" title="Activity">🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span></a></div>
+        </div>
+    </div>
+    <div class="content">
+        <div class="pf-tabs">
+            <a th:href="@{/admin/performance(hours=1)}" th:classappend="${hours == 1} ? 'on'">Last hour</a>
+            <a th:href="@{/admin/performance(hours=6)}" th:classappend="${hours == 6} ? 'on'">Last 6 hours</a>
+            <a th:href="@{/admin/performance(hours=24)}" th:classappend="${hours == 24} ? 'on'">Last 24 hours</a>
+        </div>
+
+        <div th:if="${alertActive}" class="pf-banner bad" role="alert">
+            🚨 <strong>Server errors are spiking right now:</strong>
+            <span th:text="${alertThreshold} + ' or more failed requests in the last ' + ${alertWindow} + ' minutes.'"></span>
+            See &ldquo;Recent server errors&rdquo; below, and use the Reference ID to find each one in Render&rsquo;s logs.
+        </div>
+        <div th:if="${!alertActive}" class="pf-banner ok">
+            ✅ No error spike right now. You get a bell alert if
+            <strong th:text="${alertThreshold}">5</strong> or more server errors happen within
+            <strong th:text="${alertWindow}">5</strong> minutes.
+            <span th:if="${lastAlertAt != null}" th:text="'Last alert: ' + ${lastAlertAt} + '.'"></span>
+        </div>
+
+        <div class="pf-cards">
+            <div class="pf-card"><div class="k">Requests</div><div class="v" th:text="${#numbers.formatInteger(summary.requests, 1, 'COMMA')}">0</div></div>
+            <div class="pf-card"><div class="k">Typical response</div><div class="v" th:text="${avg}">0 ms</div></div>
+            <div class="pf-card"><div class="k">Server errors (5xx)</div><div class="v" th:classappend="${summary.errors5xx > 0} ? 'bad' : 'good'" th:text="${summary.errors5xx}">0</div></div>
+            <div class="pf-card"><div class="k">Denied / not found (4xx)</div><div class="v" th:text="${summary.errors4xx}">0</div></div>
+            <div class="pf-card"><div class="k">Slow endpoints (&ge; 3 s)</div><div class="v" th:classappend="${summary.slowEndpoints > 0} ? 'bad' : 'good'" th:text="${summary.slowEndpoints}">0</div></div>
+        </div>
+
+        <h2 class="pf-h">Slowest endpoints first</h2>
+        <div class="card" style="padding:0">
+            <div th:if="${#lists.isEmpty(rows)}" class="empty-state" style="padding:40px 20px">
+                <div class="empty-icon">⏱️</div>
+                <div>Nothing recorded yet in this window.</div>
+                <div class="text-muted" style="margin-top:6px">Use the app for a few minutes and refresh this page.</div>
+            </div>
+            <div th:if="${!#lists.isEmpty(rows)}" class="table-wrapper" style="border:none">
+                <table style="min-width:760px">
+                    <thead>
+                        <tr>
+                            <th>Page / action</th>
+                            <th class="num">Times used</th>
+                            <th class="num">Typical</th>
+                            <th class="num">Slow case (95%)</th>
+                            <th class="num">Slowest</th>
+                            <th class="num">4xx</th>
+                            <th class="num">5xx</th>
+                            <th>Last 5xx</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="r : ${rows}" th:classappend="'r-' + ${r.level}">
+                            <td class="route" th:text="${r.route}"></td>
+                            <td class="num" th:text="${r.requests}"></td>
+                            <td class="num" th:text="${r.avg}"></td>
+                            <td class="num" th:text="${r.p95}"></td>
+                            <td class="num" th:text="${r.max}"></td>
+                            <td class="num" th:text="${r.errors4xx}"></td>
+                            <td class="num" th:text="${r.errors5xx}"></td>
+                            <td class="text-muted" th:text="${r.last5xx}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <h2 class="pf-h">Recent server errors</h2>
+        <div class="card" style="padding:0">
+            <div th:if="${#lists.isEmpty(errors)}" class="empty-state" style="padding:28px 20px">
+                <div>No server errors since the last restart.</div>
+            </div>
+            <div th:if="${!#lists.isEmpty(errors)}" class="table-wrapper" style="border:none">
+                <table style="min-width:640px">
+                    <thead><tr><th>When</th><th>Request</th><th class="num">Status</th><th class="num">Took</th><th>Reference ID</th></tr></thead>
+                    <tbody>
+                        <tr th:each="e : ${errors}">
+                            <td class="text-muted" th:text="${e.at}"></td>
+                            <td class="route" th:text="${e.route}"></td>
+                            <td class="num" th:text="${e.status}"></td>
+                            <td class="num" th:text="${e.took}"></td>
+                            <td style="font-family:monospace" th:text="${e.traceId}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <p class="pf-note">
+            Counts are kept in memory and start again whenever the server restarts or sleeps, so this shows what is
+            happening <em>now</em>, not long-term history. &ldquo;Slow case (95%)&rdquo; means 19 out of 20 requests were
+            faster than this; it is estimated from time ranges. The keep-alive ping and static files (scripts, styles)
+            are not counted. Paste a Reference ID into Render&rsquo;s log search to see the full error.
+        </p>
+    </div>
+</div>
+<script>
+(function(){
+    var badge = document.getElementById('notifBadge');
+    if (!badge) return;
+    function poll(){
+        fetch('/admin/notifications/unread-count').then(function(r){return r.json();}).then(function(d){
+            if (d.count > 0) { badge.textContent = d.count > 99 ? '99+' : d.count; badge.style.display='flex'; }
+            else { badge.style.display='none'; }
+        }).catch(function(){});
+    }
+    poll();
+    setInterval(poll, 45000);
+})();
+</script>
+<script>
+function toggleSidebar() {
+    document.querySelector('.sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+</script>
+<script th:src="@{/js/pt-loading.js}"></script>
+</body>
+</html>

@@ -127,6 +127,7 @@
         <a href="/admin/history" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>📜</span> Audit Log</a>
         <a href="/admin/login-history" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>🕐</span> Login History</a>
         <a href="/admin/collection-map" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>🗺️</span> Collection Map</a>
+        <a href="/admin/performance" class="nav-link" sec:authorize="hasRole('ADMIN')"><span>⚡</span> Performance</a>
     </nav>
     <div class="sidebar-footer">
         <form th:action="@{/logout}" method="post">
