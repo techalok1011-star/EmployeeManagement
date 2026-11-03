@@ -150,6 +150,52 @@ public class InvoiceService {
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    /**
+     * One page of the admin Invoices list, filtered and searched in the database (it used to load and draw every
+     * invoice ever saved). {@code voucherSort} needs every matching row because it orders by the numeric part of the
+     * sales voucher number; the filters narrow that first.
+     *
+     * @param q free text matched (case-insensitive) against invoice no., party, sales voucher, description,
+     *          transport number and amount
+     */
+    @Transactional(readOnly = true)
+    public com.empmgmt.util.PageResult<InvoiceDTO.Response> searchInvoices(
+            LocalDate from, LocalDate to, String createdBy, String q,
+            boolean voucherSort, boolean voucherAscending, int page, int size) {
+        org.springframework.data.jpa.domain.Specification<Invoice> spec = (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> ps = new java.util.ArrayList<>();
+            if (from != null) ps.add(cb.greaterThanOrEqualTo(root.get("invoiceDate"), from));
+            if (to != null) ps.add(cb.lessThanOrEqualTo(root.get("invoiceDate"), to));
+            if (createdBy != null && !createdBy.isBlank()) ps.add(cb.equal(root.get("createdBy"), createdBy));
+            if (q != null && !q.isBlank()) {
+                String like = "%" + q.trim().toLowerCase().replace("%", "").replace("_", "") + "%";
+                ps.add(cb.or(
+                        cb.like(cb.lower(root.get("invoiceNumber")), like),
+                        cb.like(cb.lower(root.get("partyName")), like),
+                        cb.like(cb.lower(cb.coalesce(root.<String>get("salesVchNo"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.<String>get("description"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.<String>get("transportNumber"), "")), like),
+                        cb.like(root.get("amount").as(String.class), like)));
+            }
+            return cb.and(ps.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+        org.springframework.data.domain.Sort order = org.springframework.data.domain.Sort.by(
+                org.springframework.data.domain.Sort.Order.desc("invoiceDate"),
+                org.springframework.data.domain.Sort.Order.desc("createdAt"),
+                org.springframework.data.domain.Sort.Order.desc("id"));
+        if (voucherSort) {
+            List<InvoiceDTO.Response> all = invoiceRepository.findAll(spec, order)
+                    .stream().map(this::toResponse).collect(Collectors.toList());
+            all.sort(com.empmgmt.util.VoucherNumberParser.comparator(InvoiceDTO.Response::getSalesVchNo, voucherAscending));
+            return com.empmgmt.util.PageResult.slice(all, page, size);
+        }
+        long total = invoiceRepository.count(spec);
+        int p = com.empmgmt.util.PageResult.clampPage(page, total, size);
+        var rows = invoiceRepository.findAll(spec, org.springframework.data.domain.PageRequest.of(p, size, order));
+        return new com.empmgmt.util.PageResult<>(
+                rows.getContent().stream().map(this::toResponse).collect(Collectors.toList()), total, p, size);
+    }
+
     /** Invoices within [from, to] inclusive, newest first. Either bound may be null to leave that side open. */
     @Transactional(readOnly = true)
     public List<InvoiceDTO.Response> getInvoicesByDateRange(LocalDate from, LocalDate to) {

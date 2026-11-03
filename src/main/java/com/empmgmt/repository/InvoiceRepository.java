@@ -12,7 +12,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
+public interface InvoiceRepository extends JpaRepository<Invoice, Long>,
+        org.springframework.data.jpa.repository.JpaSpecificationExecutor<Invoice> {
 
     List<Invoice> findAllByOrderByInvoiceDateDescCreatedAtDesc();
 

@@ -45,6 +45,9 @@ import java.util.List;
 @Slf4j
 public class ManagerController {
 
+    /** The My Entries / My Collections lists show this many days unless a date range or Show all dates is chosen. */
+    private static final int WINDOW_DAYS = 30;
+
     private final InvoiceService invoiceService;
     private final PaymentEntryService paymentEntryService;
     private final UserService userService;
@@ -319,17 +322,20 @@ public class ManagerController {
     public String allEntries(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "false") boolean all,
             Model model, Authentication auth) {
         String username = auth.getName();
-        boolean filtered = from != null || to != null;
+        // The list grows every day: without a filter show the last 30 days ("Show all dates" lifts it).
+        boolean defaultWindow = from == null && to == null && !all;
+        if (defaultWindow) from = IstClock.today().minusDays(WINDOW_DAYS - 1);
         model.addAttribute("user", userService.getUserByUsername(username));
-        model.addAttribute("dayGroups", filtered
-                ? paymentEntryService.getFilteredEntriesGroupedByDayForEmployee(username, from, to)
-                : paymentEntryService.getEntriesGroupedByDayForEmployee(username));
+        model.addAttribute("dayGroups", paymentEntryService.getFilteredEntriesGroupedByDayForEmployee(username, from, to));
         model.addAttribute("summary", paymentEntryService.getDailySummaryForEmployee(username));
         model.addAttribute("totalAllTime", paymentEntryService.getEntriesForEmployee(username).size());
         model.addAttribute("from", from);
         model.addAttribute("to", to);
+        model.addAttribute("defaultWindow", defaultWindow);
+        model.addAttribute("windowDays", WINDOW_DAYS);
         return "manager/entries";
     }
 
@@ -379,7 +385,10 @@ public class ManagerController {
             paymentEntryService.updateEntryByManager(id, request, auth.getName());
             redirectAttributes.addFlashAttribute("successMsg", "Collection updated successfully!");
             // land on the row that was just edited (the list spans every day, so the top of the page loses the place)
-            return "redirect:/manager/entries#entry-" + id;
+            // an entry older than the default 30-day window would not be on the page: open all dates then
+            boolean outsideWindow = request.getEntryDate() != null
+                    && request.getEntryDate().isBefore(IstClock.today().minusDays(WINDOW_DAYS - 1));
+            return "redirect:/manager/entries" + (outsideWindow ? "?all=true" : "") + "#entry-" + id;
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMsg", e.getMessage());
         }

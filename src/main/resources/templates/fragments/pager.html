@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  Page bar for server-paged lists (admin All Entries / Invoices). Usage:
+    <div th:replace="~{fragments/pager :: pager(${pager})}"></div>
+  `pager` is a com.empmgmt.util.Pager.View built by the controller; every link already carries the filters.
+-->
+<div th:fragment="pager(pg)" class="pg-wrap">
+    <style>
+        .pg-wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px}
+        .pg-summary{font-size:12.5px;color:var(--muted)}
+        .pg-bar{display:flex;gap:6px;flex-wrap:wrap}
+        .pg-bar a,.pg-bar span{min-width:38px;height:38px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;font-size:13px;font-weight:600;text-decoration:none;border:1px solid var(--border);background:var(--surface);color:var(--text);font-variant-numeric:tabular-nums}
+        .pg-bar a:hover{border-color:var(--accent);color:var(--accent)}
+        .pg-bar a.cur{background:rgba(108,142,255,.16);border-color:var(--accent);color:var(--accent)}
+        .pg-bar span.dis{color:var(--muted);opacity:.5;background:transparent}
+        @media(max-width:520px){.pg-wrap{justify-content:center}.pg-summary{width:100%;text-align:center}}
+    </style>
+    <div class="pg-summary" th:text="${pg.summary}">Showing 1–100 of 7,632</div>
+    <nav class="pg-bar" th:if="${pg.needed}" aria-label="Pages">
+        <th:block th:each="l : ${pg.links}">
+            <a th:if="${!l.disabled}" th:href="${l.url}" th:text="${l.label}" th:classappend="${l.current} ? 'cur'"
+               th:attr="aria-current=${l.current} ? 'page'">1</a>
+            <span th:if="${l.disabled}" th:text="${l.label}" class="dis">…</span>
+        </th:block>
+    </nav>
+</div>
+</body>
+</html>

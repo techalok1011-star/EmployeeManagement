@@ -215,9 +215,14 @@
                 <a href="/manager/entries" class="btn-filter btn-filter-clear">✕ Clear</a>
             </div>
             <div th:if="${from != null or to != null}" style="align-self:flex-end">
-                <span class="filter-active-badge">● Filtered</span>
+                <span class="filter-active-badge" th:if="${!defaultWindow}">● Filtered</span>
             </div>
         </form>
+
+        <div th:if="${defaultWindow}" style="margin-bottom:14px;padding:10px 16px;background:rgba(108,142,255,0.1);border:1px solid rgba(108,142,255,0.25);border-radius:10px;font-size:13px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+            <span>🗓 Showing the last <strong th:text="${windowDays}">30</strong> days. Use the dates above, or show everything.</span>
+            <a href="/manager/entries?all=true" style="color:var(--accent);text-decoration:none;font-weight:600;white-space:nowrap">Show all dates</a>
+        </div>
 
         <!-- Search -->
         <div class="search-bar">

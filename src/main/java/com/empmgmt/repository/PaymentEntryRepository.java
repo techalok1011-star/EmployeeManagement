@@ -15,7 +15,8 @@ import java.util.List;
 import java.util.Map;
 
 @Repository
-public interface PaymentEntryRepository extends JpaRepository<PaymentEntry, Long> {
+public interface PaymentEntryRepository extends JpaRepository<PaymentEntry, Long>,
+        org.springframework.data.jpa.repository.JpaSpecificationExecutor<PaymentEntry> {
 
     /**
      * Collections that have a location, for the admin Collection Map. The location is the entry's own

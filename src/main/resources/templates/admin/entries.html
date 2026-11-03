@@ -168,7 +168,7 @@
         <span class="topbar-title">All Payment Entries</span>
         <div style="display:flex;align-items:center;gap:12px">
             <span style="font-size:13px;color:var(--muted)"
-                  th:text="${#lists.size(entries)} + (${from != null or to != null or selectedEmployeeId != null} ? ' filtered entries' : ' total entries')"></span>
+                  th:text="${#numbers.formatInteger(total, 1, 'COMMA')} + (${userFiltered} ? ' matching entries' : (${defaultWindow} ? ' entries, last ' + ${windowDays} + ' days' : ' total entries'))"></span>
             <div style="display:flex;align-items:center;gap:10px"><button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle light/dark theme">☀️</button><a href="/admin/activity" class="notif-bell" title="Activity">🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span></a></div>
         </div>
     </div>
@@ -195,11 +195,16 @@
                             th:selected="${emp.id == selectedEmployeeId}"></option>
                 </select>
             </div>
+            <div class="filter-group" style="flex:1;min-width:200px">
+                <label class="filter-label">Search</label>
+                <input type="search" name="q" class="filter-input" th:value="${q}" maxlength="80"
+                       placeholder="Party, employee, mode, amount, voucher, remarks…" autocomplete="off"/>
+            </div>
             <div class="filter-group" style="flex-direction:row;gap:8px;align-items:flex-end">
                 <button type="submit" class="btn-filter btn-filter-apply">🔍 Filter</button>
                 <a href="/admin/entries" class="btn-filter btn-filter-clear">✕ Clear</a>
             </div>
-            <div th:if="${from != null or to != null or selectedEmployeeId != null}" style="align-self:flex-end">
+            <div th:if="${userFiltered}" style="align-self:flex-end">
                 <span class="filter-active-badge">● Filtered</span>
             </div>
             <!-- Export buttons (carry current filter state) -->
@@ -212,18 +217,25 @@
             </div>
         </form>
 
+        <div th:if="${defaultWindow}" style="margin-bottom:14px;padding:10px 16px;background:rgba(108,142,255,0.1);border:1px solid rgba(108,142,255,0.25);border-radius:10px;font-size:13px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+            <span>🗓 Showing the last <strong th:text="${windowDays}">30</strong> days (from
+                <strong th:text="${#temporals.format(from, 'dd MMM yyyy')}"></strong>). Use the dates above to look further back.</span>
+            <a href="/admin/entries?all=true" style="color:var(--accent);text-decoration:none;font-weight:600;white-space:nowrap">Show all dates</a>
+        </div>
+
         <div class="card">
-            <div class="search-bar">
-                <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search by party name, employee, mode, amount..."/>
+            <div th:if="${#lists.isEmpty(entries)}" class="empty-state" style="padding:40px 20px;text-align:center;color:var(--muted)">
+                <div style="font-size:36px;margin-bottom:8px">📭</div>
+                <div th:text="${userFiltered or defaultWindow} ? 'No entries match these filters.' : 'No entries yet.'"></div>
             </div>
-            <div class="table-wrapper">
+            <div class="table-wrapper" th:if="${!#lists.isEmpty(entries)}">
                 <table>
                     <thead>
                         <tr>
                             <th>#</th>
                             <th>Party Name</th>
                             <th>
-                                <a th:href="@{/admin/entries(from=${from},to=${to},employeeId=${selectedEmployeeId},sort='vch',dir=${sort == 'vch' and dir == 'asc' ? 'desc' : 'asc'})}"
+                                <a th:href="@{/admin/entries(from=${from},to=${to},employeeId=${selectedEmployeeId},q=${q},all=${allDates ? 'true' : null},sort='vch',dir=${sort == 'vch' and dir == 'asc' ? 'desc' : 'asc'})}"
                                    class="th-sort-link">
                                     Receipt Vch No.
                                     <span th:if="${sort == 'vch'}" th:text="${dir == 'asc' ? '▲' : '▼'}"></span>
@@ -240,7 +252,7 @@
                     <tbody id="entriesTable">
                         <tr th:each="entry, stat : ${entries}"
                             th:classappend="${entry.editedBy == 'ADMIN'} ? 'was-edited-admin' : (${entry.edited} ? 'was-edited' : '')">
-                            <td class="text-muted" th:text="${stat.count}"></td>
+                            <td class="text-muted" th:text="${rowOffset + stat.count}"></td>
                             <td>
                                 <div style="font-weight:500" th:text="${entry.partyName}"></div>
                                 <span th:if="${entry.editedBy == 'EMPLOYEE'}" class="badge badge-edited-emp">✏ Emp Edited</span>
@@ -276,17 +288,10 @@
                     </tbody>
                 </table>
             </div>
+            <div th:replace="~{fragments/pager :: pager(${pager})}"></div>
         </div>
     </div>
 </div>
-<script>
-    document.getElementById('searchInput').addEventListener('input', function() {
-        const q = this.value.toLowerCase();
-        document.querySelectorAll('#entriesTable tr').forEach(row => {
-            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-        });
-    });
-</script>
 <script>
 (function(){
     var badge = document.getElementById('notifBadge');

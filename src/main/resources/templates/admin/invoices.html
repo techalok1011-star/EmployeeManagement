@@ -255,24 +255,34 @@
                             <label class="filter-label">To Date</label>
                             <input type="date" name="to" class="filter-input" th:value="${to}"/>
                         </div>
+                        <div class="filter-group" style="flex:1;min-width:180px">
+                            <label class="filter-label">Search</label>
+                            <input type="search" name="q" class="filter-input" th:value="${q}" maxlength="80"
+                                   placeholder="Invoice no, party, voucher, amount…" autocomplete="off"/>
+                        </div>
                         <div class="filter-group" style="flex-direction:row;gap:8px;align-items:flex-end">
                             <button type="submit" class="btn-filter btn-filter-apply">🔍 Filter</button>
                             <a href="/admin/invoices" class="btn-filter btn-filter-clear">✕ Clear</a>
                         </div>
-                        <div th:if="${from != null or to != null}" style="align-self:flex-end">
+                        <div th:if="${userFiltered}" style="align-self:flex-end">
                             <span class="filter-active-badge">● Filtered</span>
                         </div>
                     </form>
 
+                    <div th:if="${defaultWindow}" style="margin-bottom:14px;padding:10px 16px;background:rgba(108,142,255,0.1);border:1px solid rgba(108,142,255,0.25);border-radius:10px;font-size:13px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+                        <span>🗓 Showing the last <strong th:text="${windowDays}">30</strong> days (from
+                            <strong th:text="${#temporals.format(from, 'dd MMM yyyy')}"></strong>). Use the dates above to look further back.</span>
+                        <a href="/admin/invoices?all=true" style="color:var(--accent);text-decoration:none;font-weight:600;white-space:nowrap">Show all dates</a>
+                    </div>
+
                     <div th:if="${#lists.isEmpty(invoices)}" class="empty-state">
                         <div class="empty-icon">🧾</div>
-                        <div style="font-size:15px;font-weight:600;margin-bottom:6px">No invoices yet</div>
-                        <div style="font-size:13px">Add an invoice using the form on the right.</div>
+                        <div style="font-size:15px;font-weight:600;margin-bottom:6px"
+                             th:text="${userFiltered or defaultWindow} ? 'No invoices match these filters' : 'No invoices yet'"></div>
+                        <div style="font-size:13px" th:text="${userFiltered or defaultWindow} ? 'Try a wider date range, or use Show all dates.' : 'Add an invoice using the form on the right.'"></div>
                     </div>
 
                     <div th:if="${!#lists.isEmpty(invoices)}">
-                        <input type="text" id="invSearch" class="search-input"
-                               placeholder="🔍 Search by invoice no, party name…"/>
                         <div class="table-wrapper">
                             <table id="invTable">
                                 <thead>
@@ -280,7 +290,7 @@
                                         <th>#</th>
                                         <th>Invoice No.</th>
                                         <th>
-                                            <a th:href="@{/admin/invoices(from=${from},to=${to},createdBy=${createdBy},sort='vch',dir=${sort == 'vch' and dir == 'asc' ? 'desc' : 'asc'})}"
+                                            <a th:href="@{/admin/invoices(from=${from},to=${to},createdBy=${createdBy},q=${q},all=${allDates ? 'true' : null},sort='vch',dir=${sort == 'vch' and dir == 'asc' ? 'desc' : 'asc'})}"
                                                class="th-sort-link">
                                                 Sales Vch No.
                                                 <span th:if="${sort == 'vch'}" th:text="${dir == 'asc' ? '▲' : '▼'}"></span>
@@ -298,7 +308,7 @@
                                 </thead>
                                 <tbody>
                                     <tr th:each="inv, iStat : ${invoices}">
-                                        <td class="text-muted" th:text="${iStat.count}"></td>
+                                        <td class="text-muted" th:text="${rowOffset + iStat.count}"></td>
                                         <td><span class="inv-no" th:text="${inv.invoiceNumber}"></span></td>
                                         <td class="text-muted" th:text="${inv.salesVchNo != null ? inv.salesVchNo : '—'}"></td>
                                         <td class="text-muted"
@@ -336,6 +346,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div th:replace="~{fragments/pager :: pager(${pager})}"></div>
                     </div>
                 </div>
 
@@ -558,14 +569,6 @@
         display.value = (!isNaN(bags) && !isNaN(rate)) ? (bags * rate).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '';
     }
     recalcAmount(); // handle validation-error re-render where bags/rate already have values
-
-    // ── Invoice table search ──
-    document.getElementById('invSearch')?.addEventListener('input', function() {
-        const q = this.value.toLowerCase();
-        document.querySelectorAll('#invTable tbody tr').forEach(row => {
-            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-        });
-    });
 
     // ── Party autocomplete ──
     const partyInput    = document.getElementById('partyInput');

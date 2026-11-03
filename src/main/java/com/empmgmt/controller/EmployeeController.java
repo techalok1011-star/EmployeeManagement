@@ -28,6 +28,9 @@ import java.time.LocalDate;
 @Slf4j
 public class EmployeeController {
 
+    /** The My Entries / My Collections lists show this many days unless a date range or Show all dates is chosen. */
+    private static final int WINDOW_DAYS = 30;
+
     private final PaymentEntryService paymentEntryService;
     private final UserService userService;
 
@@ -97,17 +100,20 @@ public class EmployeeController {
     public String allEntries(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "false") boolean all,
             Model model, Authentication auth) {
         String username = auth.getName();
-        boolean filtered = from != null || to != null;
+        // The list grows every day: without a filter show the last 30 days ("Show all dates" lifts it).
+        boolean defaultWindow = from == null && to == null && !all;
+        if (defaultWindow) from = IstClock.today().minusDays(WINDOW_DAYS - 1);
         model.addAttribute("user", userService.getUserByUsername(username));
-        model.addAttribute("dayGroups", filtered
-                ? paymentEntryService.getFilteredEntriesGroupedByDayForEmployee(username, from, to)
-                : paymentEntryService.getEntriesGroupedByDayForEmployee(username));
+        model.addAttribute("dayGroups", paymentEntryService.getFilteredEntriesGroupedByDayForEmployee(username, from, to));
         model.addAttribute("summary", paymentEntryService.getDailySummaryForEmployee(username));
         model.addAttribute("totalAllTime", paymentEntryService.getEntriesForEmployee(username).size());
         model.addAttribute("from", from);
         model.addAttribute("to", to);
+        model.addAttribute("defaultWindow", defaultWindow);
+        model.addAttribute("windowDays", WINDOW_DAYS);
         return "employee/entries";
     }
 

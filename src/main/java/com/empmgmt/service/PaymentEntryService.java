@@ -281,6 +281,63 @@ public class PaymentEntryService {
                 .stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    /**
+     * One page of the admin "All Entries" list, filtered and searched IN THE DATABASE. The page used to load,
+     * map and draw every collection ever saved (14 MB of HTML for ~7,600 rows); now only {@code size} rows are
+     * read per request. {@code voucherSort} is the one exception: it orders by the numeric part of the voucher
+     * number, which SQL cannot do, so it loads the matching rows (already narrowed by the filters) and slices.
+     *
+     * @param q free text matched (case-insensitive) against party, remarks, voucher no., employee, amount and mode
+     */
+    @Transactional(readOnly = true)
+    public com.empmgmt.util.PageResult<PaymentEntryDTO.Response> searchEntriesForAdmin(
+            LocalDate from, LocalDate to, Long employeeId, String q,
+            boolean voucherSort, boolean voucherAscending, int page, int size) {
+        var spec = entrySpec(from, to, employeeId, q);
+        org.springframework.data.domain.Sort order = org.springframework.data.domain.Sort.by(
+                org.springframework.data.domain.Sort.Order.desc("entryDate"),
+                org.springframework.data.domain.Sort.Order.desc("createdAt"),
+                org.springframework.data.domain.Sort.Order.desc("id"));
+        if (voucherSort) {
+            List<PaymentEntryDTO.Response> all = paymentEntryRepository.findAll(spec, order)
+                    .stream().map(this::mapToResponse).collect(Collectors.toList());
+            all.sort(com.empmgmt.util.VoucherNumberParser.comparator(PaymentEntryDTO.Response::getReceiptVchNo, voucherAscending));
+            return com.empmgmt.util.PageResult.slice(all, page, size);
+        }
+        long total = paymentEntryRepository.count(spec);
+        int p = com.empmgmt.util.PageResult.clampPage(page, total, size);
+        var rows = paymentEntryRepository.findAll(spec, org.springframework.data.domain.PageRequest.of(p, size, order));
+        return new com.empmgmt.util.PageResult<>(
+                rows.getContent().stream().map(this::mapToResponse).collect(Collectors.toList()), total, p, size);
+    }
+
+    private static org.springframework.data.jpa.domain.Specification<PaymentEntry> entrySpec(
+            LocalDate from, LocalDate to, Long employeeId, String q) {
+        return (root, query, cb) -> {
+            // fetch the employee in the same query (mapToResponse reads its name) - but not for the count query
+            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+                root.fetch("employee", jakarta.persistence.criteria.JoinType.LEFT);
+            }
+            List<jakarta.persistence.criteria.Predicate> ps = new java.util.ArrayList<>();
+            if (from != null) ps.add(cb.greaterThanOrEqualTo(root.get("entryDate"), from));
+            if (to != null) ps.add(cb.lessThanOrEqualTo(root.get("entryDate"), to));
+            if (employeeId != null) ps.add(cb.equal(root.get("employee").get("id"), employeeId));
+            if (q != null && !q.isBlank()) {
+                String like = "%" + q.trim().toLowerCase().replace("%", "").replace("_", "") + "%";
+                String modeLike = "%" + q.trim().toLowerCase().replace(' ', '_') + "%";
+                var emp = root.join("employee", jakarta.persistence.criteria.JoinType.LEFT);
+                ps.add(cb.or(
+                        cb.like(cb.lower(root.get("partyName")), like),
+                        cb.like(cb.lower(cb.coalesce(root.<String>get("remarks"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.<String>get("receiptVchNo"), "")), like),
+                        cb.like(cb.lower(emp.<String>get("fullName")), like),
+                        cb.like(root.get("amount").as(String.class), like),
+                        cb.like(cb.lower(root.get("modeOfPayment").as(String.class)), modeLike)));
+            }
+            return cb.and(ps.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+    }
+
     @Transactional(readOnly = true)
     public List<PaymentEntryDTO.Response> getFilteredEntriesForAdmin(LocalDate from, LocalDate to, Long employeeId) {
         LocalDate start = from != null ? from : LocalDate.of(2000, 1, 1);

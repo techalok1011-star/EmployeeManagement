@@ -20,6 +20,8 @@ import com.empmgmt.service.PaymentEntryService;
 import com.empmgmt.service.UserService;
 import com.empmgmt.service.VoucherAuditService;
 import com.empmgmt.util.IstClock;
+import com.empmgmt.util.PageResult;
+import com.empmgmt.util.Pager;
 import com.empmgmt.util.VoucherNumberParser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +57,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 public class AdminController {
+
+    /** All Entries / Invoices show this many days when no filter is set ("Show all dates" lifts it). */
+    private static final int DEFAULT_WINDOW_DAYS = 30;
 
     private final PaymentEntryService paymentEntryService;
     private final UserService userService;
@@ -160,21 +165,34 @@ public class AdminController {
             @RequestParam(required = false) Long employeeId,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false, defaultValue = "asc") String dir,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") String page,
+            @RequestParam(defaultValue = "false") boolean all,
+            jakarta.servlet.http.HttpServletRequest request,
             Model model, Authentication auth) {
-        boolean filtered = from != null || to != null || employeeId != null;
-        var entries = filtered
-                ? paymentEntryService.getFilteredEntriesForAdmin(from, to, employeeId)
-                : paymentEntryService.getAllEntries();
-        entries = paymentEntryService.withReceiptFlags(entries);
-        if ("vch".equals(sort)) {
-            entries.sort(VoucherNumberParser.comparator(PaymentEntryDTO.Response::getReceiptVchNo, !"desc".equals(dir)));
-        }
+        // Without any filter the page shows the last 30 days (it used to draw every entry ever saved: ~14 MB).
+        boolean narrowed = from != null || to != null || employeeId != null || (q != null && !q.isBlank());
+        boolean defaultWindow = !narrowed && !all;
+        if (defaultWindow) from = IstClock.today().minusDays(DEFAULT_WINDOW_DAYS - 1);
+
+        var result = paymentEntryService.searchEntriesForAdmin(from, to, employeeId, q,
+                "vch".equals(sort), !"desc".equals(dir), PageResult.parsePage(page), PageResult.DEFAULT_SIZE);
+        var entries = paymentEntryService.withReceiptFlags(result.items());
+
         model.addAttribute("entries", entries);
+        model.addAttribute("pager", Pager.of(request, result));
+        model.addAttribute("total", result.total());
+        model.addAttribute("rowOffset", (long) result.page() * result.size());
         model.addAttribute("employees", userService.getAllEmployees());
         model.addAttribute("adminName", auth.getName());
         model.addAttribute("from", from);
         model.addAttribute("to", to);
+        model.addAttribute("q", q);
         model.addAttribute("selectedEmployeeId", employeeId);
+        model.addAttribute("userFiltered", narrowed);
+        model.addAttribute("defaultWindow", defaultWindow);
+        model.addAttribute("allDates", all);
+        model.addAttribute("windowDays", DEFAULT_WINDOW_DAYS);
         model.addAttribute("sort", sort);
         model.addAttribute("dir", dir);
         return "admin/entries";
@@ -340,21 +358,31 @@ public class AdminController {
             @RequestParam(required = false) String createdBy,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false, defaultValue = "asc") String dir,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") String page,
+            @RequestParam(defaultValue = "false") boolean all,
+            jakarta.servlet.http.HttpServletRequest request,
             Model model, Authentication auth) {
-        boolean dateFiltered = from != null || to != null;
-        List<InvoiceDTO.Response> invoiceList;
-        if (createdBy != null && !createdBy.isBlank()) {
-            invoiceList = invoiceService.getInvoicesByCreatedBy(createdBy, from, to);
+        boolean byCreator = createdBy != null && !createdBy.isBlank();
+        if (byCreator) {
             model.addAttribute("createdByName", userService.getUserByUsername(createdBy).getFullName());
-        } else {
-            invoiceList = dateFiltered
-                    ? invoiceService.getInvoicesByDateRange(from, to)
-                    : invoiceService.getAllInvoices();
         }
-        if ("vch".equals(sort)) {
-            invoiceList.sort(VoucherNumberParser.comparator(InvoiceDTO.Response::getSalesVchNo, !"desc".equals(dir)));
-        }
-        model.addAttribute("invoices", invoiceList);
+        // Without any filter the list shows the last 30 days (it used to draw every invoice ever saved: ~6 MB).
+        boolean narrowed = from != null || to != null || byCreator || (q != null && !q.isBlank());
+        boolean defaultWindow = !narrowed && !all;
+        if (defaultWindow) from = IstClock.today().minusDays(DEFAULT_WINDOW_DAYS - 1);
+
+        var result = invoiceService.searchInvoices(from, to, byCreator ? createdBy : null, q,
+                "vch".equals(sort), !"desc".equals(dir), PageResult.parsePage(page), PageResult.DEFAULT_SIZE);
+        model.addAttribute("invoices", result.items());
+        model.addAttribute("pager", Pager.of(request, result));
+        model.addAttribute("total", result.total());
+        model.addAttribute("rowOffset", (long) result.page() * result.size());
+        model.addAttribute("q", q);
+        model.addAttribute("userFiltered", narrowed);
+        model.addAttribute("defaultWindow", defaultWindow);
+        model.addAttribute("allDates", all);
+        model.addAttribute("windowDays", DEFAULT_WINDOW_DAYS);
         model.addAttribute("from", from);
         model.addAttribute("to", to);
         model.addAttribute("createdBy", createdBy);
